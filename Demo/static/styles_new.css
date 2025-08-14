@@ -1,0 +1,712 @@
+
+/* Titles */
+h1, h2, h3, h4, h5, h6 {
+    color: #294d76; 
+    text-align: center;
+    margin: 20px 0;
+}
+
+
+.dropdown-content a {
+    color: black;
+    padding: 10px 15px;
+    text-decoration: none;
+    display: block;
+    font-size: 14px;
+    transition: background-color 0.3s ease;
+}
+
+.dropdown-content a:hover {
+    background-color: #E1F5FE; 
+}
+
+/* Nested Dropdown Fix */
+.dropdown .dropdown {
+    position: relative;
+}
+
+.dropdown .dropdown-content {
+    left: 100%;
+    top: 0;
+}
+
+.dropdown:hover .dropdown-content {
+    display: block;
+}
+
+
+
+/* Individual Navigation Links */
+nav a {
+    color: #273546;
+    margin: 0 15px;
+    text-decoration: none;
+    /* CHANGE */
+    direction: ltr;
+    font-weight: bold;
+    transition: color 0.3s ease;
+    position: relative;
+}
+
+nav a:hover {
+    /* CHANGE */
+    /* text-decoration: underline; */
+    color: #385167;
+}
+
+/* CHANGE */
+/* nav a.active:after {
+    content: '';
+    display: block;
+    height: 2px;
+    background-color: #13161a; /* Line color 
+    position: absolute;
+    bottom: -5px;
+    left: 0;
+    right: 0;
+} */
+
+/* Tables */
+table {
+    width: 50%;
+    border-collapse: collapse;
+    margin: 20px auto;
+    font-family: 'Verdana, Geneva, sans-serif'; /* Custom font for tables */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* CHANGE */
+/* table, th, td {
+    border: 1px solid #0c1114; /* Pastel blue border 
+} */
+
+th, td {
+    padding: 10px;
+    text-align: center;
+    background-color: #E1F5FE; /* Light pastel blue for table cells */
+    font-size: 16px;
+}
+
+th {
+    background-color: #d7e3ec; /* Slightly darker pastel blue for headers */
+}
+
+/* Labels */
+form label {
+    font-size: 16px;
+    color: black; 
+    margin-bottom: 5px;
+}
+
+label {
+    display: block;
+    font-size: 16px;
+    color: black; 
+    margin-bottom: 5px;
+    direction: rtl; /* Right-to-left direction */
+    text-align: right; /* Align label text to the right */
+}
+
+/* CHANGE */
+/* Buttons */
+button, input[type="submit"] {
+    display: inline-block; /* Ensures button does not stretch to full width */
+    width: auto; /* Default to auto width */
+    max-width: 200px; /* Max width if needed */
+    background-color: #0d6efdaa; /* Pastel blue */
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s ease;
+}
+/* CHANGE */
+button:hover, input[type="submit"]:hover {
+    background-color: #2c99f0; /* Slightly darker pastel blue */
+}
+/* CHANGE */
+/* Form Fields */
+form {
+    margin: 20px 0;
+    padding: 20px;
+    background-color: #FFFFFF; /* White background */
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-start; /* Align items to the start */
+}
+
+/* Ensure form or table doesn't force full width */
+form, table {
+    width: auto; /* or a specific width if needed */
+    display: block;
+}
+
+/* Ensure buttons in forms don’t stretch */
+form button, form input[type="submit"] {
+    flex-shrink: 0; /* Prevent the button from shrinking */
+}
+
+/* CHANGE */
+.form-group {
+    display: flex;
+    flex-direction: column;
+    margin: 10px;
+    width: 50%;
+    max-width: 300px;
+}
+
+form input[type="text"],
+form input[type="email"],
+form input[type="number"],
+form input[type="password"],
+form textarea,
+form select {
+    width: 100%;
+    padding: 10px;
+    margin: 10px 0;
+    border: 1px solid #B3E5FC; /* Pastel blue border */
+    border-radius: 5px;
+    box-sizing: border-box;
+    background-color: #E1F5FE; /* Light pastel blue */
+    font-size: 16px;
+    transition: border-color 0.3s ease;
+}
+
+form input[type="text"]:focus,
+form input[type="email"]:focus,
+form input[type="number"]:focus,
+form input[type="password"]:focus,
+form textarea:focus,
+form select:focus {
+    border-color: #42A5F5; /* Darker pastel blue */
+    outline: none;
+}
+
+/* CHANGE */
+.form-group.buttons {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 80%;
+}
+
+
+
+
+
+
+
+
+
+/* add new CSS */
+*, ::after, ::before {
+    box-sizing: content-box;
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.pagination{
+    display: inline-block;
+}
+
+/* General styles */
+body {
+    background-color: #f5f5f5; /* Light blue background */
+    font-family: 'Arial, sans-serif';
+    color: #555555; /* Pastel gray text color */
+    margin: 0;
+    padding: 0;
+    line-height: 1.6;
+    /* new CSS */
+    display: flex;
+}
+/* edit new */
+main{
+    padding-left: 15vw;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: center;
+    overflow-y: auto;
+}
+
+/* Navigation */
+nav {
+    background-color: #fbfbfb;
+    padding: 10px;
+    text-align: center;
+    position: relative;
+    direction: rtl;
+    /* new CSS */
+    z-index: 2;
+    position: fixed;
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 20px);
+    box-shadow: 0 0px 15px rgba(0, 0, 0, 0.9);
+    border-radius: 0 20px 20px 0;
+    overflow-y: scroll;
+    scrollbar-width: none;
+}
+
+.dropdown {
+    display: flex;
+    position: relative;
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.dropdown-content a {
+    border-radius: 30px;
+}
+
+.dropdown-content a:hover {
+    background-color: #55555520; 
+}
+
+.dropdown-content {
+    display: block;
+    position: static;
+    background-color: #efeff1;
+    text-align: center;
+    border-radius: 5px;
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height 1s ease-in-out;
+}
+
+.dropdown-content.show {
+    max-height: 400px;
+}
+
+
+/* Dropdown menu */
+.dropdown {
+    display: inline-block;
+    position: relative;
+}
+
+.dropbtn {
+    background-color: #fbfbfb;
+    color: #273546;
+    width: 80%;
+    border-radius: 20px 20px 0 0;
+    font-weight: bold;
+    margin: 5px 0 0 0;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s ease;
+}
+
+.dropbtn:hover {
+    background-color: #fbfbfb;
+    color: #294d76;
+    -webkit-animation: slide-fwd-right 0.45s cubic-bezier(0.250, 0.460, 0.450, 0.940) both;
+	        animation: slide-fwd-right 0.45s cubic-bezier(0.250, 0.460, 0.450, 0.940) both;
+}
+
+.upload-box {
+    border: 2px dashed #aaa;
+    padding: 40px;
+    text-align: center;
+    border-radius: 10px;
+    background-color: #fafafa;
+    color: #666;
+    transition: border-color 0.3s ease;
+}
+.upload-box:hover {
+    border-color: #4CAF50;
+}
+
+form{
+    width: 40vw;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 15px;
+    /* max-height: 80vh; */
+    overflow-y: auto;
+    flex-wrap: nowrap;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+/* edit new */
+form:has(table){
+    width: 70vw;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 15px;
+    /* max-height: 80vh; */
+    overflow-y: auto;
+    flex-wrap: nowrap;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.date-picker{
+    width: 40vw;
+    display: flex;
+    flex-wrap: wrap;
+    direction: rtl;
+    padding: 20px;
+    gap: 5px;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    align-content: center;
+}
+
+.date-picker .form-control{
+    width: 10vw;
+}
+
+form .row .col-12{
+    width: 98%;
+}
+
+form .row{
+    width: 70vw;
+    justify-content: center;
+}
+
+.form-select.form-select-sm{
+    left: 10px;
+    position: relative;
+    text-align: end;
+}
+
+.dataTables_wrapper label{
+    left: 30px;
+    position: relative;
+}
+
+form input[type="text"], form input[type="email"], form input[type="number"], form input[type="password"], form textarea, form select {
+    border: 1px solid #00000050;
+    background-color: #f5f5f5;
+    text-align: end;
+}
+
+.form-control{
+    width: 95%;
+    direction: rtl;
+    background-color: #f5f5f5;
+    border: 1px solid #00000050;
+}
+
+
+table + button {
+    position: relative;
+    margin-top: 1%;
+    left: 40%;
+}
+
+nav a.active{
+    background: linear-gradient(#efeff1 0%, #55555505 90%, #555555 100%)
+}
+
+button.dropbtn.active {
+    color: #4c81bd;
+}
+
+.select2-container--bootstrap-5 .select2-selection--single {
+    text-align: end;
+    background-color: #f5f5f5;
+    border: 1px solid #00000050;
+}
+
+@-webkit-keyframes slide-fwd-right {
+  0% {
+    -webkit-transform: translateZ(0) translateX(0);
+            transform: translateZ(0) translateX(0);
+  }
+  100% {
+    -webkit-transform: translateZ(60px) translateX(10px);
+            transform: translateZ(60px) translateX(10px);
+  }
+}
+@keyframes slide-fwd-right {
+  0% {
+    -webkit-transform: translateZ(0) translateX(0);
+            transform: translateZ(0) translateX(0);
+  }
+  100% {
+    -webkit-transform: translateZ(60px) translateX(10px);
+            transform: translateZ(60px) translateX(10px);
+  }
+}
+
+
+div.row.dt-row{
+    width: 90vw;
+}
+ul.pagination{
+    width: 30;
+    position: relative;
+}
+
+.paginate_button.page-item{
+    padding: 0 !important;
+} 
+
+table{
+    max-height: calc(100vh - 180px);
+}
+
+
+.card_width_vw{
+    margin: 10px 0;
+}
+
+.card_width_90vw{
+    width: 90vw !important
+}
+
+th, td{
+    width: 10vw;
+    text-align: left;
+}
+
+th{
+    white-space: nowrap;
+}
+
+.card-body{
+    overflow: auto;
+}
+
+.row{
+    display: flex;
+    flex-wrap: nowrap;
+    width: 80vw;
+    margin-top: 15px;
+}
+
+th {
+    background-color: #92d1d87d !important;
+} 
+
+td:nth-child(n+2), th:nth-child(n+2) {
+    text-align: center !important;
+    width: 100vw;
+}
+tbody tr {
+    border-bottom: 1px solid #00000050;
+    transition: all 0.3s ease-in-out;
+}
+
+tbody tr:hover {
+    -webkit-animation: slide-fwd-right 0.45s cubic-bezier(0.250, 0.460, 0.450, 0.940) both;
+    animation: slide-fwd-right 0.45s cubic-bezier(0.250, 0.460, 0.450, 0.940) both;
+    box-shadow: 0 5px 15px #00000050;
+}
+
+select.form-select {
+    width: 100% !important;
+}
+
+.select2-container--bootstrap-5 .select2-selection--multiple .select2-selection__clear, .select2-container--bootstrap-5 .select2-selection--single .select2-selection__clear {
+    left: 2%;
+}
+
+table.dataTable {
+width: 98% !important;
+}
+
+table.dataTable th, table.dataTable td {
+ align-content: center;
+}
+
+.normal-table .dataTables_wrapper{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+ 
+.normal-table .dataTables_wrapper .row{
+    width: 90%;
+}
+ 
+.normal-table .dataTables_wrapper .row.dt-row{
+    width: 100%;
+}
+
+
+/* Conditional styling for Transaction Status */
+.transaction-status-paid {
+    background-color: #D5F5E3; /* Pastel green background */
+}
+
+.transaction-status-pending {
+    background-color: #F9FBE7; /* Light pastel yellow background */
+}
+
+.transaction-status-declined {
+    background-color: #FFCDD2; /* Light pastel red background */
+}
+
+.transaction-status-pemo {
+    background-color: #edf1de; /* Light pastel blue background */
+}
+
+/* Default background for table cells */
+.transaction-status-default {
+    background-color: transparent;
+}
+
+.acc-status-prepared {
+    background-color: #D5F5E3; /* Pastel green background */
+}
+
+.acc-status-pemo {
+    background-color: #edf1de; /* Pastel green background */
+}
+
+.business-silkywave {
+    background-color: #A67582;
+}
+
+.status-approved {
+    background-color: #D5F5E3; /* Pastel green background */
+}
+
+.ad-status-medium {
+    background-color: #F9FBE7; /* Light pastel yellow background */
+}
+
+.ad-status-high {
+    background-color: #D5F5E3; /* Pastel green background */
+}
+
+.ad-status-low {
+    background-color: #FFCDD2; /* Light pastel red background */
+}
+
+.row_form form, .row_form .row{
+    width: 100%;
+    flex-wrap: wrap;
+    align-items: center;
+    padding: 0;
+    margin: 1vw 0;
+    gap: 0;
+}
+
+select.form-select {
+    width: 100% !important;
+    background-color: #f5f5f5;
+    border: 1px solid #00000050;
+    padding: 12px 30px;
+}
+
+/*Making sure it looks good on mobile screen, tables-wise*/
+@media only screen and (max-width: 1000px) {
+    main{
+        padding-left: 26vw !important;
+    }
+    .row {
+        width: 70vw;
+    }
+}
+
+
+/* Applying color to rows */
+/* Transaction status row highlights */
+tr:has(td.transaction-status-paid) td {
+    background-color: #D5F5E3 !important; /* Pastel green */
+}
+ 
+tr:has(td.transaction-status-pending) td {
+    background-color: #F9FBE7 !important; /* Light pastel yellow */
+}
+ 
+tr:has(td.transaction-status-declined) td {
+    background-color: #FFCDD2 !important; /* Light pastel red */
+}
+ 
+tr:has(td.transaction-status-pemo) td {
+    background-color: #edf1de !important; /* Light pastel blue */
+}
+ 
+/* Account status row highlights */
+tr:has(td.acc-status-prepared) td {
+    background-color: #D5F5E3 !important;
+}
+ 
+tr:has(td.acc-status-pemo) td {
+    background-color: #edf1de !important;
+}
+ 
+/* Business specific row highlights */
+tr:has(td.business-silkywave) td {
+    background-color: #A67582 !important;
+}
+ 
+/* Approval and Ad statuses */
+tr:has(td.status-approved) td {
+    background-color: #D5F5E3 !important;
+}
+ 
+tr:has(td.ad-status-medium) td {
+    background-color: #F9FBE7 !important;
+}
+ 
+tr:has(td.ad-status-high) td {
+    background-color: #D5F5E3 !important;
+}
+ 
+tr:has(td.ad-status-low) td {
+    background-color: #FFCDD2 !important;
+}
+
+/*Saleh Status*/
+tr:has(td.saleh-status-paid) td {
+    background-color: #D5F5E3 !important;
+}
+
+
+tr:has(td.transaction-status-default) td {
+    background-color: transparent !important;
+}
+
+body {
+      font-family: sans-serif;
+      /* padding: 20px; */
+    }
+    #scanner-area {
+      display: flex;
+      gap: 20px;
+    }
+    #scanFeed {
+      max-height: 300px;
+      overflow-y: auto;
+      border: 1px solid #ccc;
+      padding: 10px;
+      list-style: none;
+    }
+    #confirmModal {
+      display: none;
+      position: fixed;
+      top: 30%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: white;
+      border: 1px solid #ccc;
+      padding: 20px;
+      z-index: 10;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    }
+    #overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.4);
+      z-index: 5;
+    }
+    .modal-buttons {
+      margin-top: 10px;
+    }

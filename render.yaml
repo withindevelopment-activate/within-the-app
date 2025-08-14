@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: django-web
+    runtime: python
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn Django_Demo.wsgi:application --bind 0.0.0.0:$PORT"
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: Django_Demo.settings
+      - key: PYTHON_VERSION
+        value: 3.12.2
+      - key: DJANGO_DEBUG
+        value: "False"

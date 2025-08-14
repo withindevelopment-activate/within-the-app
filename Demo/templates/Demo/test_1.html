@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Orders File{% endblock %}
+
+{% block content %}
+
+<h1>Upload Orders File</h1>
+{% if messages %}
+    <div class="alert">
+    {% for message in messages %}
+        <p>{{ message }}</p>
+    {% endfor %}
+    </div>
+{% endif %}
+
+<form action="/process_send_outs" method="post" enctype="multipart/form-data">
+    <input class="form-control" type="file" name="file" accept=".xlsx,.xls" required>
+    <button type="submit">Get Orders to Send Out</button>
+</form>
+
+{% endblock %}

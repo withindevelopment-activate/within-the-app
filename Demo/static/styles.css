@@ -1,0 +1,287 @@
+/* General styles */
+body {
+    background-color: #E3F2FD; /* Light blue background */
+    font-family: 'Arial, sans-serif';
+    color: #555555; /* Pastel gray text color */
+    margin: 0;
+    padding: 0;
+    line-height: 1.6;
+}
+
+/* Titles */
+h1, h2, h3, h4, h5, h6 {
+    color: #294d76; 
+    text-align: center;
+    margin: 20px 0;
+}
+
+/* Navigation */
+nav {
+    background-color: #BBDEFB; /* Light pastel blue */
+    padding: 10px;
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    position: relative;
+    direction: rtl;
+}
+
+/* Dropdown menu */
+.dropdown {
+    display: inline-block;
+    position: relative;
+}
+
+.dropbtn {
+    background-color: #BBDEFB; /* Light pastel blue */
+    color: #273546;
+    font-weight: bold;
+    padding: 10px 15px;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s ease;
+}
+
+.dropbtn:hover {
+    background-color: #A5C6F1; /* Slightly darker pastel blue */
+}
+
+/* Dropdown Content */
+.dropdown-content {
+    display: none;
+    position: absolute;
+    background-color: white;
+    min-width: 160px;
+    box-shadow: 0px 8px 16px rgba(0, 0, 0, 0.2);
+    z-index: 1;
+    text-align: right;
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+.dropdown-content a {
+    color: black;
+    padding: 10px 15px;
+    text-decoration: none;
+    display: block;
+    font-size: 14px;
+    transition: background-color 0.3s ease;
+}
+
+.dropdown-content a:hover {
+    background-color: #E1F5FE; /* Light pastel blue */
+}
+
+/* Nested Dropdown Fix */
+.dropdown .dropdown {
+    position: relative;
+}
+
+.dropdown .dropdown-content {
+    left: 100%;
+    top: 0;
+}
+
+.dropdown:hover .dropdown-content {
+    display: block;
+}
+
+
+
+/* Individual Navigation Links */
+nav a {
+    color: #273546;
+    margin: 0 15px;
+    text-decoration: none;
+    font-weight: bold;
+    transition: color 0.3s ease;
+    position: relative;
+}
+
+nav a:hover {
+    text-decoration: underline;
+    color: #385167;
+}
+
+nav a.active:after {
+    content: '';
+    display: block;
+    height: 2px;
+    background-color: #13161a; /* Line color */
+    position: absolute;
+    bottom: -5px;
+    left: 0;
+    right: 0;
+}
+
+/* Tables */
+table {
+    width: 50%;
+    border-collapse: collapse;
+    margin: 20px auto;
+    font-family: 'Verdana, Geneva, sans-serif'; /* Custom font for tables */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+table, th, td {
+    border: 1px solid #0c1114; /* Pastel blue border */
+}
+
+th, td {
+    padding: 10px;
+    text-align: center;
+    font-size: 16px;
+}
+
+th {
+    background-color: #d7e3ec; /* Slightly darker pastel blue for headers */
+}
+
+/* Labels */
+form label {
+    font-size: 16px;
+    color: black; 
+    margin-bottom: 5px;
+}
+
+/* Buttons */
+button, input[type="submit"] {
+    display: inline-block; /* Ensures button does not stretch to full width */
+    width: auto; /* Default to auto width */
+    max-width: 200px; /* Max width if needed */
+    background-color: #64B5F6; /* Pastel blue */
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s ease;
+}
+
+button:hover, input[type="submit"]:hover {
+    background-color: #42A5F5; /* Slightly darker pastel blue */
+}
+
+/* Form Fields */
+form {
+    margin: 20px 0;
+    padding: 20px;
+    background-color: #FFFFFF; /* White background */
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    margin: 10px;
+    width: 50%;
+    max-width: 300px;
+}
+
+form input[type="text"],
+form input[type="email"],
+form input[type="number"],
+form input[type="password"],
+form textarea {
+    width: 230px;
+    padding: 5px;
+    margin: 10px 0;
+    border: 1px solid #B3E5FC; /* Pastel blue border */
+    border-radius: 5px;
+    box-sizing: border-box;
+    background-color: #E1F5FE; /* Light pastel blue */
+    font-size: 16px;
+    transition: border-color 0.3s ease;
+}
+
+form input[type="text"]:focus,
+form input[type="email"]:focus,
+form input[type="number"]:focus,
+form input[type="password"]:focus,
+form textarea:focus {
+    border-color: #42A5F5; /* Darker pastel blue */
+    outline: none;
+}
+
+.form-group.buttons {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    
+}
+
+form input[type="submit"] {
+    background-color: #64B5F6; /* Pastel blue */
+    color: white;
+    padding: 5px 10px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+form input[type="submit"]:hover {
+    background-color: #42A5F5; /* Slightly darker pastel blue */
+}
+
+/* Conditional styling for Transaction Status */
+.transaction-status-paid {
+    background-color: #D5F5E3; /* Pastel green background */
+}
+
+.transaction-status-pending {
+    background-color: #F9FBE7; /* Light pastel yellow background */
+}
+
+.transaction-status-declined {
+    background-color: #FFCDD2; /* Light pastel red background */
+}
+
+.transaction-status-pemo {
+    background-color: #edf1de; /* Light pastel blue background */
+}
+
+/* Default background for table cells */
+.transaction-status-default {
+    background-color: transparent;
+}
+
+.acc-status-prepared {
+    background-color: #D5F5E3; /* Pastel green background */
+}
+
+.acc-status-pemo {
+    background-color: #edf1de; /* Pastel green background */
+}
+
+.business-silkywave {
+    background-color: #A67582;
+}
+
+.status-approved {
+    background-color: #D5F5E3; /* Pastel green background */
+}
+
+.ad-status-medium {
+    background-color: #F9FBE7; /* Light pastel yellow background */
+}
+
+.ad-status-high {
+    background-color: #D5F5E3; /* Pastel green background */
+}
+
+.ad-status-low {
+    background-color: #FFCDD2; /* Light pastel red background */
+}
+
+/* Background color for different sources */
+tr[data-source="PO_VIEW Entry"] { background-color: #ffcccc; } /* Light Red */
+tr[data-source="TABLE_SELECT Entry"] { background-color: #ccffcc; } /* Light Green */
+tr[data-source="Quantity_Difference"] { background-color: #ccccff; } /* Light Blue */
+tr[data-source="Supplier_D"] { background-color: #ffffcc; } /* Light Yellow */

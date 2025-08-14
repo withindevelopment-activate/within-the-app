@@ -1,0 +1,230 @@
+{% extends "Demo/base.html" %}
+
+{% block title %} Dashboard {% endblock title %}  
+
+{% block content %}
+<body class="bg-light">
+  <div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <div>
+        <h2>Zid Analytics Dashboard</h2>
+        <p class="text-muted">Welcome, {{ user_name }} | Store: {{ store_title }}</p>
+      </div>
+      <a href="{% url 'Demo:zid_logout' %}" class="btn btn-outline-danger">Logout</a>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row text-center mb-4">
+      <div class="col-md-4">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <h5 class="card-title">Total Orders</h5>
+            <h3>{{ total_orders }}</h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <h5 class="card-title">Total Products</h5>
+            <h3>{{ total_products }}</h3>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <h5 class="card-title">Total Revenue</h5>
+            <h3>AED {{ total_revenue|floatformat:2 }}</h3>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="row mb-5">
+      <div class="col-md-6">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <h5 class="card-title">Order Totals</h5>
+            <canvas id="orderChart"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <h5 class="card-title">Top Products</h5>
+            <canvas id="productChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tables -->
+    <div class="row">
+      <div class="col-md-10 offset-md-1">
+        <h4>Recent Orders</h4>
+        <table class="table table-bordered table-sm bg-white">
+          <thead>
+            <tr><th>ID</th><th>Status</th><th>Total (AED)</th><th>Payment Status</th><th>Source</th><th>Created At</th><th>Updated At</th></tr>
+          </thead>
+          <tbody>
+            {% for o in orders %}
+              <tr>
+                <td>{{ o.id }}</td>
+                <td>{{ o.display_status }}</td>
+                <td>{{ o.order_total  }}</td>
+                <td>{{ o.payment_status  }}</td>
+                <td>{{ o.source  }}</td>
+                <td>{{ o.created_at|date:"Y-m-d H:i" }}</td>
+                <td>{{ o.updated_at|date:"Y-m-d H:i" }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="col-md-10 offset-md-1 mt-4">
+        <h4>Sample Products</h4>
+        <table class="table table-bordered table-sm bg-white">
+          <thead>
+            <tr><th>Name</th><th>SKU</th><th>Price</th></tr>
+          </thead>
+          <tbody>
+            {% for p in products %}
+              <tr>
+                <td>
+                  <img src="{{ p.display_image }}" alt="{{ p.display_name }}" class="img-thumbnail" style="width: 50px; height: 50px;">
+                  {{ p.display_name|truncatewords:3 }}
+                </td>
+                <td>{{ p.sku }}</td>
+                <td>{{ p.price }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chart Data Injection -->
+  <script>
+    const orderData = {
+      labels: [{% for o in orders %}"#{{ o.id }}",{% endfor %}],
+      datasets: [{
+        label: 'Order Total (AED)',
+        data: [{% for o in orders %}{{ o.order_total|floatformat:2 }},{% endfor %}],
+        backgroundColor: 'rgba(54, 162, 235, 0.6)',
+        borderColor: 'rgba(54, 162, 235, 1)',
+        hoverBackgroundColor:"rgba(54, 162, 235, 1)",
+        borderRadius: 20,
+        hoverBorderRadius: 10,
+        borderWidth: 1,
+        barPercentage: 0.5,
+        tension: 0.3
+      }]
+    };
+
+    const productData = {
+      labels: [{% for p in products %}"{{ p.display_name|truncatewords:3 }}",{% endfor %}],
+      datasets: [{
+        label: 'Product Prices (AED)',
+        data: [{% for p in products %}{{ p.price|floatformat:2 }},{% endfor %}],
+        backgroundColor: 'rgba(255, 99, 132, 0.6)',
+        borderColor: 'rgba(255, 99, 132, 1)',
+        hoverBackgroundColor:"rgba(255, 99, 132, 1)",
+        borderRadius: 20,
+        hoverBorderRadius: 10,
+        borderWidth: 1,
+        barPercentage: 0.5,
+        tension: 0.3,
+      }]
+    };
+
+    const sharedOptions = {
+      responsive: true,
+      plugins: {
+        legend: {
+          position: 'top',
+          labels: {
+            font: {
+              size: 14,
+              weight: 'bold'
+            }
+          }
+        },
+        animation: {
+          duration: 1000,
+          easing: 'easeOutQuart',
+          animateScale: true,
+          animateRotate: true,
+          animations: {
+            borderRadius: {
+              duration: 800,
+              easing: 'easeOutCubic'
+            }
+          }
+        },
+        tooltip: {
+          backgroundColor: '#333',
+          titleColor: '#fff',
+          bodyColor: '#eee',
+          titleFont: {
+            size: 14,
+            weight: 'bold'
+          },
+          bodyFont: {
+            size: 13
+          },
+          padding: 10,
+          borderColor: '#888',
+          borderWidth: 1
+        },
+        title: {
+          display: false,
+        }
+      },
+      scales: {
+        x: {
+          ticks: {
+            font: {
+              size: 12
+            },
+            maxRotation: 45,
+            minRotation: 0,
+          },
+          grid: {
+            display: false
+          }
+        },
+        y: {
+          beginAtZero: true,
+          ticks: {
+            font: {
+              size: 12
+            }
+          },
+          grid: {
+            color: 'rgba(200, 200, 200, 0.2)'
+          }
+        }
+      }
+    };
+
+
+    const configOrder = {
+      type: 'bar',
+      data: orderData,
+      options: sharedOptions
+    };
+    const configProduct = {
+      type: 'bar',
+      data: productData,
+      options: sharedOptions
+    };
+
+    new Chart(document.getElementById('orderChart'), configOrder);
+    new Chart(document.getElementById('productChart'), configProduct);
+  </script>
+
+{% endblock %}

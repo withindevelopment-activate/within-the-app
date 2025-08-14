@@ -1,0 +1,25 @@
+{% extends "Demo/base.html" %}
+
+{% block title %} Error {% endblock title %}  
+
+{% block content %}
+<div class="container text-center">
+<div class="row justify-content-center">
+    <div class="col-md-8">
+    <div class="card shadow-sm">
+        <div class="card-body">
+        <h2 class="text-danger mb-3">⚠️ Something went wrong</h2>
+        <p class="fs-5">{{ message }}</p>
+
+        {% if details %}
+            <pre class="text-muted text-start bg-light p-3 rounded mt-3" style="max-height: 200px; overflow: auto;">{{ details }}</pre>
+        {% endif %}
+
+        <a href="{% url 'Demo:zid_login' %}" class="btn btn-primary mt-4">Try Again</a>
+        </div>
+    </div>
+    </div>
+</div>
+</div>
+
+{% endblock %}
