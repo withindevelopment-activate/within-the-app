@@ -52,3 +52,4 @@ tzdata==2025.2
 urllib3==2.5.0
 websockets==15.0.1
 yarl==1.20.1
+rapidfuzz==3.2.1
