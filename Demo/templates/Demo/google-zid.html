@@ -1,0 +1,232 @@
+{% extends "ads_api/base.html" %}
+{% load filters %}
+{% block title %}Order & Analytics Match{% endblock %}
+{% block content %}
+
+<h2 class="mb-4">🔄 Match Orders with Analytics</h2>
+
+<!-- Upload Form -->
+<form method="post" enctype="multipart/form-data" class="mb-4">
+    {% csrf_token %}
+    <div class="row g-3 align-items-end">
+        <div class="col-md-4">
+            <label>Orders Excel (.xlsx)</label>
+            <input type="file" name="orders_file" accept=".xlsx" class="form-control" required>
+        </div>
+        <div class="col-md-4">
+            <label>Analytics CSV</label>
+            <input type="file" name="analytics_file" accept=".csv" class="form-control" required>
+        </div>
+        <div class="col-md-4">
+            <label>Start Date</label>
+            <input type="date" name="start_date" class="form-control">
+        </div>
+        <div class="col-md-4">
+            <label>End Date</label>
+            <input type="date" name="end_date" class="form-control">
+        </div>
+        <div class="col-md-3">
+            <button type="submit" class="btn btn-primary w-100">Upload & Match</button>
+        </div>
+    </div>
+</form>
+
+<!-- Totals -->
+{% if total_order_value %}
+<div class="row row-cols-2 g-3 mb-4">
+    <div class="col">
+        <div class="card text-center shadow-sm">
+            <div class="card-body">
+                <h6>Total Order Value</h6>
+                <p class="fs-4 fw-bold">{{ total_order_value }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="card text-center shadow-sm">
+            <div class="card-body">
+                <h6>Total Purchase Revenue</h6>
+                <p class="fs-4 fw-bold">{{ total_purchase_revenue }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Campaign → Products Sold -->
+{% if campaign_product_sales %}
+<h3>Campaign → Products Sold</h3>
+<div class="row row-cols-2 mb-4 g-0 flex-nowrap scroll_overflow-x" style="height: 60vh;">
+    {% for campaign, products in campaign_product_sales.items %}
+    <div class="col">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h6>{{ campaign }}</h6>
+                <p class="fs-4 fw-bold">{{ products|length }} Products</p>
+                <ul>
+                    {% for product, qty in products.items %}
+                    <li>{{ product }} (x{{ qty }})</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- KPI Chart -->
+{% if source_metrics %}
+<div class="mb-3">
+    <label for="kpiSelect" class="form-label custom_bg">Select KPI:</label>
+    <select id="kpiSelect" class="form-select custom_bg" style="width: auto;">
+        <option value="Purchase revenue">Purchase Revenue</option>
+        <option value="Ecommerce purchases">Ecommerce Purchases</option>
+        <option value="Ecommerce purchase quantity">Purchase Quantity</option>
+    </select>
+</div>
+
+<canvas id="sourceRevenueChart" height="100"></canvas>
+<script>
+    const data = {{ source_metrics|safe }};
+    const kpiSelect = document.getElementById("kpiSelect");
+    const ctx = document.getElementById("sourceRevenueChart").getContext("2d");
+
+    const chart = new Chart(ctx, {
+        type: 'bar',
+        data: { labels: [], datasets: [{ label: '', data: [], backgroundColor: "rgba(13, 110, 253, 0.7)", borderRadius: 20 }] },
+        options: { responsive: true, plugins: { legend: { display: false } } }
+    });
+
+    function updateChart(kpi) {
+        const sortedEntries = Object.entries(data)
+            .map(([src, metrics]) => [src, metrics[kpi]])
+            .sort((a, b) => b[1] - a[1]);
+        chart.data.labels = sortedEntries.map(e => e[0]);
+        chart.data.datasets[0].label = kpi;
+        chart.data.datasets[0].data = sortedEntries.map(e => e[1]);
+        chart.update();
+    }
+    kpiSelect.addEventListener("change", e => updateChart(e.target.value));
+    updateChart(kpiSelect.value);
+</script>
+{% endif %}
+
+<!-- Matched Orders -->
+{% if matched %}
+<div class="card mb-4 scroll_overflow-x">
+    <div class="card-body">
+        <div class="mb-3">
+            <label for="campaignFilter" class="form-label">Filter by Campaign:</label>
+            <select id="campaignFilter" class="form-select">
+                <option value="">All Campaigns</option>
+                {% for row in matched %}
+                    <option value="{{ row.campaign }}">{{ row.campaign }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <table class="table table-bordered table-striped small align-middle AdsTable">
+            <thead>
+                <tr>
+                    <th>ID</th><th>Status</th><th>Campaign</th>
+                    <th>Product Name</th><th>Order Total</th>
+                    <th>Purchase Revenue</th><th>Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in matched %}
+                <tr data-campaign="{{ row.campaign }}">
+                    <td>{{ row.id }}</td><td>{{ row.status }}</td>
+                    <td>{{ row.campaign }}</td>
+                    <td>{{ row.products_str }}</td>
+                    <td>{{ row.order_total }}</td>
+                    <td>{{ row.purchase_revenue }}</td>
+                    <td>{{ row.date }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- Unmatched Orders -->
+{% if unmatched_orders %}
+<div class="accordion mb-4" id="accordionUnmatchedOrders">
+    <div class="accordion-item">
+        <h2 class="accordion-header">
+            <button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#unmatchedOrders">
+                🚫 Unmatched Orders ({{ unmatched_orders|length }})
+            </button>
+        </h2>
+        <div id="unmatchedOrders" class="accordion-collapse collapse">
+            <div class="accordion-body">
+                <table class="table table-sm table-bordered">
+                    <thead>
+                        <tr>
+                            {% for key in unmatched_orders.0.keys %}
+                            <th>{{ key|title }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in unmatched_orders %}
+                        <tr>
+                            {% for value in row.values %}
+                            <td>{{ value }}</td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Unmatched Analytics -->
+{% if unmatched_analytics %}
+<div class="accordion mb-4" id="accordionUnmatchedAnalytics">
+    <div class="accordion-item">
+        <h2 class="accordion-header">
+            <button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#unmatchedAnalytics">
+                🚫 Unmatched Analytics ({{ unmatched_analytics|length }})
+            </button>
+        </h2>
+        <div id="unmatchedAnalytics" class="accordion-collapse collapse">
+            <div class="accordion-body">
+                <table class="table table-sm table-bordered">
+                    <thead>
+                        <tr><th>Transaction ID</th><th>Purchase Revenue</th><th>Date</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for row in unmatched_analytics %}
+                        <tr>
+                            <td>{{ row|get_item:"Transaction ID" }}</td>
+                            <td>{{ row|get_item:"Purchase revenue" }}</td>
+                            <td>{{ row|get_item:"date" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- DataTables + Filter Script -->
+<script>
+    $(document).ready(function () {
+        $('.AdsTable').DataTable({ paging: false, order: [[0, "asc"]] });
+    });
+    document.getElementById('campaignFilter')?.addEventListener('change', function () {
+        var val = this.value.toLowerCase();
+        document.querySelectorAll('.AdsTable tbody tr').forEach(row => {
+            row.style.display = (!val || row.dataset.campaign.toLowerCase() === val) ? "" : "none";
+        });
+    });
+</script>
+
+{% endblock %}
