@@ -9,10 +9,13 @@
 <form method="post" enctype="multipart/form-data" class="mb-4">
     {% csrf_token %}
     <div class="row g-3 align-items-end">
+        <!-- Omit the zid upload section 
         <div class="col-md-4">
             <label>Orders Excel (.xlsx)</label>
             <input type="file" name="orders_file" accept=".xlsx" class="form-control" required>
         </div>
+        -->
+        
         <div class="col-md-4">
             <label>Analytics CSV</label>
             <input type="file" name="analytics_file" accept=".csv" class="form-control" required>
@@ -88,7 +91,7 @@
 
 <canvas id="sourceRevenueChart" height="100"></canvas>
 <script>
-    const data = {{ source_metrics|safe }};
+    const data = JSON.parse('{{ source_metrics|escapejs }}'); // This is fixed -- the previous format is not a valid javascript format.
     const kpiSelect = document.getElementById("kpiSelect");
     const ctx = document.getElementById("sourceRevenueChart").getContext("2d");
 

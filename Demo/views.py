@@ -1,4 +1,5 @@
 from datetime import datetime
+import pandas as pd
 import requests
 from django.conf import settings
 from django.shortcuts import redirect, render
@@ -208,13 +209,15 @@ def zid_refresh_token(request):
 
     return JsonResponse({'status': 'refreshed', 'new_access_token': new_tokens.get('access_token')})
 
-import requests
-import pandas as pd
-from django.shortcuts import render
-from django.contrib import messages
-from django.conf import settings
 
 
+###############################################################################
+################# ZID ORDERS + GOOGLE ANALYTICS ###############################
+'''
+This section takes in the data from Google Analytics and:
+1- Extracts the Order ID from the Analytics data, locates this order in the store through the API connection.
+2- Performs analysis on pulled information. 
+'''
 def normalize_campaign(name):
     if not isinstance(name, str):
         return ""
@@ -378,7 +381,6 @@ def match_orders_with_analytics(request):
                 total_purchase_revenue += purchase_revenue
 
             # Any order found in Zid but not in analytics → unmatched_orders
-            # (Optional: only possible if you fetch all Zid orders separately)
 
     except Exception as e:
         messages.error(request, f"Error: {str(e)}")
