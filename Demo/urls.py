@@ -9,4 +9,5 @@ urlpatterns = [
     path('logout/', views.zid_logout, name='zid_logout'),
     path('zid/refresh/', views.zid_refresh_token, name='zid_refresh'),
     path('zid/orders/', views.match_orders_with_analytics, name='zid_orders'),
+    path("save-tracking", views.save_tracking, name="save_tracking"), # The path for the visitor tracking
 ]

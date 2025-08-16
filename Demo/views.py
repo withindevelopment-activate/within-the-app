@@ -3,10 +3,13 @@ import pandas as pd
 import requests
 from django.conf import settings
 from django.shortcuts import redirect, render
+from django.views.decorators.csrf import csrf_exempt
 from django.contrib import messages
 import traceback
 from django.http import JsonResponse, HttpResponseBadRequest
 from rapidfuzz import fuzz
+import json
+
 
 # Step 1: Redirect user to Zid OAuth page
 def zid_login(request):
@@ -397,3 +400,16 @@ def match_orders_with_analytics(request):
         "source_metrics": source_metrics,
         "campaign_product_sales": campaign_product_sales,
     })
+
+
+#############################################################################################################
+################################## The Visitor Tracking Section #############################################
+@csrf_exempt  # This is added because we are adding the tracking javascript to the app but the store pages likely do not have a <meta name="csrf-token">
+def save_tracking(request):
+    if request.method == "POST":
+        data = json.loads(request.body)
+        print("Tracking data:", data)
+
+        return JsonResponse({"status": "success"})
+    
+    return JsonResponse({"error": "Invalid request method"}, status=405)
