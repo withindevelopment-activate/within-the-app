@@ -450,7 +450,7 @@ def save_tracking(request):
         'Visited_at': get_uae_current_date(),
         'Cookie_ID': data.get('custom_cookie_id'),
         'Session_ID': data.get('session_id'),
-        'Referrer_Platfrom': data.get('referrer', ''),
+        'Referrer_Platform': data.get('referrer', ''),
         'UTM_Source': data.get('utm_source', '')
     }
 
