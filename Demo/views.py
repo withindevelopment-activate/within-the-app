@@ -451,7 +451,11 @@ def save_tracking(request):
         'Cookie_ID': data.get('custom_cookie_id'),
         'Session_ID': data.get('session_id'),
         'Referrer_Platform': data.get('referrer', ''),
-        'UTM_Source': data.get('utm_source', '')
+        'UTM_Source': data.get('utm_source', ''),
+        'Screen_Resolution': data.get('screen_resolution', ''),
+        'Device_Memory': data.get('device_memory', ''),
+        'Timezone': data.get('timezone', ''),
+        'User_Agent': data.get('user_agent', ''),
     }
 
     tracking_entry_df = pd.DataFrame([tracking_entry])
