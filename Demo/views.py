@@ -427,8 +427,22 @@ def match_orders_with_analytics(request):
 ################################## The Visitor Tracking Section #############################################
 @csrf_exempt  # This is added because we are adding the tracking javascript to the app but the store pages likely do not have a <meta name="csrf-token">
 def save_tracking(request):
-    data = json.loads(request.body)
-    # print("Tracking data:", data)
+    if request.method != "POST":
+        # OPTIONS, GET, etc. just return a simple response -- This avoids errors during the usage of other methods
+        return JsonResponse({"status": "ok"})
+
+    if not request.body:
+        return JsonResponse({"status": "error", "message": "Empty request body"}, status=400)
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"status": "error", "message": "Invalid JSON"}, status=400)
+
+    # Required fields check
+    required_fields = ['visitor_id', 'custom_cookie_id', 'session_id']
+    if not all(field in data and data[field] for field in required_fields):
+        return JsonResponse({"status": "error", "message": "Missing required tracking data"}, status=400)
 
     tracking_entry = {
         'Distinct_ID': int(get_next_id_from_supabase_compatible_all(name='Tracking_Visitors', column='Distinct_ID')),
@@ -436,12 +450,10 @@ def save_tracking(request):
         'Visited_at': get_uae_current_date(),
         'Cookie_ID': data.get('custom_cookie_id'),
         'Session_ID': data.get('session_id'),
-        'Referrer_Platfrom': data.get('referrer'),
-        'UTM_Source': data.get('utm_source')
-        }
+        'Referrer_Platfrom': data.get('referrer', ''),
+        'UTM_Source': data.get('utm_source', '')
+    }
 
-    # Batch insert this data
-    # convert to df
     tracking_entry_df = pd.DataFrame([tracking_entry])
     batch_insert_to_supabase(tracking_entry_df, 'Tracking_Visitors')
 
