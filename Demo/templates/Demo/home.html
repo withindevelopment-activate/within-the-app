@@ -107,16 +107,25 @@
     </div>
   </div>
 
-  <!-- Chart Data Injection -->
+  {% load json_script %}
+
+  <!-- Convert data into JSON prior to usage -- Prevents error trails -->
+  {{ orders|json_script:"orders-data" }}
+  {{ products|json_script:"products-data" }}
+
   <script>
+    // Parse JSON 
+    const orders = JSON.parse(document.getElementById("orders-data").textContent);
+    const products = JSON.parse(document.getElementById("products-data").textContent);
+
     const orderData = {
-      labels: [{% for o in orders %}"#{{ o.id }}",{% endfor %}],
+      labels: orders.map(o => `#${o.id}`),
       datasets: [{
         label: 'Order Total (AED)',
-        data: [{% for o in orders %}{{ o.order_total|floatformat:2 }},{% endfor %}],
+        data: orders.map(o => parseFloat(o.order_total).toFixed(2)),
         backgroundColor: 'rgba(54, 162, 235, 0.6)',
         borderColor: 'rgba(54, 162, 235, 1)',
-        hoverBackgroundColor:"rgba(54, 162, 235, 1)",
+        hoverBackgroundColor: "rgba(54, 162, 235, 1)",
         borderRadius: 20,
         hoverBorderRadius: 10,
         borderWidth: 1,
@@ -126,18 +135,18 @@
     };
 
     const productData = {
-      labels: [{% for p in products %}"{{ p.display_name|truncatewords:3 }}",{% endfor %}],
+      labels: products.map(p => p.display_name),
       datasets: [{
         label: 'Product Prices (AED)',
-        data: [{% for p in products %}{{ p.price|floatformat:2 }},{% endfor %}],
+        data: products.map(p => parseFloat(p.price).toFixed(2)),
         backgroundColor: 'rgba(255, 99, 132, 0.6)',
         borderColor: 'rgba(255, 99, 132, 1)',
-        hoverBackgroundColor:"rgba(255, 99, 132, 1)",
+        hoverBackgroundColor: "rgba(255, 99, 132, 1)",
         borderRadius: 20,
         hoverBorderRadius: 10,
         borderWidth: 1,
         barPercentage: 0.5,
-        tension: 0.3,
+        tension: 0.3
       }]
     };
 
@@ -181,7 +190,7 @@
           borderWidth: 1
         },
         title: {
-          display: false,
+          display: false
         }
       },
       scales: {
@@ -191,7 +200,7 @@
               size: 12
             },
             maxRotation: 45,
-            minRotation: 0,
+            minRotation: 0
           },
           grid: {
             display: false
@@ -211,20 +220,20 @@
       }
     };
 
-
-    const configOrder = {
+    // Create charts
+    new Chart(document.getElementById('orderChart'), {
       type: 'bar',
       data: orderData,
       options: sharedOptions
-    };
-    const configProduct = {
+    });
+
+    new Chart(document.getElementById('productChart'), {
       type: 'bar',
       data: productData,
       options: sharedOptions
-    };
-
-    new Chart(document.getElementById('orderChart'), configOrder);
-    new Chart(document.getElementById('productChart'), configProduct);
+    });
   </script>
+
+
 
 {% endblock %}

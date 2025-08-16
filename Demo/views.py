@@ -8,11 +8,12 @@ from django.contrib import messages
 import traceback
 from django.http import JsonResponse, HttpResponseBadRequest
 from rapidfuzz import fuzz
+from urllib.parse import urlencode
 import json
 
 
 # Step 1: Redirect user to Zid OAuth page
-def zid_login(request):
+'''def zid_login(request):
     params = {
             'client_id': settings.ZID_CLIENT_ID,
             'redirect_uri': settings.ZID_REDIRECT_URI,
@@ -21,7 +22,17 @@ def zid_login(request):
     
     # Add optional parameters if they exist
     query_string = '&'.join([f'{k}={v}' for k, v in params.items()])
-    return redirect(f'{settings.ZID_AUTH_URL}?{query_string}')
+    return redirect(f'{settings.ZID_AUTH_URL}?{query_string}')'''
+
+def zid_login(request):
+    params = {
+        "client_id": settings.ZID_CLIENT_ID,
+        "redirect_uri": settings.ZID_REDIRECT_URI,
+        "response_type": "code",
+    }
+    url = settings.ZID_AUTH_URL
+    auth_url = f"{url}?{urlencode(params)}"
+    return redirect(auth_url)
 
 
 # Step 2: Handle callback and exchange code for access_token
@@ -48,17 +59,15 @@ def zid_callback(request):
         refresh_token = token_data.get('refresh_token')
         authorization_token = token_data.get('authorization')
 
-        # ✅ Save token to session
+        print("Retrieved Token data:", token_data)
+
+        # Save tokens to session
         request.session['access_token'] = token_data.get('access_token')
         request.session['refresh_token'] = token_data.get('refresh_token')
         request.session['authorization_token'] = token_data.get('authorization')
 
-        # # Log the tokens for debugging
-        headers = {
-            'Authorization': f'Bearer {authorization_token}',
-            'X-MANAGER-TOKEN': access_token,  # Sometimes needed depending on endpoint
-        }
-
+        ''' 
+        # Commented this part since it is redundant ----
         # Fetch user profile to get store ID
         profile_response = requests.get(f"{settings.ZID_API_BASE}/managers/account/profile", headers=headers)
         profile = profile_response.json() if profile_response.status_code == 200 else {}
@@ -67,7 +76,7 @@ def zid_callback(request):
             request.session['store_id'] = store_id
             print("Store ID saved to session: - views.py:61", store_id)
         else:
-            print("⚠️ Store ID not found in profile response. - views.py:63")
+            print("⚠️ Store ID not found in profile response. - views.py:63")'''
         return redirect('Demo:home')  # go to the home view
 
     except requests.RequestException as e:
@@ -80,8 +89,10 @@ def home(request):
     auth_token = request.session.get('authorization_token')
     store_id = request.session.get('store_id')
 
-    if not token:
-        return redirect('Demo:zid_login')
+    print("The access token is:", token)
+    print("The authorization token is:", auth_token)
+    print("The retrieved store id is:", store_id)
+
 
     headers = {
         'Authorization': f'Bearer {auth_token}',
@@ -90,7 +101,7 @@ def home(request):
 
     headers_product = {
             'Authorization': f'Bearer {auth_token}',
-            'X-MANAGER-TOKEN': token,  # Sometimes needed depending on endpoint
+            'X-MANAGER-TOKEN': token, 
             'accept': 'application/json',
             'Accept-Language': 'all-languages',
             'Store-Id': f'{store_id}',
@@ -163,7 +174,7 @@ def home(request):
     # Handle any request errors       
     except requests.RequestException as e:
         traceback.print_exc()
-        messages.error(request, f"⚠️ Something went wrong: {str(e)}")
+        messages.error(request, f"Something went wrong: {str(e)}")
     
     context= {
         'profile': profile,
@@ -178,13 +189,13 @@ def home(request):
 
     return render(request, 'Demo/home.html', context)
 
-# Step 4: Logout and clear session
+# Logout and clear session
 def zid_logout(request):
     request.session.flush()
     messages.success(request, "You have been logged out.")
     return redirect('Demo:zid_login')
 
-# Step 5: Refresh access token using stored refresh token
+# Refresh access token using stored refresh token
 def zid_refresh_token(request):
     """Refresh the access token using session-stored refresh token"""
     refresh_token = request.session.get('refresh_token')
