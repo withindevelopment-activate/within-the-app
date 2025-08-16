@@ -12,8 +12,8 @@ from urllib.parse import urlencode
 import json
 
 # Supabase imports
-from supabase_functions import batch_insert_to_supabase, get_next_id_from_supabase_compatible_all
-from supporting_functions import get_uae_current_date
+from .supabase_functions import batch_insert_to_supabase, get_next_id_from_supabase_compatible_all
+from .supporting_functions import get_uae_current_date
 
 
 # Redirect user to Zid OAuth page

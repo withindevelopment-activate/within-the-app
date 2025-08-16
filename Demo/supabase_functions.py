@@ -1,32 +1,10 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, send_from_directory, session, render_template_string, abort, send_file
 import pandas as pd
-from datetime import datetime
 import os
-from io import BytesIO
-from fpdf import FPDF
 import logging
-import json
-import pdfkit
-import subprocess
 from supabase import create_client, Client
-import pytz
-from collections import Counter
-import requests
-from bs4 import BeautifulSoup
-from fuzzywuzzy import fuzz
 import ast
-import asyncio
-import aiohttp
 from concurrent.futures import ThreadPoolExecutor
-import threading
-
-app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY")
-
-######################## File Creations ########################
-# Set the environment variable to disable HTTP/2
-os.environ["HTTPX_HTTP2"] = "0"
-
+# Import keys
 url: str = os.environ.get('SUPABASE_URL')
 key: str = os.environ.get('SUPABASE_KEY')
 
