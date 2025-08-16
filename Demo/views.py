@@ -62,9 +62,9 @@ def zid_callback(request):
         print("Retrieved Token data:", token_data)
 
         # Save tokens to session
-        request.session['access_token'] = token_data.get('access_token')
-        request.session['refresh_token'] = token_data.get('refresh_token')
-        request.session['authorization_token'] = token_data.get('authorization')
+        request.session['access_token'] = access_token
+        request.session['refresh_token'] = refresh_token
+        request.session['authorization_token'] = authorization_token
 
         ''' 
         # Commented this part since it is redundant ----
