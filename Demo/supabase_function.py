@@ -221,7 +221,35 @@ def upsert_partial(df, table_name, pk):
             .execute()
     
 
+def get_next_id_from_supabase_compatible_all(name, column): # getting the next id
+    """
+    Retrieve the last ID from a specified column in the Supabase table and return the incremented value.
 
+    Parameters:
+    - name (str): The name of the Supabase table.
+    - column (str): The column name to fetch the last ID from.
+
+    Returns:
+    - int: The next available ID.
+    """
+    try:
+        response = supabase.table(name).select(column).order(column, desc=True).limit(1).execute()
+        
+        if not response.data:
+            # If no data is found, start with 1 as the initial ID
+            return 1
+        
+        # Extract the last ID
+        last_id = int(response.data[0][column])
+        
+        # Increment the ID
+        next_id = last_id + 1
+        
+        return next_id
+    
+    except Exception as e:
+        print(f"Error fetching the next ID from Supabase: {e}")
+        raise
     
 
 ########### --------------- THE ULTIMATE FUNCTION ---------------- #######################

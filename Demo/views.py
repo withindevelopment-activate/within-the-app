@@ -427,11 +427,10 @@ def match_orders_with_analytics(request):
 ################################## The Visitor Tracking Section #############################################
 @csrf_exempt  # This is added because we are adding the tracking javascript to the app but the store pages likely do not have a <meta name="csrf-token">
 def save_tracking(request):
-    if request.method == "POST":
-        data = json.loads(request.body)
-        print("Tracking data:", data)
+    data = json.loads(request.body)
+    # print("Tracking data:", data)
 
-        tracking_entry = {
+    tracking_entry = {
         'Distinct_ID': int(get_next_id_from_supabase_compatible_all(name='Tracking_Visitors', column='Distinct_ID')),
         'Visitor_ID': data.get('visitor_id'),
         'Visited_at': get_uae_current_date(),
@@ -441,11 +440,9 @@ def save_tracking(request):
         'UTM_Source': data.get('utm_source')
         }
 
-        # Batch insert this data
-        # convert to df
-        tracking_entry_df = pd.DataFrame([tracking_entry])
-        batch_insert_to_supabase(tracking_entry_df, 'Tracking_Visitors')
+    # Batch insert this data
+    # convert to df
+    tracking_entry_df = pd.DataFrame([tracking_entry])
+    batch_insert_to_supabase(tracking_entry_df, 'Tracking_Visitors')
 
-        return JsonResponse({"status": "success"})
-    
-    return JsonResponse({"error": "Invalid request method"}, status=405)
+    return JsonResponse({"status": "success"})
