@@ -144,13 +144,13 @@ LOGOUT_REDIRECT_URL = '/login/'
 
 LOGIN_URL = '/login/'
 
+ZID_CLIENT_ID = os.environ.get('ZID_CLIENT_ID')
+ZID_CLIENT_SECRET = os.environ.get('ZID_CLIENT_SECRET')
 ZID_AUTH_URL = 'https://oauth.zid.sa/oauth/authorize'
 ZID_TOKEN_URL = 'https://oauth.zid.sa/oauth/token'
 ZID_API_BASE = 'https://api.zid.sa/v1'
 ZID_SCOPES = 'orders.read products.read account.read'
-ZID_CLIENT_ID = os.environ.get('ZID_CLIENT_ID')
-ZID_CLIENT_SECRET = os.environ.get('ZID_CLIENT_SECRET')
-ZID_REDIRECT_URI = 'https://zid-sleepy-test.onrender.com/callback'
+ZID_REDIRECT_URI = 'https://testing-within.onrender.com/zid/callback'
 
 SESSION_COOKIE_AGE = 3600  # 1 hour
 SESSION_SAVE_EVERY_REQUEST = True

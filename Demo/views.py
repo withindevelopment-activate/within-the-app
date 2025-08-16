@@ -12,7 +12,7 @@ from urllib.parse import urlencode
 import json
 
 
-# Step 1: Redirect user to Zid OAuth page
+# Redirect user to Zid OAuth page
 '''def zid_login(request):
     params = {
             'client_id': settings.ZID_CLIENT_ID,
@@ -35,7 +35,7 @@ def zid_login(request):
     return redirect(auth_url)
 
 
-# Step 2: Handle callback and exchange code for access_token
+# Handle callback and exchange code for access_token
 def zid_callback(request):
     code = request.GET.get('code')
     if not code:
