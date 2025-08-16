@@ -11,6 +11,10 @@ from rapidfuzz import fuzz
 from urllib.parse import urlencode
 import json
 
+# Supabase imports
+from supabase_functions import batch_insert_to_supabase, get_next_id_from_supabase_compatible_all
+from supporting_functions import get_uae_current_date
+
 
 # Redirect user to Zid OAuth page
 '''def zid_login(request):
@@ -162,7 +166,7 @@ def home(request):
         products_res = requests.get(f"{settings.ZID_API_BASE}/products", headers=headers_product)
         products_res.raise_for_status()
         products_data = products_res.json()
-        print("Products data fetched successfully:", products_data)
+        #print("Products data fetched successfully:", products_data)
         products = products_data.get('results', [])
         total_products = products_data.get('count', len(products))
         # Process products to extract price and display name
@@ -426,6 +430,21 @@ def save_tracking(request):
     if request.method == "POST":
         data = json.loads(request.body)
         print("Tracking data:", data)
+
+        tracking_entry = {
+        'Distinct_ID': int(get_next_id_from_supabase_compatible_all(name='Tracking_Visitors', column='Distinct_ID')),
+        'Visitor_ID': data.get('visitor_id'),
+        'Visited_at': get_uae_current_date(),
+        'Cookie_ID': data.get('custom_cookie_id'),
+        'Session_ID': data.get('session_id'),
+        'Referrer_Platfrom': data.get('referrer'),
+        'UTM_Source': data.get('utm_source')
+        }
+
+        # Batch insert this data
+        # convert to df
+        tracking_entry_df = pd.DataFrame([tracking_entry])
+        batch_insert_to_supabase(tracking_entry_df, 'Tracking_Visitors')
 
         return JsonResponse({"status": "success"})
     
