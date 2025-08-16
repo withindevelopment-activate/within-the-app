@@ -89,24 +89,15 @@ def home(request):
     auth_token = request.session.get('authorization_token')
     store_id = request.session.get('store_id')
 
-    print("The access token is:", token)
+    '''print("The access token is:", token)
     print("The authorization token is:", auth_token)
     print("The retrieved store id is:", store_id)
-
+'''
 
     headers = {
         'Authorization': f'Bearer {auth_token}',
         'X-MANAGER-TOKEN': token,
     }
-
-    headers_product = {
-            'Authorization': f'Bearer {auth_token}',
-            'X-MANAGER-TOKEN': token, 
-            'accept': 'application/json',
-            'Accept-Language': 'all-languages',
-            'Store-Id': f'{store_id}',
-            'Role': 'Manager',
-        }
 
     profile = {}
     orders = []
@@ -123,11 +114,15 @@ def home(request):
         user_name = profile.get('user', {}).get('name') or profile.get('username')
         store_title = profile.get('user', {}).get('store', {}).get('title', 'Unknown Store')
 
+        # Get the Store ID
+        store_id = profile.get('user', {}).get('store', {}).get('id')
+        if store_id:
+            request.session['store_id'] = store_id
+
         # Fetch orders
         orders_res = requests.get(f"{settings.ZID_API_BASE}/managers/store/orders", headers=headers)
         orders_res.raise_for_status()
         orders_data = orders_res.json()
-        print("Orders data fetched successfully:", orders_data)
 
         # Extract orders and calculate totals
         orders = orders_data.get('orders', [])
@@ -153,6 +148,17 @@ def home(request):
             order["display_status"] = status_obj.get("name") or status_obj.get("code") or "unknown"
 
         # Fetch products
+        # Define the headers to retrieve the products
+        headers_product = {
+            'Authorization': f'Bearer {auth_token}',
+            'X-MANAGER-TOKEN': token, 
+            'accept': 'application/json',
+            'Accept-Language': 'all-languages',
+            'Store-Id': f'{store_id}',
+            'Role': 'Manager',
+        }
+
+        # Call the products --
         products_res = requests.get(f"{settings.ZID_API_BASE}/products", headers=headers_product)
         products_res.raise_for_status()
         products_data = products_res.json()
