@@ -19,6 +19,7 @@
             <label>Analytics CSV</label>
             <input type="file" name="analytics_file" accept=".csv" class="form-control" required>
         </div>
+        <!--
         <div class="col-md-4">
             <label>Start Date</label>
             <input type="date" name="start_date" class="form-control">
@@ -27,6 +28,7 @@
             <label>End Date</label>
             <input type="date" name="end_date" class="form-control">
         </div>
+        -->
         <div class="col-md-3">
             <button type="submit" class="btn btn-primary w-100">Upload & Match</button>
         </div>
@@ -143,7 +145,6 @@
                     <td>{{ row.products_str }}</td>
                     <td>{{ row.order_total }}</td>
                     <td>{{ row.purchase_revenue }}</td>
-                    <td>{{ row.date }}</td>
                 </tr>
                 {% endfor %}
             </tbody>

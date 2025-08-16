@@ -409,7 +409,7 @@ def match_orders_with_analytics(request):
     except Exception as e:
         messages.error(request, f"Error: {str(e)}")
 
-    return render(request, "ads_api/match_orders.html", {
+    return render(request, "Demo/google-zid.html", {
         "matched": matched,
         "total_order_value": round(total_order_value, 2),
         "total_purchase_revenue": round(total_purchase_revenue, 2),
