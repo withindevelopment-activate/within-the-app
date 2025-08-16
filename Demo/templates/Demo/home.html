@@ -107,8 +107,6 @@
     </div>
   </div>
 
-  {% load json_script %}
-
   <!-- Convert data into JSON prior to usage -- Prevents error trails -->
   {{ orders|json_script:"orders-data" }}
   {{ products|json_script:"products-data" }}
