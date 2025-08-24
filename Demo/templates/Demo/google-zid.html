@@ -1,34 +1,17 @@
 {% extends "Demo/base.html" %}
+{% load custom_filters %}
 {% block title %}Order & Analytics Match{% endblock %}
 {% block content %}
-
 <h2 class="mb-4">🔄 Match Orders with Analytics</h2>
 
 <!-- Upload Form -->
 <form method="post" enctype="multipart/form-data" class="mb-4">
     {% csrf_token %}
     <div class="row g-3 align-items-end">
-        <!-- Omit the zid upload section 
-        <div class="col-md-4">
-            <label>Orders Excel (.xlsx)</label>
-            <input type="file" name="orders_file" accept=".xlsx" class="form-control" required>
-        </div>
-        -->
-        
         <div class="col-md-4">
             <label>Analytics CSV</label>
             <input type="file" name="analytics_file" accept=".csv" class="form-control" required>
         </div>
-        <!--
-        <div class="col-md-4">
-            <label>Start Date</label>
-            <input type="date" name="start_date" class="form-control">
-        </div>
-        <div class="col-md-4">
-            <label>End Date</label>
-            <input type="date" name="end_date" class="form-control">
-        </div>
-        -->
         <div class="col-md-3">
             <button type="submit" class="btn btn-primary w-100">Upload & Match</button>
         </div>
@@ -60,7 +43,7 @@
 <!-- Campaign → Products Sold -->
 {% if campaign_product_sales %}
 <h3>Campaign → Products Sold</h3>
-<div class="row row-cols-2 mb-4 g-0 flex-nowrap scroll_overflow-x" style="height: 60vh;">
+<div class="row row-cols-2 mb-4 g-0 flex-nowrap over-all" style="height: 60vh;">
     {% for campaign, products in campaign_product_sales.items %}
     <div class="col">
         <div class="card shadow-sm">
@@ -81,16 +64,22 @@
 
 <!-- KPI Chart -->
 {% if source_metrics %}
-<div class="mb-3">
-    <label for="kpiSelect" class="form-label custom_bg">Select KPI:</label>
-    <select id="kpiSelect" class="form-select custom_bg" style="width: auto;">
-        <option value="Purchase revenue">Purchase Revenue</option>
-        <option value="Ecommerce purchases">Ecommerce Purchases</option>
-        <option value="Ecommerce purchase quantity">Purchase Quantity</option>
-    </select>
+<div class="row mb-5">
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <label for="kpiSelect" class="form-label custom_bg">Select KPI:</label>
+                <select id="kpiSelect" class="form-select custom_bg">
+                    <option value="Purchase revenue">Purchase Revenue</option>
+                    <option value="Ecommerce purchases">Ecommerce Purchases</option>
+                    <option value="Ecommerce purchase quantity">Purchase Quantity</option>
+                </select>
+                <canvas id="sourceRevenueChart" height="100"></canvas>
+            </div>
+        </div>
+    </div>
 </div>
 
-<canvas id="sourceRevenueChart" height="100"></canvas>
 <script>
     const data = JSON.parse('{{ source_metrics|escapejs }}'); // This is fixed -- the previous format is not a valid javascript format.
     const kpiSelect = document.getElementById("kpiSelect");
@@ -118,37 +107,44 @@
 
 <!-- Matched Orders -->
 {% if matched %}
-<div class="card mb-4 scroll_overflow-x">
-    <div class="card-body">
+<div class="data-wrap">
+    <div class="data-viewport">
         <div class="mb-3">
             <label for="campaignFilter" class="form-label">Filter by Campaign:</label>
             <select id="campaignFilter" class="form-select">
                 <option value="">All Campaigns</option>
                 {% for row in matched %}
-                    <option value="{{ row.campaign }}">{{ row.campaign }}</option>
+                <option value="{{ row.campaign }}">{{ row.campaign }}</option>
                 {% endfor %}
             </select>
         </div>
-        <table class="table table-bordered table-striped small align-middle AdsTable">
-            <thead>
-                <tr>
-                    <th>ID</th><th>Status</th><th>Campaign</th>
-                    <th>Product Name</th><th>Order Total</th>
-                    <th>Purchase Revenue</th><th>Date</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for row in matched %}
-                <tr data-campaign="{{ row.campaign }}">
-                    <td>{{ row.id }}</td><td>{{ row.status }}</td>
-                    <td>{{ row.campaign }}</td>
-                    <td>{{ row.products_str }}</td>
-                    <td>{{ row.order_total }}</td>
-                    <td>{{ row.purchase_revenue }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <div class="data-scroller" role="region" aria-label="Scrollable data table" tabindex="0">
+            <table class="data-table" role="table" aria-label="Analytics dataset">
+                <thead>
+                    <tr role="row">
+                        <th>ID</th>
+                        <th>Status</th>
+                        <th class="sticky-col">Campaign</th>
+                        <th>Product Name</th>
+                        <th>Order Total</th>
+                        <th>Purchase Revenue</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in matched %}
+                    <tr data-campaign="{{ row.campaign }}">
+                        <td>{{ row.id }}</td>
+                        <td>{{ row.status }}</td>
+                        <td class="sticky-col">{{ row.campaign }}</td>
+                        <td>{{ row.products_str }}</td>
+                        <td>{{ row.order_total }}</td>
+                        <td>{{ row.purchase_revenue }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 {% endif %}
@@ -164,24 +160,30 @@
         </h2>
         <div id="unmatchedOrders" class="accordion-collapse collapse">
             <div class="accordion-body">
-                <table class="table table-sm table-bordered">
-                    <thead>
-                        <tr>
-                            {% for key in unmatched_orders.0.keys %}
-                            <th>{{ key|title }}</th>
-                            {% endfor %}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for row in unmatched_orders %}
-                        <tr>
-                            {% for value in row.values %}
-                            <td>{{ value }}</td>
-                            {% endfor %}
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                <div class="data-wrap">
+                    <div class="data-viewport">
+                        <div class="data-scroller" role="region" aria-label="Scrollable data table" tabindex="0">
+                            <table class="data-table" role="table" aria-label="Analytics dataset">
+                                <thead>
+                                    <tr role="row">
+                                        {% for key in unmatched_orders.0.keys %}
+                                        <th>{{ key|title }}</th>
+                                        {% endfor %}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in unmatched_orders %}
+                                    <tr>
+                                        {% for value in row.values %}
+                                        <td>{{ value }}</td>
+                                        {% endfor %}
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -189,15 +191,11 @@
 {% endif %}
 
 
-
 <!-- DataTables + Filter Script -->
 <script>
-    $(document).ready(function () {
-        $('.AdsTable').DataTable({ paging: false, order: [[0, "asc"]] });
-    });
     document.getElementById('campaignFilter')?.addEventListener('change', function () {
         var val = this.value.toLowerCase();
-        document.querySelectorAll('.AdsTable tbody tr').forEach(row => {
+        document.querySelectorAll('tbody tr').forEach(row => {
             row.style.display = (!val || row.dataset.campaign.toLowerCase() === val) ? "" : "none";
         });
     });

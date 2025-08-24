@@ -1,74 +1,202 @@
-{% load static %}
 <!DOCTYPE html>
 <html lang="en">
+{% load static %}
+
 <head>
   <meta charset="UTF-8">
   <title>{% block title %}WithIn – Zid Dashboard{% endblock %}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <!-- Bootstrap 5 -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <style>
-    body {
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
-    main {
-      flex: 1;
-    }
-  </style>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="{% static 'CSS/style.css' %}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@100;200;300;400;500;600;700&family=Roboto:ital,wght@0,100..900;1,100..900&display=swap"
+    rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body>
 
-  <!-- Navbar -->
-  <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
-    <div class="container">
-      <a class="navbar-brand fw-bold" href="{% url 'Demo:home' %}">📊 Within</a>
+<body class="d-flex flex-column min-vh-100">
+  <nav class="navbar navbar-expand-lg mb-0">
+    <div class="container-fluid">
+      <a class="navbar-brand fw-bold" href="{% url 'Demo:home' %}"><img src="{% static 'images/logo.png' %}"
+          alt="WithIn Logo" height="50"></a>
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent">
         <span class="navbar-toggler-icon"></span>
       </button>
       <div class="collapse navbar-collapse" id="navbarContent">
+        <ul class="navbar-nav">
+          <li class="nav-item"><a class="nav-link" href="{% url 'Demo:home' %}">Dashboard</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'Demo:match_google' %}">Analytics</a></li>
+        </ul>
         <ul class="navbar-nav ms-auto">
           <li class="nav-item">
-            <a class="nav-link" href="{% url 'Demo:home' %}">Dashboard</a>
+            <form class="d-flex position-relative me-3" role="search" id="searchForm">
+              <input class="form-control me-2" type="search" placeholder="Search..." aria-label="Search"
+                id="searchInput" autocomplete="off">
+              <ul class="list-group position-absolute w-100 shadow" id="searchResults"
+                style="top:100%; z-index:1000; display:none;"></ul>
+            </form>
           </li>
-          <li class="nav-item">
-            <a class="nav-link" href="{% url 'Demo:zid_orders' %}">Orders & Google Analytics</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link text-warning" href="{% url 'Demo:zid_logout' %}">Logout</a>
-          </li>
+          <li class="nav-item"><a class="nav-link text-danger" href="{% url 'Demo:zid_logout' %}">Logout</a></li>
         </ul>
       </div>
     </div>
   </nav>
-{% if messages %}
-    <div class="container mt-2">
-      {% for message in messages %}
-        {% if message.tags == 'error' %}
-          <div class="alert alert-danger">{{ message }}<br>{% if details %}{{ details }}{% endif %}</div>
-        {% else %}
-          <div class="alert alert-success">{{ message }}</div>
-        {% endif %}
-      {% endfor %}
-    </div>
-  {% endif %}
-  <!-- Page Content -->
-  <main class="container mb-5">
-    {% block content %}
-    {% endblock %}
-  </main>
 
-  <!-- Footer -->
-  <footer class="bg-light text-center text-muted py-3 mt-auto">
-    <small>&copy; {{ now|date:"Y" }} <strong>Within</strong> by Within. All rights reserved.</small>
-  </footer>
+  <!-- Layout -->
+  <div class="d-flex">
+    <!-- Main content -->
+    <main class="flex-grow-1 p-4 mb-5 col-lg-9" id="mainContent">
+      {% block content %}{% endblock %}
+    </main>
 
-  <!-- Bootstrap JS -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  
-  <!-- Load the script.js -->
-  <script src="{% static 'script.js' %}"></script>
+    <!-- Sidebar -->
+    <aside id="sidebar" class="p-3">
+      <button id="toggleSidebar"
+        class="btn btn-sm btn-outline-secondary mb-3 w-100 d-flex align-items-center justify-content-center"
+        data-bs-toggle="tooltip" data-bs-placement="left" title="Collapse Sidebar">
+        <i class="bi bi-chevron-bar-right"></i>
+      </button>
+
+      <h6 class="text-muted">Sections</h6>
+      <ul class="sidebar-mini nav flex-column">
+        <li class="nav-item">
+          <a href="{% url 'Demo:home' %}" class="nav-link d-flex align-items-center" data-bs-toggle="tooltip"
+            data-bs-placement="left" title="View Dashboard">
+            <i class="bi bi-speedometer2 me-2"></i>
+            <span class="sidebar-text">Dashboard</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="{% url 'Demo:match_google' %}" class="nav-link d-flex align-items-center" data-bs-toggle="tooltip"
+            data-bs-placement="left" title="View Analytics">
+            <i class="bi bi-graph-up-arrow me-2"></i>
+            <span class="sidebar-text">Analytics</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="#" class="nav-link d-flex align-items-center" data-bs-toggle="tooltip" data-bs-placement="left"
+            title="View Customers">
+            <i class="bi bi-people me-2"></i>
+            <span class="sidebar-text">Customers</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="{% url 'Demo:orders_page' %}" class="nav-link d-flex align-items-center" data-bs-toggle="tooltip" data-bs-placement="left"
+            title="View Orders">
+            <i class="bi bi-box me-2"></i>
+            <span class="sidebar-text">Orders</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="{% url 'Demo:products_page' %}" class="nav-link d-flex align-items-center" data-bs-toggle="tooltip" data-bs-placement="left"
+            title="View Products">
+            <i class="bi bi-bag me-2"></i>
+            <span class="sidebar-text">Products</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="{% url 'Demo:marketing' %}" class="nav-link d-flex align-items-center" data-bs-toggle="tooltip" data-bs-placement="left"
+            title="View Marketing">
+            <i class="bi bi-clipboard-data me-2"></i>
+            <span class="sidebar-text">Marketing</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a href="#" class="nav-link d-flex align-items-center" data-bs-toggle="tooltip" data-bs-placement="left"
+            title="View Abandoned Carts">
+            <i class="bi bi-cart-x me-2"></i>
+            <span class="sidebar-text">Abandoned Carts</span>
+          </a>
+        </li>
+      </ul>
+    </aside>
+  </div>
+
 </body>
+<!-- Footer -->
+<footer class="text-center text-muted py-3 mt-auto">
+  <small>&copy; {{ now|date:"Y" }} <strong>WithIn</strong> by YourCompany. All rights reserved.</small>
+</footer>
+
+<script>
+  // Collapse Sidebar
+  document.addEventListener("DOMContentLoaded", () => {
+    const sidebar = document.getElementById("sidebar");
+    const toggleBtn = document.getElementById("toggleSidebar");
+    const toggleIcon = toggleBtn.querySelector("i");
+
+    // Init tooltips
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    const tooltips = tooltipTriggerList.map(el => new bootstrap.Tooltip(el));
+    tooltips.forEach(t => t.disable());  // Disable tooltips initially
+    toggleBtn.addEventListener("click", () => {
+      sidebar.classList.toggle("collapsed");
+
+      if (sidebar.classList.contains("collapsed")) {
+        toggleIcon.classList.replace("bi-chevron-bar-right", "bi-chevron-bar-left");
+        toggleBtn.setAttribute("title", "Expand Sidebar");
+        tooltips.forEach(t => t.enable());   // enable tooltips
+      } else {
+        toggleIcon.classList.replace("bi-chevron-bar-left", "bi-chevron-bar-right");
+        toggleBtn.setAttribute("title", "Collapse Sidebar");
+        tooltips.forEach(t => t.disable());  // disable tooltips
+      }
+
+      // Refresh tooltip on toggleBtn so new title shows
+      bootstrap.Tooltip.getInstance(toggleBtn)?.dispose();
+      new bootstrap.Tooltip(toggleBtn);
+    });
+  });
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Search Functionality -->
+<script>
+  document.addEventListener("DOMContentLoaded", () => {
+    const searchInput = document.getElementById("searchInput");
+    const searchResults = document.getElementById("searchResults");
+
+    searchInput.addEventListener("keyup", async function () {
+      let query = this.value.trim();
+
+      if (query.length < 2) {
+        searchResults.style.display = "none";
+        return;
+      }
+
+      try {
+        const response = await fetch(`/search/?q=${encodeURIComponent(query)}`);
+        const results = await response.json();
+
+        searchResults.innerHTML = "";
+        if (results.length > 0) {
+          results.forEach(item => {
+            let li = document.createElement("li");
+            li.classList.add("list-group-item", "list-group-item-action");
+            li.innerHTML = `<a href="${item.url}" class="text-decoration-none d-block">${item.title}</a>`;
+            searchResults.appendChild(li);
+          });
+          searchResults.style.display = "block";
+        } else {
+          searchResults.style.display = "none";
+        }
+      } catch (err) {
+        console.error("Search error:", err);
+        searchResults.style.display = "none";
+      }
+    });
+
+    // Hide results when clicking outside
+    document.addEventListener("click", (e) => {
+      if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+        searchResults.style.display = "none";
+      }
+    });
+  });
+</script>
+
 </html>

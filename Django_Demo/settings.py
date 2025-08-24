@@ -49,7 +49,10 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    "whitenoise.middleware.WhiteNoiseMiddleware"
 ]
+
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 ROOT_URLCONF = 'Django_Demo.urls'
 
@@ -125,13 +128,8 @@ DEBUG = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = 'static/'
-
-STATICFILES_DIRS = [
-    BASE_DIR / 'Demo' / 'static', 
-]
-
-STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -144,13 +142,13 @@ LOGOUT_REDIRECT_URL = '/login/'
 
 LOGIN_URL = '/login/'
 
-ZID_CLIENT_ID = os.environ.get('ZID_CLIENT_ID')
-ZID_CLIENT_SECRET = os.environ.get('ZID_CLIENT_SECRET')
 ZID_AUTH_URL = 'https://oauth.zid.sa/oauth/authorize'
 ZID_TOKEN_URL = 'https://oauth.zid.sa/oauth/token'
 ZID_API_BASE = 'https://api.zid.sa/v1'
-ZID_SCOPES = 'orders.read products.read account.read'
-ZID_REDIRECT_URI = 'https://testing-within.onrender.com/zid/callback'
+
+ZID_CLIENT_ID = os.environ.get('ZID_CLIENT_ID')
+ZID_CLIENT_SECRET = os.environ.get('ZID_CLIENT_SECRET')
+ZID_REDIRECT_URI = 'https://zid-sleepy-test.onrender.com/callback'
 
 SESSION_COOKIE_AGE = 3600  # 1 hour
 SESSION_SAVE_EVERY_REQUEST = True

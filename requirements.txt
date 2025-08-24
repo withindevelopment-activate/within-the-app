@@ -12,6 +12,7 @@ charset-normalizer==3.4.2
 deprecation==2.1.0
 dj-database-url==3.0.1
 Django==5.2.4
+et_xmlfile==2.0.0
 frozenlist==1.7.0
 gotrue==2.12.3
 gunicorn==23.0.0
@@ -25,6 +26,7 @@ idna==3.10
 multidict==6.6.3
 narwhals==2.0.1
 numpy==2.3.2
+openpyxl==3.1.5
 packaging==25.0
 pandas==2.3.1
 plotly==6.2.0
@@ -36,6 +38,7 @@ pydantic_core==2.33.2
 PyJWT==2.10.1
 python-dateutil==2.9.0.post0
 pytz==2025.2
+RapidFuzz==3.13.0
 realtime==2.6.0
 requests==2.32.4
 six==1.17.0
@@ -51,5 +54,5 @@ typing_extensions==4.14.1
 tzdata==2025.2
 urllib3==2.5.0
 websockets==15.0.1
+whitenoise==6.9.0
 yarl==1.20.1
-rapidfuzz==3.0.0

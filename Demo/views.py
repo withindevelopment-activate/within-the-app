@@ -10,6 +10,8 @@ from django.http import JsonResponse, HttpResponseBadRequest
 from rapidfuzz import fuzz
 from urllib.parse import urlencode
 import json
+from django.core.files.storage import FileSystemStorage
+import re
 
 # Supabase imports
 from .supabase_functions import batch_insert_to_supabase, get_next_id_from_supabase_compatible_all
@@ -462,3 +464,167 @@ def save_tracking(request):
     batch_insert_to_supabase(tracking_entry_df, 'Tracking_Visitors')
 
     return JsonResponse({"status": "success"})
+
+
+def search_view(request):
+    query = request.GET.get("q", "").lower()
+    results = []
+
+    if query:
+        # Example: search in predefined pages
+        pages = [
+            {"title": "Dashboard", "url": "/"},
+            {"title": "Analytics", "url": "/zid_orders/"},
+            {"title": "Logout", "url": "/zid_logout/"},
+            {"title": "Marketing", "url": "/marketing/"},
+            {"title": "Products", "url": "/zid/products//"},
+            {"title": "Orders", "url": "/zid/orders//"},
+            {"title": "Analytics", "url": "/zid/match_google//"},
+        ]
+        results = [p for p in pages if query in p["title"].lower()]
+
+    return JsonResponse(results, safe=False)
+
+def orders_page(request):
+    token = request.session.get('access_token')
+    auth_token = request.session.get('authorization_token')
+    store_id = request.session.get('store_id')
+
+    if not token:
+        return redirect('Demo:zid_login')
+
+    headers = {
+        'Authorization': f'Bearer {auth_token}',
+        'X-MANAGER-TOKEN': token,
+    }
+
+    try:
+        orders_res = requests.get(f"{settings.ZID_API_BASE}/managers/store/orders", headers=headers)
+        orders_res.raise_for_status()
+        orders_data = orders_res.json()
+        orders = orders_data.get('orders', [])
+
+        # process dates + totals
+        for order in orders:
+            order['order_total'] = float(order.get('order_total', 0))
+            order['display_status'] = order.get('order_status', {}).get('name', 'unknown')
+
+            created_str = order.get("created_at")
+            updated_str = order.get("updated_at")
+            if created_str:
+                try:
+                    order["created_at"] = datetime.strptime(created_str, "%Y-%m-%d %H:%M:%S")
+                    order["updated_at"] = datetime.strptime(updated_str, "%Y-%m-%d %H:%M:%S") if updated_str else order["created_at"]
+                except ValueError:
+                    order["created_at"] = None
+                    order["updated_at"] = None
+
+    except requests.RequestException as e:
+        traceback.print_exc()
+        messages.error(request, f"⚠️ Error fetching orders: {str(e)}")
+        orders = []
+
+    return render(request, 'Demo/orders.html', {
+        'orders': orders,
+        'total_orders': len(orders),
+        'total_revenue': sum(o['order_total'] for o in orders),
+    })
+
+def products_page(request):
+    token = request.session.get('access_token')
+    auth_token = request.session.get('authorization_token')
+    store_id = request.session.get('store_id')
+
+    if not token:
+        return redirect('Demo:zid_login')
+
+    headers_product = {
+        'Authorization': f'Bearer {auth_token}',
+        'X-MANAGER-TOKEN': token,
+        'accept': 'application/json',
+        'Accept-Language': 'all-languages',
+        'Store-Id': f'{store_id}',
+        'Role': 'Manager',
+    }
+
+    products_res = requests.get(f"{settings.ZID_API_BASE}/products", headers=headers_product)
+    products_res.raise_for_status()
+    products_data = products_res.json()
+    print("Products data fetched successfully:", products_data)
+
+    # Extract product list safely
+    products_list = products_data.get("results", [])  # ✅ correct key
+    total_products = products_data.get("total_products_count", len(products_list))
+
+    # KPIs
+    published_count = sum(1 for p in products_list if p.get("is_published"))
+    avg_rating = (
+        round(sum(p.get("rating", {}).get("average", 0) for p in products_list) / total_products, 2)
+        if total_products > 0 else 0
+    )
+    on_sale_count = sum(
+        1 for p in products_list if p.get("sale_price") and p.get("price") and p["sale_price"] < p["price"]
+    )
+
+    context = {
+        "products": products_list,  # send all products
+        "total_products": total_products,
+        "published_count": published_count,
+        "avg_rating": avg_rating,
+        "on_sale_count": on_sale_count,
+    }
+
+    return render(request, "Demo/products_page.html", context)
+
+def safe_name(name):
+    return re.sub(r'[^0-9a-zA-Z_]', '_', str(name))
+
+
+def safe_numeric(value):
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return 0  # fallback if non-numeric
+
+def marketing_page(request):
+    context = {}
+    if request.method == "POST" and request.FILES.get("excel_file"):
+        excel_file = request.FILES["excel_file"]
+
+        # Save uploaded file temporarily
+        fs = FileSystemStorage()
+        filename = fs.save(excel_file.name, excel_file)
+        file_path = fs.path(filename)
+
+        # Read Excel with pandas (all sheets)
+        xls = pd.ExcelFile(file_path)
+        sheets_data = {}
+
+        for sheet_name in xls.sheet_names:
+            df = pd.read_excel(file_path, sheet_name=sheet_name)
+            safe_sheet = safe_name(sheet_name)
+
+            # Extract labels (first column, may be Arabic)
+            labels = df.iloc[:, 0].fillna("").astype(str).tolist()
+
+            # Extract numeric columns after the first one
+            charts = []
+            for col in df.columns[1:]:
+                # Convert all values safely to numeric
+                values = [safe_numeric(v) for v in df[col].tolist()]
+                charts.append({
+                    "column": col,
+                    "values": values
+                })
+
+            sheets_data[sheet_name] = {
+                "columns": df.columns.tolist(),
+                "safe_name": safe_sheet,
+                "rows": df.values.tolist(),
+                "labels": json.dumps(labels, ensure_ascii=False),  # keep Arabic intact
+                "charts": charts,
+            }
+
+        context["sheets"] = sheets_data
+
+    return render(request, "Demo/marketing.html", context)

@@ -8,6 +8,10 @@ urlpatterns = [
     path('zid/callback/', views.zid_callback, name='zid_callback'),
     path('zid/logout/', views.zid_logout, name='zid_logout'),
     path('zid/refresh/', views.zid_refresh_token, name='zid_refresh'),
-    path('zid/orders/', views.match_orders_with_analytics, name='zid_orders'),
-    path('save-tracking/', views.save_tracking, name='save_tracking'), # The path for the visitor tracking
+    path('save-tracking/', views.save_tracking, name='save_tracking'),
+    path('zid/match_google/', views.match_orders_with_analytics, name='match_google'),
+    path('zid/orders/', views.orders_page, name='orders_page'),
+    path('zid/products/', views.products_page, name='products_page'),
+    path("search/", views.search_view, name="search"),
+    path("marketing/", views.marketing_page, name="marketing"), # The path for the visitor tracking
 ]
