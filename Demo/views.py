@@ -468,7 +468,8 @@ def save_tracking(request):
 
     return JsonResponse({"status": "success"})
 
-
+###################################################################################################################3
+###########################################
 def search_view(request):
     query = request.GET.get("q", "").lower()
     results = []
