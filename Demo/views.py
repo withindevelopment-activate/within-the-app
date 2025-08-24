@@ -1,23 +1,19 @@
 from datetime import datetime
-import pandas as pd
 import requests
 from django.conf import settings
 from django.shortcuts import redirect, render
-from django.views.decorators.csrf import csrf_exempt
 from django.contrib import messages
 import traceback
 from django.http import JsonResponse, HttpResponseBadRequest
+import pandas as pd
 from rapidfuzz import fuzz
-from urllib.parse import urlencode
 import json
+import pandas as pd
+from django.core.files.storage import FileSystemStorage
+import re
 
-# Supabase imports
-from .supabase_functions import batch_insert_to_supabase, get_next_id_from_supabase_compatible_all
-from .supporting_functions import get_uae_current_date
-
-
-# Redirect user to Zid OAuth page
-'''def zid_login(request):
+# Step 1: Redirect user to Zid OAuth page
+def zid_login(request):
     params = {
             'client_id': settings.ZID_CLIENT_ID,
             'redirect_uri': settings.ZID_REDIRECT_URI,
@@ -26,20 +22,10 @@ from .supporting_functions import get_uae_current_date
     
     # Add optional parameters if they exist
     query_string = '&'.join([f'{k}={v}' for k, v in params.items()])
-    return redirect(f'{settings.ZID_AUTH_URL}?{query_string}')'''
-
-def zid_login(request):
-    params = {
-        "client_id": settings.ZID_CLIENT_ID,
-        "redirect_uri": settings.ZID_REDIRECT_URI,
-        "response_type": "code",
-    }
-    url = settings.ZID_AUTH_URL
-    auth_url = f"{url}?{urlencode(params)}"
-    return redirect(auth_url)
+    return redirect(f'{settings.ZID_AUTH_URL}?{query_string}')
 
 
-# Handle callback and exchange code for access_token
+# Step 2: Handle callback and exchange code for access_token
 def zid_callback(request):
     code = request.GET.get('code')
     if not code:
@@ -63,15 +49,17 @@ def zid_callback(request):
         refresh_token = token_data.get('refresh_token')
         authorization_token = token_data.get('authorization')
 
-        print("Retrieved Token data:", token_data)
+        # ✅ Save token to session
+        request.session['access_token'] = token_data.get('access_token')
+        request.session['refresh_token'] = token_data.get('refresh_token')
+        request.session['authorization_token'] = token_data.get('authorization')
 
-        # Save tokens to session
-        request.session['access_token'] = access_token
-        request.session['refresh_token'] = refresh_token
-        request.session['authorization_token'] = authorization_token
+        # # Log the tokens for debugging
+        headers = {
+            'Authorization': f'Bearer {authorization_token}',
+            'X-MANAGER-TOKEN': access_token,  # Sometimes needed depending on endpoint
+        }
 
-        ''' 
-        # Commented this part since it is redundant ----
         # Fetch user profile to get store ID
         profile_response = requests.get(f"{settings.ZID_API_BASE}/managers/account/profile", headers=headers)
         profile = profile_response.json() if profile_response.status_code == 200 else {}
@@ -80,7 +68,7 @@ def zid_callback(request):
             request.session['store_id'] = store_id
             print("Store ID saved to session: - views.py:61", store_id)
         else:
-            print("⚠️ Store ID not found in profile response. - views.py:63")'''
+            print("⚠️ Store ID not found in profile response. - views.py:63")
         return redirect('Demo:home')  # go to the home view
 
     except requests.RequestException as e:
@@ -93,15 +81,22 @@ def home(request):
     auth_token = request.session.get('authorization_token')
     store_id = request.session.get('store_id')
 
-    '''print("The access token is:", token)
-    print("The authorization token is:", auth_token)
-    print("The retrieved store id is:", store_id)
-'''
+    if not token:
+        return redirect('Demo:zid_login')
 
     headers = {
         'Authorization': f'Bearer {auth_token}',
         'X-MANAGER-TOKEN': token,
     }
+
+    headers_product = {
+            'Authorization': f'Bearer {auth_token}',
+            'X-MANAGER-TOKEN': token,  # Sometimes needed depending on endpoint
+            'accept': 'application/json',
+            'Accept-Language': 'all-languages',
+            'Store-Id': f'{store_id}',
+            'Role': 'Manager',
+        }
 
     profile = {}
     orders = []
@@ -117,16 +112,13 @@ def home(request):
         profile = profile_res.json()
         user_name = profile.get('user', {}).get('name') or profile.get('username')
         store_title = profile.get('user', {}).get('store', {}).get('title', 'Unknown Store')
-
-        # Get the Store ID
-        store_id = profile.get('user', {}).get('store', {}).get('id')
-        if store_id:
-            request.session['store_id'] = store_id
-
+        if not user_name:
+            return redirect('Demo:zid_login')
         # Fetch orders
         orders_res = requests.get(f"{settings.ZID_API_BASE}/managers/store/orders", headers=headers)
         orders_res.raise_for_status()
         orders_data = orders_res.json()
+        print("Orders data fetched successfully:", orders_data)
 
         # Extract orders and calculate totals
         orders = orders_data.get('orders', [])
@@ -152,21 +144,10 @@ def home(request):
             order["display_status"] = status_obj.get("name") or status_obj.get("code") or "unknown"
 
         # Fetch products
-        # Define the headers to retrieve the products
-        headers_product = {
-            'Authorization': f'Bearer {auth_token}',
-            'X-MANAGER-TOKEN': token, 
-            'accept': 'application/json',
-            'Accept-Language': 'all-languages',
-            'Store-Id': f'{store_id}',
-            'Role': 'Manager',
-        }
-
-        # Call the products --
         products_res = requests.get(f"{settings.ZID_API_BASE}/products", headers=headers_product)
         products_res.raise_for_status()
         products_data = products_res.json()
-        #print("Products data fetched successfully:", products_data)
+        print("Products data fetched successfully:", products_data)
         products = products_data.get('results', [])
         total_products = products_data.get('count', len(products))
         # Process products to extract price and display name
@@ -184,7 +165,7 @@ def home(request):
     # Handle any request errors       
     except requests.RequestException as e:
         traceback.print_exc()
-        messages.error(request, f"Something went wrong: {str(e)}")
+        messages.error(request, f"⚠️ Something went wrong: {str(e)}")
     
     context= {
         'profile': profile,
@@ -199,13 +180,13 @@ def home(request):
 
     return render(request, 'Demo/home.html', context)
 
-# Logout and clear session
+# Step 4: Logout and clear session
 def zid_logout(request):
     request.session.flush()
     messages.success(request, "You have been logged out.")
     return redirect('Demo:zid_login')
 
-# Refresh access token using stored refresh token
+# Step 5: Refresh access token using stored refresh token
 def zid_refresh_token(request):
     """Refresh the access token using session-stored refresh token"""
     refresh_token = request.session.get('refresh_token')
@@ -233,15 +214,6 @@ def zid_refresh_token(request):
 
     return JsonResponse({'status': 'refreshed', 'new_access_token': new_tokens.get('access_token')})
 
-
-
-###############################################################################
-################# ZID ORDERS + GOOGLE ANALYTICS ###############################
-'''
-This section takes in the data from Google Analytics and:
-1- Extracts the Order ID from the Analytics data, locates this order in the store through the API connection.
-2- Performs analysis on pulled information. 
-'''
 def normalize_campaign(name):
     if not isinstance(name, str):
         return ""
@@ -280,6 +252,12 @@ def clean_source(source):
         return "Direct"
     else:
         return source.title()
+
+
+def safe_name(name):
+    return re.sub(r'[^0-9a-zA-Z_]', '_', str(name))
+
+
 
 def get_order_from_zid(order_id , headers):
     """
@@ -418,47 +396,163 @@ def match_orders_with_analytics(request):
         "unmatched_order_total": round(unmatched_order_total, 2),
         "unmatched_analytics_total": round(unmatched_analytics_total, 2),
         "unmatched_merchant_admin_total": round(unmatched_merchant_admin_total, 2),
-        "source_metrics": source_metrics,
+        "source_metrics": json.dumps(source_metrics),
         "campaign_product_sales": campaign_product_sales,
     })
 
 
-#############################################################################################################
-################################## The Visitor Tracking Section #############################################
-@csrf_exempt  # This is added because we are adding the tracking javascript to the app but the store pages likely do not have a <meta name="csrf-token">
-def save_tracking(request):
-    if request.method != "POST":
-        # OPTIONS, GET, etc. just return a simple response -- This avoids errors during the usage of other methods
-        return JsonResponse({"status": "ok"})
+def search_view(request):
+    query = request.GET.get("q", "").lower()
+    results = []
 
-    if not request.body:
-        return JsonResponse({"status": "error", "message": "Empty request body"}, status=400)
+    if query:
+        # Example: search in predefined pages
+        pages = [
+            {"title": "Dashboard", "url": "/"},
+            {"title": "Analytics", "url": "/zid_orders/"},
+            {"title": "Logout", "url": "/zid_logout/"},
+        ]
+        results = [p for p in pages if query in p["title"].lower()]
 
-    try:
-        data = json.loads(request.body)
-    except json.JSONDecodeError:
-        return JsonResponse({"status": "error", "message": "Invalid JSON"}, status=400)
+    return JsonResponse(results, safe=False)
 
-    # Required fields check
-    required_fields = ['visitor_id', 'custom_cookie_id', 'session_id']
-    if not all(field in data and data[field] for field in required_fields):
-        return JsonResponse({"status": "error", "message": "Missing required tracking data"}, status=400)
+def orders_page(request):
+    token = request.session.get('access_token')
+    auth_token = request.session.get('authorization_token')
+    store_id = request.session.get('store_id')
 
-    tracking_entry = {
-        'Distinct_ID': int(get_next_id_from_supabase_compatible_all(name='Tracking_Visitors', column='Distinct_ID')),
-        'Visitor_ID': data.get('visitor_id'),
-        'Visited_at': get_uae_current_date(),
-        'Cookie_ID': data.get('custom_cookie_id'),
-        'Session_ID': data.get('session_id'),
-        'Referrer_Platform': data.get('referrer', ''),
-        'UTM_Source': data.get('utm_source', ''),
-        'Screen_Resolution': data.get('screen_resolution', ''),
-        'Device_Memory': data.get('device_memory', ''),
-        'Timezone': data.get('timezone', ''),
-        'User_Agent': data.get('user_agent', ''),
+    if not token:
+        return redirect('Demo:zid_login')
+
+    headers = {
+        'Authorization': f'Bearer {auth_token}',
+        'X-MANAGER-TOKEN': token,
     }
 
-    tracking_entry_df = pd.DataFrame([tracking_entry])
-    batch_insert_to_supabase(tracking_entry_df, 'Tracking_Visitors')
+    try:
+        orders_res = requests.get(f"{settings.ZID_API_BASE}/managers/store/orders", headers=headers)
+        orders_res.raise_for_status()
+        orders_data = orders_res.json()
+        orders = orders_data.get('orders', [])
 
-    return JsonResponse({"status": "success"})
+        # process dates + totals
+        for order in orders:
+            order['order_total'] = float(order.get('order_total', 0))
+            order['display_status'] = order.get('order_status', {}).get('name', 'unknown')
+
+            created_str = order.get("created_at")
+            updated_str = order.get("updated_at")
+            if created_str:
+                try:
+                    order["created_at"] = datetime.strptime(created_str, "%Y-%m-%d %H:%M:%S")
+                    order["updated_at"] = datetime.strptime(updated_str, "%Y-%m-%d %H:%M:%S") if updated_str else order["created_at"]
+                except ValueError:
+                    order["created_at"] = None
+                    order["updated_at"] = None
+
+    except requests.RequestException as e:
+        traceback.print_exc()
+        messages.error(request, f"⚠️ Error fetching orders: {str(e)}")
+        orders = []
+
+    return render(request, 'Demo/orders.html', {
+        'orders': orders,
+        'total_orders': len(orders),
+        'total_revenue': sum(o['order_total'] for o in orders),
+    })
+
+def products_page(request):
+    token = request.session.get('access_token')
+    auth_token = request.session.get('authorization_token')
+    store_id = request.session.get('store_id')
+
+    if not token:
+        return redirect('Demo:zid_login')
+
+    headers_product = {
+        'Authorization': f'Bearer {auth_token}',
+        'X-MANAGER-TOKEN': token,
+        'accept': 'application/json',
+        'Accept-Language': 'all-languages',
+        'Store-Id': f'{store_id}',
+        'Role': 'Manager',
+    }
+
+    products_res = requests.get(f"{settings.ZID_API_BASE}/products", headers=headers_product)
+    products_res.raise_for_status()
+    products_data = products_res.json()
+    print("Products data fetched successfully:", products_data)
+
+    # Extract product list safely
+    products_list = products_data.get("results", [])  # ✅ correct key
+    total_products = products_data.get("total_products_count", len(products_list))
+
+    # KPIs
+    published_count = sum(1 for p in products_list if p.get("is_published"))
+    avg_rating = (
+        round(sum(p.get("rating", {}).get("average", 0) for p in products_list) / total_products, 2)
+        if total_products > 0 else 0
+    )
+    on_sale_count = sum(
+        1 for p in products_list if p.get("sale_price") and p.get("price") and p["sale_price"] < p["price"]
+    )
+
+    context = {
+        "products": products_list,  # send all products
+        "total_products": total_products,
+        "published_count": published_count,
+        "avg_rating": avg_rating,
+        "on_sale_count": on_sale_count,
+    }
+
+    return render(request, "Demo/products_page.html", context)
+
+
+def safe_numeric(value):
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return 0  # fallback if non-numeric
+
+def marketing_page(request):
+    context = {}
+    if request.method == "POST" and request.FILES.get("excel_file"):
+        excel_file = request.FILES["excel_file"]
+
+        # Save uploaded file temporarily
+        fs = FileSystemStorage()
+        filename = fs.save(excel_file.name, excel_file)
+        file_path = fs.path(filename)
+
+        # Read Excel with pandas (all sheets)
+        xls = pd.ExcelFile(file_path)
+        sheets_data = {}
+
+        for sheet_name in xls.sheet_names:
+            df = pd.read_excel(file_path, sheet_name=sheet_name)
+            safe_sheet = safe_name(sheet_name)
+
+            # Extract labels (first column, may be Arabic)
+            labels = df.iloc[:, 0].fillna("").astype(str).tolist()
+
+            # Extract numeric columns after the first one
+            charts = []
+            for col in df.columns[1:]:
+                # Convert all values safely to numeric
+                values = [safe_numeric(v) for v in df[col].tolist()]
+                charts.append({
+                    "column": col,
+                    "values": values
+                })
+
+            sheets_data[sheet_name] = {
+                "columns": df.columns.tolist(),
+                "safe_name": safe_sheet,
+                "rows": df.values.tolist(),
+                "labels": json.dumps(labels, ensure_ascii=False),  # keep Arabic intact
+                "charts": charts,
+            }
+
+        context["sheets"] = sheets_data
+
+    return render(request, "Demo/marketing.html", context)

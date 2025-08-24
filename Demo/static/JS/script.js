@@ -45,7 +45,6 @@ document.addEventListener("DOMContentLoaded", function () {
       button.classList.remove('active');
     }
   });
-
 });
 
 

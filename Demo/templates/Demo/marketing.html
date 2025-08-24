@@ -1,0 +1,160 @@
+{% extends "Demo/base.html" %}
+
+{% block title %} Marketing {% endblock title %}
+{% load custom_filters %}
+
+{% block content %}
+<div class="container py-4">
+    <h2 class="mb-4">Upload Excel File</h2>
+    <form method="POST" enctype="multipart/form-data" class="mb-4">
+        {% csrf_token %}
+        <div class="mb-3">
+            <input type="file" name="excel_file" class="form-control" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Upload</button>
+    </form>
+
+{% if sheets %}
+  <ul class="nav nav-tabs" id="myTab" role="tablist">
+    {% for sheet, data in sheets.items %}
+      <li class="nav-item">
+        <button class="nav-link {% if forloop.first %}active{% endif %}" 
+                data-bs-toggle="tab" data-bs-target="#{{ data.safe_name }}">
+          {{ data.safe_name }}
+        </button>
+      </li>
+    {% endfor %}
+  </ul>
+
+  <div class="tab-content mt-3">
+    {% for sheet, data in sheets.items %}
+      <div class="tab-pane fade {% if forloop.first %}show active{% endif %}" id="{{ data.safe_name }}">
+        
+        <div class="data-wrap">
+            <div class="data-viewport">
+                <div class="data-scroller" role="region" aria-label="Scrollable data table" tabindex="0">
+                    <table class="data-table" role="table" aria-label="Analytics dataset">
+                        <thead>
+                            <tr>
+                                {% for col in data.columns %}
+                                <th>{{ col }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in data.rows %}
+                            <tr>
+                                {% for cell in row %}
+                                <td>{{ cell }}</td>
+                                {% endfor %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="row mt-4">
+            {% for chart in data.charts %}
+                <div class="col-lg-6 col-md-10 mb-4">
+                    <div class="card shadow-sm">
+                        <div class="card-body" style="padding-right: 8rem;">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h6>{{ chart.column }}</h6>
+                                <select id="chartType-{{ data.safe_name }}-{{ forloop.counter }}" class="form-select form-select-sm" style="width:120px;">
+                                <option value="bar" selected>Bar</option>
+                                <option value="line">Line</option>
+                                <option value="pie">Pie</option>
+                                <option value="doughnut">Doughnut</option>
+                                </select>
+                            </div>
+                            <div class="chart-wrapper d-flex" style="height: 300px;">
+                                <canvas id="chart-{{ data.safe_name }}-{{ forloop.counter }}" class="flex-grow-1"></canvas>
+                                <div id="legend-{{ data.safe_name }}-{{ forloop.counter }}" 
+                                    class="legend-container"
+                                    style="max-height: 380px; overflow-y: auto; min-width: 180px;">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+            </div>
+
+            <script>
+                document.addEventListener("DOMContentLoaded", function() {
+                    const labels_{{ data.safe_name }} = {{ data.labels|safe }};
+                    {% for chart in data.charts %}
+                        const values_{{ data.safe_name }}_{{ forloop.counter }} = {{ chart.values|safe }};
+                        const ctx_{{ data.safe_name }}_{{ forloop.counter }} = document.getElementById("chart-{{ data.safe_name }}-{{ forloop.counter }}");
+
+                        function renderLegend(chart, legendId) {
+                            const legendContainer = document.getElementById(legendId);
+                            if (!legendContainer) return;
+
+                            const items = Chart.helpers
+                                .toFont
+                                ? chart.options.plugins.legend.labels.generateLabels(chart)
+                                : [];
+
+                            legendContainer.innerHTML = items.map(item => `
+                                <div class="legend-item d-flex align-items-center mb-1">
+                                    <span class="legend-box" style="
+                                        background:${item.fillStyle};
+                                        border:1px solid ${item.strokeStyle};
+                                        width:12px; height:12px; display:inline-block; margin-right:6px;">
+                                    </span>
+                                    <span>${item.text}</span>
+                                </div>
+                            `).join("");
+                        }
+
+
+                        let chartInstance_{{ data.safe_name }}_{{ forloop.counter }} = new Chart(ctx_{{ data.safe_name }}_{{ forloop.counter }}, {
+                            type: 'bar',
+                            data: { 
+                                labels: labels_{{ data.safe_name }}, 
+                                datasets: [{ label: '{{ chart.column }}', data: values_{{ data.safe_name }}_{{ forloop.counter }} }] 
+                            },
+                            options: {
+                                maintainAspectRatio: false,
+                                responsive: true,
+                                plugins: { legend: { display: false } }, // disable default legend
+                                layout: { padding: { right: 30 } }
+                            }
+                        });
+
+                        renderLegend(chartInstance_{{ data.safe_name }}_{{ forloop.counter }}, "legend-{{ data.safe_name }}-{{ forloop.counter }}");
+
+                        document.getElementById("chartType-{{ data.safe_name }}-{{ forloop.counter }}").addEventListener("change", function(e) {
+                            chartInstance_{{ data.safe_name }}_{{ forloop.counter }}.destroy();
+                            chartInstance_{{ data.safe_name }}_{{ forloop.counter }} = new Chart(ctx_{{ data.safe_name }}_{{ forloop.counter }}, {
+                                type: e.target.value,
+                                data: { 
+                                    labels: labels_{{ data.safe_name }}, 
+                                    datasets: [{ label: '{{ chart.column }}', data: values_{{ data.safe_name }}_{{ forloop.counter }} }] 
+                                },
+                                options: {
+                                    maintainAspectRatio: false,
+                                    responsive: true,
+                                    plugins: { legend: { display: false } },
+                                    layout: { padding: { right: 30 } }
+                                }
+                            });
+                            renderLegend(chartInstance_{{ data.safe_name }}_{{ forloop.counter }}, "legend-{{ data.safe_name }}-{{ forloop.counter }}");
+                        });
+                    {% endfor %}
+                });
+                </script>
+
+        </div>
+    {% endfor %}
+    </div>
+{% endif %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+{% endblock %}
