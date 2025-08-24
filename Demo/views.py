@@ -118,6 +118,9 @@ def home(request):
         profile_res.raise_for_status()
         profile = profile_res.json()
         user_name = profile.get('user', {}).get('name') or profile.get('username')
+        if not user_name:
+            print("Couldn't retrieve username")
+            user_name = 'Default'
         store_title = profile.get('user', {}).get('store', {}).get('title', 'Unknown Store')
 
         # Get the Store ID
