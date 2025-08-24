@@ -13,7 +13,7 @@ import json
 from django.core.files.storage import FileSystemStorage
 import re
 
-# Supabase imports
+# Supabase & Supporting imports
 from .supabase_functions import batch_insert_to_supabase, get_next_id_from_supabase_compatible_all
 from .supporting_functions import get_uae_current_date
 

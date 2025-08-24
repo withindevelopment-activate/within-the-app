@@ -190,6 +190,35 @@
 </div>
 {% endif %}
 
+{% if unmatched_analytics %}
+<div class="accordion mb-4" id="accordionUnmatchedAnalytics">
+    <div class="accordion-item">
+        <h2 class="accordion-header">
+            <button class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#unmatchedAnalytics">
+                🚫 Unmatched Analytics ({{ unmatched_analytics|length }})
+            </button>
+        </h2>
+        <div id="unmatchedAnalytics" class="accordion-collapse collapse">
+            <div class="accordion-body">
+                <table class="table table-sm table-bordered">
+                    <thead>
+                        <tr><th>Transaction ID</th><th>Purchase Revenue</th><th>Date</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for row in unmatched_analytics %}
+                        <tr>
+                            <td>{{ row|get_item:"Transaction ID" }}</td>
+                            <td>{{ row|get_item:"Purchase revenue" }}</td>
+                            <td>{{ row|get_item:"date" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 <!-- DataTables + Filter Script -->
 <script>
