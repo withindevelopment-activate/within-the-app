@@ -141,11 +141,11 @@ def home(request):
 
         # Extract orders and calculate totals
         orders = orders_data.get('orders', [])
-        print("The orders payload is:", orders)
-        for order in orders[:5]:
-            print(order)
+        #print("The orders payload is:", orders)
+        '''for order in orders[:5]:
+            print(order)'''
         total_orders = round(orders_data.get('total_order_count', len(orders)), 2)
-        total_revenue = sum(float(order['transaction_amount'] for order in orders))
+        total_revenue = sum(float(order['transaction_amount']) for order in orders)
         total_revenue = round(total_revenue, 2)
 
         # Process orders to extract total and status
@@ -586,7 +586,7 @@ def orders_page(request):
     return render(request, 'Demo/orders.html', {
         'orders': orders,
         'total_orders': len(orders),
-        'total_revenue': sum(o['order_total'] for o in orders),
+        'total_revenue': sum(float(order['transaction_amount']) for order in orders)
     })
 
 def products_page(request):
