@@ -5,13 +5,50 @@
 
 {% block content %}
 <div class="container py-4">
-    <h2 class="mb-4">Upload Excel File</h2>
-    <form method="POST" enctype="multipart/form-data" class="mb-4">
-        {% csrf_token %}
-        <div class="mb-3">
-            <input type="file" name="excel_file" class="form-control" required>
+    <h2 class="mb-4">رفع ملفات السوشل ميديا</h2>
+    <form id="marketing-report-form" enctype="multipart/form-data">
+        <!-- Date Selection -->
+        <div class="date-selection">
+            <label for="start_time">Start Date:</label>
+            <input type="date" id="start_time" name="start_time" required>
+            
+            <label for="end_time">End Date:</label>
+            <input type="date" id="end_time" name="end_time" required>
+        </div><br><br>
+
+        <!-- File Uploads -->
+        <div class="file-upload-form">
+            <label for="file1">Facebook File:</label>
+            <input type="file" id="file1" name="file1" accept=".xlsx" required>
         </div>
-        <button type="submit" class="btn btn-primary">Upload</button>
+        
+        <div class="file-upload-form">
+            <label for="file2">Tiktok File:</label>
+            <input type="file" id="file2" name="file2" accept=".xlsx" required>
+        </div>
+        
+        <div class="file-upload-form">
+            <label for="file3">Snapchat File:</label>
+            <input type="file" id="file3" name="file3" accept=".xlsx" required>
+        </div>
+        
+        <div class="file-upload-form">
+            <label for="file4">Google ADS File:</label>
+            <input type="file" id="file4" name="file4" accept=".xlsx" required>
+        </div>
+        
+        <div class="file-upload-form">
+            <label for="file5">Zid File:</label>
+            <input type="file" id="file5" name="file5" accept=".xlsx" required>
+        </div>
+
+        <div class="file-upload-form">
+            <label for="file6">Google Analytics File:</label>
+            <input type="file" id="file6" name="file6" accept=".xlsx" required>
+        </div>
+        
+        <!-- Submit all button -->
+        <button type="submit" id="global-submit" class="btn btn-primary">Submit</button>
     </form>
 
 {% if sheets %}
@@ -26,10 +63,12 @@
     {% endfor %}
   </ul>
 
+   <!-- Tab Content -->
   <div class="tab-content mt-3">
     {% for sheet, data in sheets.items %}
       <div class="tab-pane fade {% if forloop.first %}show active{% endif %}" id="{{ data.safe_name }}">
         
+        <!-- Table Section -->
         <div class="data-wrap">
             <div class="data-viewport">
                 <div class="data-scroller" role="region" aria-label="Scrollable data table" tabindex="0">
@@ -55,103 +94,68 @@
             </div>
         </div>
 
-        <!-- Charts -->
-        <div class="row mt-4">
-            {% for chart in data.charts %}
-                <div class="col-lg-6 col-md-10 mb-4">
-                    <div class="card shadow-sm">
-                        <div class="card-body" style="padding-right: 8rem;">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <h6>{{ chart.column }}</h6>
-                                <select id="chartType-{{ data.safe_name }}-{{ forloop.counter }}" class="form-select form-select-sm" style="width:120px;">
-                                <option value="bar" selected>Bar</option>
-                                <option value="line">Line</option>
-                                <option value="pie">Pie</option>
-                                <option value="doughnut">Doughnut</option>
-                                </select>
-                            </div>
-                            <div class="chart-wrapper d-flex" style="height: 300px;">
-                                <canvas id="chart-{{ data.safe_name }}-{{ forloop.counter }}" class="flex-grow-1"></canvas>
-                                <div id="legend-{{ data.safe_name }}-{{ forloop.counter }}" 
-                                    class="legend-container"
-                                    style="max-height: 380px; overflow-y: auto; min-width: 180px;">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            {% endfor %}
-            </div>
+        <!-- Include the Charts file -->
+        {% include "charts.html" with data=data %}
 
-            <script>
-                document.addEventListener("DOMContentLoaded", function() {
-                    const labels_{{ data.safe_name }} = {{ data.labels|safe }};
-                    {% for chart in data.charts %}
-                        const values_{{ data.safe_name }}_{{ forloop.counter }} = {{ chart.values|safe }};
-                        const ctx_{{ data.safe_name }}_{{ forloop.counter }} = document.getElementById("chart-{{ data.safe_name }}-{{ forloop.counter }}");
-
-                        function renderLegend(chart, legendId) {
-                            const legendContainer = document.getElementById(legendId);
-                            if (!legendContainer) return;
-
-                            const items = Chart.helpers
-                                .toFont
-                                ? chart.options.plugins.legend.labels.generateLabels(chart)
-                                : [];
-
-                            legendContainer.innerHTML = items.map(item => `
-                                <div class="legend-item d-flex align-items-center mb-1">
-                                    <span class="legend-box" style="
-                                        background:${item.fillStyle};
-                                        border:1px solid ${item.strokeStyle};
-                                        width:12px; height:12px; display:inline-block; margin-right:6px;">
-                                    </span>
-                                    <span>${item.text}</span>
-                                </div>
-                            `).join("");
-                        }
-
-
-                        let chartInstance_{{ data.safe_name }}_{{ forloop.counter }} = new Chart(ctx_{{ data.safe_name }}_{{ forloop.counter }}, {
-                            type: 'bar',
-                            data: { 
-                                labels: labels_{{ data.safe_name }}, 
-                                datasets: [{ label: '{{ chart.column }}', data: values_{{ data.safe_name }}_{{ forloop.counter }} }] 
-                            },
-                            options: {
-                                maintainAspectRatio: false,
-                                responsive: true,
-                                plugins: { legend: { display: false } }, // disable default legend
-                                layout: { padding: { right: 30 } }
-                            }
-                        });
-
-                        renderLegend(chartInstance_{{ data.safe_name }}_{{ forloop.counter }}, "legend-{{ data.safe_name }}-{{ forloop.counter }}");
-
-                        document.getElementById("chartType-{{ data.safe_name }}-{{ forloop.counter }}").addEventListener("change", function(e) {
-                            chartInstance_{{ data.safe_name }}_{{ forloop.counter }}.destroy();
-                            chartInstance_{{ data.safe_name }}_{{ forloop.counter }} = new Chart(ctx_{{ data.safe_name }}_{{ forloop.counter }}, {
-                                type: e.target.value,
-                                data: { 
-                                    labels: labels_{{ data.safe_name }}, 
-                                    datasets: [{ label: '{{ chart.column }}', data: values_{{ data.safe_name }}_{{ forloop.counter }} }] 
-                                },
-                                options: {
-                                    maintainAspectRatio: false,
-                                    responsive: true,
-                                    plugins: { legend: { display: false } },
-                                    layout: { padding: { right: 30 } }
-                                }
-                            });
-                            renderLegend(chartInstance_{{ data.safe_name }}_{{ forloop.counter }}, "legend-{{ data.safe_name }}-{{ forloop.counter }}");
-                        });
-                    {% endfor %}
-                });
-                </script>
-
-        </div>
+      </div>
     {% endfor %}
-    </div>
+  </div>
+{% endif %}
+</div>
+<script>
+    // The script for the AJAX call for the marketing report
+    $('#marketing-report-form').on('submit', function (event) {
+        event.preventDefault();
+
+        let allFilesSelected = true;
+        let missingFileForm = null;
+
+        $('.file-upload-form').each(function () {
+            const fileInput = $(this).find('input[type="file"]');
+            if (!fileInput[0].files.length) {
+                allFilesSelected = false;
+                missingFileForm = $(this);
+                return false;
+            }
+        });
+
+        if (!allFilesSelected) {
+            const formId = missingFileForm.find('input[type="file"]').attr('name');
+            alert(`Form with ID ${formId} does not have a file uploaded.`);
+            return;
+        }
+
+        const startTime = $('#start_time').val();
+        const endTime = $('#end_time').val();
+
+        if (!startTime || !endTime) {
+            alert("Please select both start and end dates.");
+            return;
+        }
+
+        const formData = new FormData(this);
+        formData.append("start_time", startTime);
+        formData.append("end_time", endTime);
+
+        $.ajax({
+            url: "{% url 'process_marketing_report' %}",
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function (response) {
+                window.location.href = response.download_url;
+            },
+            error: function (xhr, status, error) {
+                alert(`Error uploading files: ${xhr.responseText}`);
+            }
+        });
+    });
+
+</script>
+</div>
+{% endfor %}
+</div>
 {% endif %}
 </div>
 

@@ -1,0 +1,88 @@
+<div class="charts-wrapper">
+    {% for chart in data.charts %}
+        <div class="chart-container mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="mb-0">{{ chart.column }}</h6>
+                <select id="chartType-{{ data.safe_name }}-{{ forloop.counter }}" class="form-select form-select-sm w-auto">
+                    <option value="bar">Bar</option>
+                    <option value="line">Line</option>
+                    <option value="pie">Pie</option>
+                    <option value="doughnut">Doughnut</option>
+                </select>
+            </div>
+            <div style="height:300px;">
+                <canvas id="chart-{{ data.safe_name }}-{{ forloop.counter }}"></canvas>
+            </div>
+            <div id="legend-{{ data.safe_name }}-{{ forloop.counter }}" class="mt-2"></div>
+        </div>
+    {% endfor %}
+</div>
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const labels_{{ data.safe_name }} = {{ data.labels|safe }};
+
+    {% for chart in data.charts %}
+        const values_{{ data.safe_name }}_{{ forloop.counter }} = {{ chart.values|safe }};
+        const ctx_{{ data.safe_name }}_{{ forloop.counter }} = document.getElementById("chart-{{ data.safe_name }}-{{ forloop.counter }}");
+
+        function renderLegend(chart, legendId) {
+            const legendContainer = document.getElementById(legendId);
+            if (!legendContainer) return;
+
+            const items = Chart.helpers
+                .toFont
+                ? chart.options.plugins.legend.labels.generateLabels(chart)
+                : [];
+
+            legendContainer.innerHTML = items.map(item => `
+                <div class="legend-item d-flex align-items-center mb-1">
+                    <span class="legend-box" style="
+                        background:${item.fillStyle};
+                        border:1px solid ${item.strokeStyle};
+                        width:12px; height:12px; display:inline-block; margin-right:6px;">
+                    </span>
+                    <span>${item.text}</span>
+                </div>
+            `).join("");
+        }
+
+        let chartInstance_{{ data.safe_name }}_{{ forloop.counter }} = new Chart(ctx_{{ data.safe_name }}_{{ forloop.counter }}, {
+            type: 'bar',
+            data: { 
+                labels: labels_{{ data.safe_name }}, 
+                datasets: [{ label: '{{ chart.column }}', data: values_{{ data.safe_name }}_{{ forloop.counter }} }] 
+            },
+            options: {
+                maintainAspectRatio: false,
+                responsive: true,
+                plugins: { legend: { display: false } },
+                layout: { padding: { right: 30 } }
+            }
+        });
+
+        renderLegend(chartInstance_{{ data.safe_name }}_{{ forloop.counter }}, "legend-{{ data.safe_name }}-{{ forloop.counter }}");
+
+        document.getElementById("chartType-{{ data.safe_name }}-{{ forloop.counter }}").addEventListener("change", function(e) {
+            chartInstance_{{ data.safe_name }}_{{ forloop.counter }}.destroy();
+            chartInstance_{{ data.safe_name }}_{{ forloop.counter }} = new Chart(ctx_{{ data.safe_name }}_{{ forloop.counter }}, {
+                type: e.target.value,
+                data: { 
+                    labels: labels_{{ data.safe_name }}, 
+                    datasets: [{ label: '{{ chart.column }}', data: values_{{ data.safe_name }}_{{ forloop.counter }} }] 
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    layout: { padding: { right: 30 } }
+                }
+            });
+            renderLegend(chartInstance_{{ data.safe_name }}_{{ forloop.counter }}, "legend-{{ data.safe_name }}-{{ forloop.counter }}");
+        });
+    {% endfor %}
+});
+</script>
+{% endblock %}
