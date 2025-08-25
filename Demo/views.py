@@ -1,19 +1,30 @@
 from datetime import datetime
+import pandas as pd
 import requests
 from django.conf import settings
 from django.shortcuts import redirect, render
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
 from django.contrib import messages
 import traceback
-from django.http import JsonResponse, HttpResponseBadRequest
-import pandas as pd
+from django.http import JsonResponse, HttpResponseBadRequest, HttpResponse
+from django.template.loader import render_to_string
 from rapidfuzz import fuzz
+from urllib.parse import urlencode
 import json
-import pandas as pd
 from django.core.files.storage import FileSystemStorage
 import re
+import asyncio
+from io import BytesIO
 
-# Step 1: Redirect user to Zid OAuth page
-def zid_login(request):
+# Supabase & Supporting imports
+from .supabase_functions import batch_insert_to_supabase, get_next_id_from_supabase_compatible_all
+from .supporting_functions import get_uae_current_date
+# Marketing Report functions
+from .marketing_report import create_general_analysis, create_product_percentage_amount_spent, landing_performance_5_async, column_check
+
+# Redirect user to Zid OAuth page
+'''def zid_login(request):
     params = {
             'client_id': settings.ZID_CLIENT_ID,
             'redirect_uri': settings.ZID_REDIRECT_URI,
@@ -22,10 +33,20 @@ def zid_login(request):
     
     # Add optional parameters if they exist
     query_string = '&'.join([f'{k}={v}' for k, v in params.items()])
-    return redirect(f'{settings.ZID_AUTH_URL}?{query_string}')
+    return redirect(f'{settings.ZID_AUTH_URL}?{query_string}')'''
+
+def zid_login(request):
+    params = {
+        "client_id": settings.ZID_CLIENT_ID,
+        "redirect_uri": settings.ZID_REDIRECT_URI,
+        "response_type": "code",
+    }
+    url = settings.ZID_AUTH_URL
+    auth_url = f"{url}?{urlencode(params)}"
+    return redirect(auth_url)
 
 
-# Step 2: Handle callback and exchange code for access_token
+# Handle callback and exchange code for access_token
 def zid_callback(request):
     code = request.GET.get('code')
     if not code:
@@ -49,17 +70,15 @@ def zid_callback(request):
         refresh_token = token_data.get('refresh_token')
         authorization_token = token_data.get('authorization')
 
-        # ✅ Save token to session
-        request.session['access_token'] = token_data.get('access_token')
-        request.session['refresh_token'] = token_data.get('refresh_token')
-        request.session['authorization_token'] = token_data.get('authorization')
+        print("Retrieved Token data:", token_data)
 
-        # # Log the tokens for debugging
-        headers = {
-            'Authorization': f'Bearer {authorization_token}',
-            'X-MANAGER-TOKEN': access_token,  # Sometimes needed depending on endpoint
-        }
+        # Save tokens to session
+        request.session['access_token'] = access_token
+        request.session['refresh_token'] = refresh_token
+        request.session['authorization_token'] = authorization_token
 
+        ''' 
+        # Commented this part since it is redundant ----
         # Fetch user profile to get store ID
         profile_response = requests.get(f"{settings.ZID_API_BASE}/managers/account/profile", headers=headers)
         profile = profile_response.json() if profile_response.status_code == 200 else {}
@@ -68,7 +87,7 @@ def zid_callback(request):
             request.session['store_id'] = store_id
             print("Store ID saved to session: - views.py:61", store_id)
         else:
-            print("⚠️ Store ID not found in profile response. - views.py:63")
+            print("⚠️ Store ID not found in profile response. - views.py:63")'''
         return redirect('Demo:home')  # go to the home view
 
     except requests.RequestException as e:
@@ -81,22 +100,15 @@ def home(request):
     auth_token = request.session.get('authorization_token')
     store_id = request.session.get('store_id')
 
-    if not token:
-        return redirect('Demo:zid_login')
+    '''print("The access token is:", token)
+    print("The authorization token is:", auth_token)
+    print("The retrieved store id is:", store_id)
+'''
 
     headers = {
         'Authorization': f'Bearer {auth_token}',
         'X-MANAGER-TOKEN': token,
     }
-
-    headers_product = {
-            'Authorization': f'Bearer {auth_token}',
-            'X-MANAGER-TOKEN': token,  # Sometimes needed depending on endpoint
-            'accept': 'application/json',
-            'Accept-Language': 'all-languages',
-            'Store-Id': f'{store_id}',
-            'Role': 'Manager',
-        }
 
     profile = {}
     orders = []
@@ -110,20 +122,30 @@ def home(request):
         profile_res = requests.get(f"{settings.ZID_API_BASE}/managers/account/profile", headers=headers)
         profile_res.raise_for_status()
         profile = profile_res.json()
-        user_name = profile.get('user', {}).get('name') or profile.get('username')
-        store_title = profile.get('user', {}).get('store', {}).get('title', 'Unknown Store')
+        user_name = profile.get('user', {}).get('name') or profile.get('username', 'Default')
+        #user_name = 'Default'
         if not user_name:
-            return redirect('Demo:zid_login')
+            print("Couldn't retrieve username")
+            user_name = 'Default'
+        store_title = profile.get('user', {}).get('store', {}).get('title', 'Unknown Store')
+
+        # Get the Store ID
+        store_id = profile.get('user', {}).get('store', {}).get('id')
+        if store_id:
+            request.session['store_id'] = store_id
+
         # Fetch orders
         orders_res = requests.get(f"{settings.ZID_API_BASE}/managers/store/orders", headers=headers)
         orders_res.raise_for_status()
         orders_data = orders_res.json()
-        print("Orders data fetched successfully:", orders_data)
 
         # Extract orders and calculate totals
         orders = orders_data.get('orders', [])
+        #print("The orders payload is:", orders)
+        '''for order in orders[:5]:
+            print(order)'''
         total_orders = round(orders_data.get('total_order_count', len(orders)), 2)
-        total_revenue = sum(float(o.get('order_total' , 0)) for o in orders)
+        total_revenue = sum(float(order['transaction_amount']) for order in orders)
         total_revenue = round(total_revenue, 2)
 
         # Process orders to extract total and status
@@ -144,10 +166,21 @@ def home(request):
             order["display_status"] = status_obj.get("name") or status_obj.get("code") or "unknown"
 
         # Fetch products
+        # Define the headers to retrieve the products
+        headers_product = {
+            'Authorization': f'Bearer {auth_token}',
+            'X-MANAGER-TOKEN': token, 
+            'accept': 'application/json',
+            'Accept-Language': 'all-languages',
+            'Store-Id': f'{store_id}',
+            'Role': 'Manager',
+        }
+
+        # Call the products --
         products_res = requests.get(f"{settings.ZID_API_BASE}/products", headers=headers_product)
         products_res.raise_for_status()
         products_data = products_res.json()
-        print("Products data fetched successfully:", products_data)
+        #print("Products data fetched successfully:", products_data)
         products = products_data.get('results', [])
         total_products = products_data.get('count', len(products))
         # Process products to extract price and display name
@@ -165,7 +198,7 @@ def home(request):
     # Handle any request errors       
     except requests.RequestException as e:
         traceback.print_exc()
-        messages.error(request, f"⚠️ Something went wrong: {str(e)}")
+        messages.error(request, f"Something went wrong: {str(e)}")
     
     context= {
         'profile': profile,
@@ -180,13 +213,13 @@ def home(request):
 
     return render(request, 'Demo/home.html', context)
 
-# Step 4: Logout and clear session
+# Logout and clear session
 def zid_logout(request):
     request.session.flush()
     messages.success(request, "You have been logged out.")
     return redirect('Demo:zid_login')
 
-# Step 5: Refresh access token using stored refresh token
+# Refresh access token using stored refresh token
 def zid_refresh_token(request):
     """Refresh the access token using session-stored refresh token"""
     refresh_token = request.session.get('refresh_token')
@@ -214,6 +247,15 @@ def zid_refresh_token(request):
 
     return JsonResponse({'status': 'refreshed', 'new_access_token': new_tokens.get('access_token')})
 
+
+
+###############################################################################
+################# ZID ORDERS + GOOGLE ANALYTICS ###############################
+'''
+This section takes in the data from Google Analytics and:
+1- Extracts the Order ID from the Analytics data, locates this order in the store through the API connection.
+2- Performs analysis on pulled information. 
+'''
 def normalize_campaign(name):
     if not isinstance(name, str):
         return ""
@@ -252,12 +294,6 @@ def clean_source(source):
         return "Direct"
     else:
         return source.title()
-
-
-def safe_name(name):
-    return re.sub(r'[^0-9a-zA-Z_]', '_', str(name))
-
-
 
 def get_order_from_zid(order_id , headers):
     """
@@ -396,11 +432,99 @@ def match_orders_with_analytics(request):
         "unmatched_order_total": round(unmatched_order_total, 2),
         "unmatched_analytics_total": round(unmatched_analytics_total, 2),
         "unmatched_merchant_admin_total": round(unmatched_merchant_admin_total, 2),
-        "source_metrics": json.dumps(source_metrics),
+        "source_metrics": source_metrics,
         "campaign_product_sales": campaign_product_sales,
     })
 
 
+#############################################################################################################
+################################## The Visitor Tracking Section #############################################
+@csrf_exempt  # This is added because we are adding the tracking javascript to the app but the store pages likely do not have a <meta name="csrf-token">
+@require_POST
+def save_tracking(request):
+    try:
+        print("ENTERED THE TRACKING FUNCTION")
+
+        import json
+        try:
+            data = json.loads(request.body)
+        except Exception:
+            return JsonResponse({"status": "error", "message": "Invalid JSON payload"}, status=400)
+
+        print("The data received is:", data)
+        if not data:
+            return JsonResponse({"status": "error", "message": "No JSON payload received"}, status=400)
+
+        # Generate unique ID
+        distinct_id = int(get_next_id_from_supabase_compatible_all(name='Tracking_Visitors', column='Distinct_ID'))
+
+        # Flatten visitor info
+        visitor_info = data.get('visitor_info', {}) or {}
+        client_info = data.get('client_info', {}) or {}
+        utm_params = data.get('utm_params', {}) or {}
+        traffic_source = data.get('traffic_source', {}) or {}
+
+        tracking_entry = {
+            'Distinct_ID': distinct_id,
+            'Visitor_ID': data.get('visitor_id'),
+            'Session_ID': data.get('session_id'),
+            'Store_URL': data.get('store_url'),
+            'Event_Type': data.get('event_type'),
+            'Event_Details': str(data.get('event_details', {})),
+            'Page_URL': data.get('page_url'),
+            'Visited_at': get_uae_current_date(),
+
+            # UTM Parameters
+            'UTM_Source': utm_params.get('utm_source'),
+            'UTM_Medium': utm_params.get('utm_medium'),
+            'UTM_Campaign': utm_params.get('utm_campaign'),
+            'UTM_Term': utm_params.get('utm_term'),
+            'UTM_Content': utm_params.get('utm_content'),
+
+            # Referrer
+            'Referrer_Platform': data.get('referrer'),
+
+            # Traffic Source
+            'Traffic_Source': traffic_source.get('source'),
+            'Traffic_Medium': traffic_source.get('medium'),
+            'Traffic_Campaign': traffic_source.get('campaign'),
+
+            # Visitor Info
+            'Customer_ID': visitor_info.get('customer_id'),
+            'Customer_Name': visitor_info.get('name'),
+            'Customer_Email': visitor_info.get('email'),
+            'Customer_Mobile': visitor_info.get('mobile'),
+
+            # Client Info
+            'User_Agent': client_info.get('user_agent'),
+            'Language': client_info.get('language'),
+            'Timezone': client_info.get('timezone'),
+            'Platform': client_info.get('platform'),
+            'Screen_Resolution': client_info.get('screen_resolution'),
+            'Device_Memory': client_info.get('device_memory')
+        }
+
+        print("ABOUT TO BATCH INSERT")
+
+        try:
+            tracking_entry_df = pd.DataFrame([tracking_entry])
+            batch_insert_to_supabase(tracking_entry_df, 'Tracking_Visitors')
+        except Exception as e:
+            print("Failed to insert tracking entry into Supabase:", e)
+            traceback.print_exc()
+
+        return JsonResponse({"status": "success"})
+    
+    except Exception as e:
+        print("TRACKING FUNCTION ERROR:", e)
+        return JsonResponse({"status": "error", "message": str(e)}, status=500)
+
+# The route to render the tracking javascript -- 
+def tracking_snippet(request):
+    js_content = render_to_string("tracking-snippet.js")
+    return HttpResponse(js_content, content_type="application/javascript")
+###################################################################################################################3
+###########################################
 def search_view(request):
     query = request.GET.get("q", "").lower()
     results = []
@@ -411,6 +535,10 @@ def search_view(request):
             {"title": "Dashboard", "url": "/"},
             {"title": "Analytics", "url": "/zid_orders/"},
             {"title": "Logout", "url": "/zid_logout/"},
+            {"title": "Marketing", "url": "/marketing/"},
+            {"title": "Products", "url": "/zid/products//"},
+            {"title": "Orders", "url": "/zid/orders//"},
+            {"title": "Analytics", "url": "/zid/match_google//"},
         ]
         results = [p for p in pages if query in p["title"].lower()]
 
@@ -458,7 +586,7 @@ def orders_page(request):
     return render(request, 'Demo/orders.html', {
         'orders': orders,
         'total_orders': len(orders),
-        'total_revenue': sum(o['order_total'] for o in orders),
+        'total_revenue': sum(float(order['transaction_amount']) for order in orders)
     })
 
 def products_page(request):
@@ -507,6 +635,9 @@ def products_page(request):
 
     return render(request, "Demo/products_page.html", context)
 
+def safe_name(name):
+    return re.sub(r'[^0-9a-zA-Z_]', '_', str(name))
+
 
 def safe_numeric(value):
     try:
@@ -514,7 +645,11 @@ def safe_numeric(value):
     except (ValueError, TypeError):
         return 0  # fallback if non-numeric
 
-def marketing_page(request):
+
+#############################################################################
+############################ Marketing Report Section #######################
+def marketing_page_ready(request):
+    # This function is made to process the ready reporting file since the system cannot perform the full operation
     context = {}
     if request.method == "POST" and request.FILES.get("excel_file"):
         excel_file = request.FILES["excel_file"]
@@ -555,4 +690,106 @@ def marketing_page(request):
 
         context["sheets"] = sheets_data
 
+    return render(request, "Demo/marketing_ready.html", context)
+
+####### The marketing report creation from scratch #############
+################################################################
+### A function just to view
+def marketing_page(request):
+    return render(request, "Demo/marketing.html", {})
+
+@csrf_exempt
+def process_marketing_report(request):
+    # A dictionary to store the data
+    context = {}
+    # Mehtod check
+    if request.method != "POST":
+        return JsonResponse({'status': 'error', 'message': 'Invalid request method'}, status=405)
+
+    uploaded_files = []
+    missing_files = []
+    dataframes = {}
+
+    # Get start and end dates
+    start_time = request.POST.get("start_time")
+    end_time = request.POST.get("end_time")
+
+    # Check uploaded files
+    for i in range(1, 7):
+        file = request.FILES.get(f'file{i}')
+        if file:
+            message, response, file_1, file_2, file_3, file_4, file_5, file_6 = column_check(file, i)
+            if not response:
+                return JsonResponse({'status': 'error', 'message': message}, status=400)
+
+            if i == 1:
+                dataframes[i] = file_1
+            elif i == 2:
+                dataframes[i] = file_2
+            elif i == 3:
+                dataframes[i] = file_3
+            elif i == 4:
+                dataframes[i] = file_4
+            elif i == 5:
+                dataframes[i] = file_5
+            elif i == 6:
+                dataframes[i] = file_6
+
+            uploaded_files.append(file.name)
+        else:
+            missing_files.append(f'file{i}')
+
+    if missing_files:
+        return JsonResponse({'status': 'error', 'message': f'Missing files: {", ".join(missing_files)}'}, status=400)
+
+    # Process data
+    subsheet_one, subsheet_two, facebook, tiktok, snapchat, google, zid, analytics, orders_breakdown, zid_unfiltered = create_general_analysis(dataframes, start_time, end_time)
+    subsheet_three, subsheet_four, facebook_detailed, snapchat_detailed, tiktok_detailed, full_detailed, facebook, tiktok, snapchat, zid, analytics, vanilla_db, advertised_prods, orders_count_unfiltered, advertised_prods_copied = create_product_percentage_amount_spent(facebook, tiktok, snapchat, zid, analytics, zid_unfiltered)
+    landing = asyncio.run(landing_performance_5_async(analytics, vanilla_db, advertised_prods_copied, full_detailed, orders_count_unfiltered))
+
+    # Collect all sheets into a dictionary for template
+    sheets_data = {
+            "General_Analysis": subsheet_one,
+            "Orders Analysis": orders_breakdown,
+            "Platforms_Summary": subsheet_two,
+            "Percentages(Orders)": subsheet_three,
+            "AD Amount Spent": subsheet_four,
+            "Facebook Detailed": facebook_detailed,
+            "Snapchat Detailed": snapchat_detailed,
+            "Tiktok Detailed": tiktok_detailed,
+            "Full Detailed": full_detailed,
+            "Landing Performance Main_Vars": landing
+    }
+
+    template_sheets = {}
+
+    for sheet_name, df in sheets_data.items():
+            safe_sheet = safe_name(sheet_name)
+
+            # Extract labels (first column)
+            labels = df.iloc[:, 0].fillna("").astype(str).tolist()
+
+            # Extract numeric columns after the first one
+            charts = []
+            for col in df.columns[1:]:
+                values = [safe_numeric(v) for v in df[col].tolist()]
+                charts.append({
+                    "column": col,
+                    "values": values
+                })
+
+            template_sheets[sheet_name] = {
+                "columns": df.columns.tolist(),
+                "safe_name": safe_sheet,
+                "rows": df.values.tolist(),
+                "labels": json.dumps(labels, ensure_ascii=False),
+                "charts": charts
+            }
+
+    context["sheets"] = template_sheets
+    context["start_time"] = start_time
+    context["end_time"] = end_time
+
     return render(request, "Demo/marketing.html", context)
+
+

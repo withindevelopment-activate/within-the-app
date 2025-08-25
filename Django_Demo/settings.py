@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 import dj_database_url
 import os 
+import re
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -32,6 +33,7 @@ ALLOWED_HOSTS = ['localhost', '127.0.0.1', '.onrender.com']
 # Application definition
 
 INSTALLED_APPS = [
+    'corsheaders',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -42,6 +44,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -51,6 +54,15 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     "whitenoise.middleware.WhiteNoiseMiddleware"
 ]
+
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://.*\.zid\.store$",
+]
+
+CORS_ALLOW_CREDENTIALS = True
+# Disable CORS for everything by default -- allow only for selected routes
+
+
 
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
@@ -148,7 +160,8 @@ ZID_API_BASE = 'https://api.zid.sa/v1'
 
 ZID_CLIENT_ID = os.environ.get('ZID_CLIENT_ID')
 ZID_CLIENT_SECRET = os.environ.get('ZID_CLIENT_SECRET')
-ZID_REDIRECT_URI = 'https://zid-sleepy-test.onrender.com/callback'
+ZID_REDIRECT_URI = 'https://testing-within.onrender.com/zid/callback'
+
 
 SESSION_COOKIE_AGE = 3600  # 1 hour
 SESSION_SAVE_EVERY_REQUEST = True

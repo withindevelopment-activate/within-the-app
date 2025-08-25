@@ -1,0 +1,112 @@
+<div class="charts-wrapper">
+    {% for chart in data.charts %}
+        <div class="chart-container mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="mb-0">{{ chart.column }}</h6>
+                <select id="chartType-{{ data.safe_name }}-{{ forloop.counter }}" class="form-select form-select-sm w-auto">
+                    <option value="bar">Bar</option>
+                    <option value="line">Line</option>
+                    <option value="pie">Pie</option>
+                    <option value="doughnut">Doughnut</option>
+                </select>
+            </div>
+            <div style="height:300px;">
+                <canvas id="chart-{{ data.safe_name }}-{{ forloop.counter }}" 
+                        data-labels='{{ data.labels|safe }}' 
+                        data-values='{{ chart.values|safe }}'></canvas>
+            </div>
+            <div id="legend-{{ data.safe_name }}-{{ forloop.counter }}" class="mt-2"></div>
+        </div>
+    {% endfor %}
+</div>
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+(function() {
+    // Local array to keep track of all chart instances
+    const chartInstances = [];
+
+    // Destroy all existing charts
+    function destroyCharts() {
+        chartInstances.forEach(chart => chart.destroy());
+        chartInstances.length = 0; // clear array
+    }
+
+    // Render chart legend
+    function renderLegend(chart, legendId) {
+        const legendContainer = document.getElementById(legendId);
+        if (!legendContainer) return;
+
+        const items = chart.options.plugins.legend.labels.generateLabels(chart);
+        legendContainer.innerHTML = items.map(item => `
+            <div class="legend-item d-flex align-items-center mb-1">
+                <span class="legend-box" style="
+                    background:${item.fillStyle};
+                    border:1px solid ${item.strokeStyle};
+                    width:12px; height:12px; display:inline-block; margin-right:6px;">
+                </span>
+                <span>${item.text}</span>
+            </div>
+        `).join("");
+    }
+
+    // Initialize all charts
+    function initCharts() {
+        destroyCharts();
+
+        document.querySelectorAll('.charts-wrapper canvas').forEach(canvas => {
+            const labels = JSON.parse(canvas.dataset.labels);
+            const values = JSON.parse(canvas.dataset.values);
+            const ctx = canvas.getContext('2d');
+            const chartIdParts = canvas.id.split('-');
+            const safeName = chartIdParts[1];
+            const counter = chartIdParts[2];
+
+            let chartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{ label: canvas.id, data: values }]
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    layout: { padding: { right: 30 } }
+                }
+            });
+
+            chartInstances.push(chartInstance);
+            renderLegend(chartInstance, `legend-${safeName}-${counter}`);
+
+            // Chart type switcher
+            const select = document.getElementById(`chartType-${safeName}-${counter}`);
+            if (select) {
+                select.addEventListener('change', (e) => {
+                    chartInstance.destroy();
+                    chartInstance = new Chart(ctx, {
+                        type: e.target.value,
+                        data: {
+                            labels: labels,
+                            datasets: [{ label: canvas.id, data: values }]
+                        },
+                        options: {
+                            maintainAspectRatio: false,
+                            responsive: true,
+                            plugins: { legend: { display: false } },
+                            layout: { padding: { right: 30 } }
+                        }
+                    });
+                    chartInstances.push(chartInstance);
+                    renderLegend(chartInstance, `legend-${safeName}-${counter}`);
+                });
+            }
+        });
+    }
+
+    // Automatically initialize charts when this file loads
+    initCharts();
+})();
+</script>
+{% endblock %}
