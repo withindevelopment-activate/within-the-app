@@ -1,5 +1,5 @@
 import pandas as pd
-from supabase_functions import fetch_data_from_supabase
+from .supabase_functions import fetch_data_from_supabase
 import ast
 from bs4 import BeautifulSoup
 import asyncio
