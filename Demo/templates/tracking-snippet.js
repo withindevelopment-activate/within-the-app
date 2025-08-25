@@ -71,12 +71,10 @@
     // ------------------- Tracking -------------------
     const BACKEND_URL = "https://testing-within.onrender.com";
 
-    function sendTrackingData(eventType = 'pageview', eventDetails = {}) {
-        //const storeUrl = "{{ store_url }}";
+    function sendPageview() {
         const storeUrl = window.location.origin;
-        console.log('IN THE TRACKING SNIPPET FILE THE STORE_URL IS:', storeUrl);
         if (!storeUrl) {
-            console.warn('tracking.js: store_url not found in sessionStorage');
+            console.warn('tracking.js: store_url not found');
             return;
         }
         const utmParams = getUTMParams();
@@ -87,8 +85,8 @@
             visitor_id: getVisitorId(),
             session_id: getOrCreateSessionId(),
             store_url: storeUrl,
-            event_type: eventType,
-            event_details: eventDetails,
+            event_type: 'pageview',
+            event_details: {},
             utm_params: utmParams,
             referrer: referrer,
             traffic_source: traffic,
@@ -105,40 +103,6 @@
         }).catch(err => console.error('Tracking failed:', err));
     }
 
-    // ------------------- Event Listeners -------------------
-    function setupListeners() {
-        window.addEventListener('load', () => sendTrackingData('pageview'));
-
-        document.addEventListener('click', event => {
-            const target = event.target;
-            sendTrackingData('click', {
-                tag: target.tagName,
-                id: target.id || null,
-                classes: target.className || null,
-                text: target.innerText ? target.innerText.substring(0,50) : null
-            });
-        });
-
-        document.addEventListener('submit', event => {
-            const target = event.target;
-            sendTrackingData('form_submit', {
-                form_id: target.id || null,
-                form_classes: target.className || null,
-                action: target.action || null
-            });
-        });
-
-        let lastScrollPercent = 0;
-        window.addEventListener('scroll', () => {
-            const scrollTop = document.documentElement.scrollTop || document.body.scrollTop;
-            const scrollHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight;
-            const scrollPercent = Math.round((scrollTop / scrollHeight) * 100);
-            if (scrollPercent - lastScrollPercent >= 25) {
-                lastScrollPercent = scrollPercent;
-                sendTrackingData('scroll', { percent: scrollPercent });
-            }
-        });
-    }
-
-    setupListeners();
+    // ------------------- Event Listener -------------------
+    window.addEventListener('load', sendPageview);
 })();
