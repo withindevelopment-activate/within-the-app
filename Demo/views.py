@@ -142,38 +142,28 @@ def home(request):
         # Extract orders and calculate totals
         orders = orders_data.get('orders', [])
         #print("The orders payload is:", orders)
-        # Convert to a df for analytics
-        orders_df = pd.DataFrame(orders)
+        '''for order in orders[:5]:
+            print(order)'''
+        total_orders = round(orders_data.get('total_order_count', len(orders)), 2)
+        total_revenue = sum(float(order['transaction_amount']) for order in orders)
+        total_revenue = round(total_revenue, 2)
 
-        # Convert the order_total column to float
-        orders_df['order_total'] = orders_df['order_total'].astype(float)
-        orders_df['id'] = orders_df['id'].astype(int)
-        # Get the order count
-        total_orders = orders_df['id'].nunique()
+        # Process orders to extract total and status
+        for order in orders:
+            created_str = order.get("created_at")
+            updated_str = order.get("updated_at")
+            if created_str:
+                try:
+                    order["created_at"] = datetime.strptime(created_str, "%Y-%m-%d %H:%M:%S")
+                    order["updated_at"] = datetime.strptime(updated_str, "%Y-%m-%d %H:%M:%S") if updated_str else order["created_at"]
+                except ValueError:
+                    order["created_at"] = None
+                    order["updated_at"] = None
 
-        orders_df['created_at'] = pd.to_datetime(orders_df['created_at'], format="%Y-%m-%d %H:%M:%S", errors='coerce')
-        orders_df['updated_at'] = pd.to_datetime(orders_df['updated_at'], format="%Y-%m-%d %H:%M:%S", errors='coerce')
-
-        # Fill missing updated_at with created_at
-        orders_df['updated_at'] = orders_df['updated_at'].fillna(orders_df['created_at'])
-
-        # Convert order_total to float
-        orders_df['order_total'] = orders_df['order_total'].astype(float)
-
-        # Extract config_logo safely
-        orders_df['config_logo'] = orders_df.get('printed_invoice_settings', pd.Series([{}]*len(orders_df))).apply(lambda x: x.get('config_logo', '') if isinstance(x, dict) else '')
-
-        # Extract display_status from order_status dict
-        orders_df['display_status'] = orders_df['order_status'].apply(lambda x: x.get('name') if isinstance(x, dict) else None)
-        orders_df['display_status'] = orders_df['display_status'].fillna(orders_df['order_status'].apply(lambda x: x.get('code') if isinstance(x, dict) else 'unknown'))
-        orders_df['display_status'] = orders_df['display_status'].fillna('unknown')
-
-        # Total revenue
-        total_revenue = orders_df['order_total'].sum()
-
-        # Sort the orders
-        
-
+            order['order_total'] = float(order.get('order_total', 0))
+            order['config_logo'] = order.get('printed_invoice_settings', {}).get('config_logo', '')
+            status_obj = order.get("order_status", {})
+            order["display_status"] = status_obj.get("name") or status_obj.get("code") or "unknown"
 
         # Fetch products
         # Define the headers to retrieve the products
@@ -190,31 +180,20 @@ def home(request):
         products_res = requests.get(f"{settings.ZID_API_BASE}/products", headers=headers_product)
         products_res.raise_for_status()
         products_data = products_res.json()
-        products_df = pd.DataFrame(products_data.get('results', []))
+        #print("Products data fetched successfully:", products_data)
+        products = products_data.get('results', [])
+        total_products = products_data.get('count', len(products))
+        # Process products to extract price and display name
+        for product in products:
+            product['price'] = float(product.get('price', 0))
+            for image in product.get('images', []):
+                product['display_image'] = image.get('image', {}).get('thumbnail', '')
+            name_obj = product.get("name", {})
+            product["display_name"] = name_obj.get("ar") or name_obj.get("en") or "Unnamed"
 
-        # Convert price to float
-        products_df['price'] = products_df['price'].astype(float)
-
-        # Extract display_name from 'name' dict
-        products_df['display_name'] = products_df['name'].apply(
-            lambda x: x.get('ar') if isinstance(x, dict) and x.get('ar') else (x.get('en') if isinstance(x, dict) else 'Unnamed')
-        )
-
-        # Extract display_image from the first image in the 'images' list
-        def extract_image(images):
-            if isinstance(images, list) and len(images) > 0:
-                img_obj = images[0].get('image') if isinstance(images[0], dict) else None
-                if isinstance(img_obj, dict):
-                    return img_obj.get('thumbnail', '')
-            return ''
-
-        products_df['display_image'] = products_df['images'].apply(extract_image)
-
-        # Sort by price descending
-        products_df = products_df.sort_values(by='price', ascending=False).reset_index(drop=True)
-
-        # Total products count
-        total_products = products_data.get('count', len(products_df))
+        # Sort orders and products by total and price respectively
+        orders = sorted(orders, key=lambda o: o['order_total'], reverse=True)
+        products = sorted(products, key=lambda p: p['price'], reverse=True)
 
     # Handle any request errors       
     except requests.RequestException as e:
