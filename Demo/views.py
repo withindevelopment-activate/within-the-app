@@ -122,7 +122,7 @@ def home(request):
         profile_res = requests.get(f"{settings.ZID_API_BASE}/managers/account/profile", headers=headers)
         profile_res.raise_for_status()
         profile = profile_res.json()
-        user_name = profile.get('user', {}).get('name') or profile.get('username')
+        user_name = profile.get('user', {}).get('name') or profile.get('username', 'Default')
         if not user_name:
             print("Couldn't retrieve username")
             user_name = 'Default'
