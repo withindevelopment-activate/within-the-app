@@ -126,7 +126,7 @@ def home(request):
         user_name = 'Default'
         '''if not user_name:
             print("Couldn't retrieve username")
-            user_name = 'Default''''
+            user_name = 'Default'''
         store_title = profile.get('user', {}).get('store', {}).get('title', 'Unknown Store')
 
         # Get the Store ID
