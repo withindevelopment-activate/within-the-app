@@ -12,12 +12,9 @@ urlpatterns = [
     path('zid/match_google/', views.match_orders_with_analytics, name='match_google'),
     path('zid/orders/', views.orders_page, name='orders_page'),
     path('zid/products/', views.products_page, name='products_page'),
-    #
     path("search/", views.search_view, name="search"),
-    # Marketing Report
-    path("marketing/", views.marketing_page, name="marketing"),
+    path("marketing/", views.marketing_page, name="marketing"), # Marketing report section
     path("process_marketing_report/", views.process_marketing_report, name="process_marketing_report"),
-    # Tracking
-    path("save_tracking/", views.save_tracking, name="save_tracking"),
+    path("save_tracking/", views.save_tracking, name="save_tracking"), # Tracking
     path("tracking_snippet.js", views.tracking_snippet, name="tracking_snippet"),
 ]
