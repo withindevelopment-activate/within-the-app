@@ -5,7 +5,6 @@ from django.conf import settings
 from django.shortcuts import redirect, render
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
-from corsheaders.decorators import cors_allow
 from django.contrib import messages
 import traceback
 from django.http import JsonResponse, HttpResponseBadRequest, HttpResponse
@@ -438,7 +437,6 @@ def match_orders_with_analytics(request):
 ################################## The Visitor Tracking Section #############################################
 @csrf_exempt  # This is added because we are adding the tracking javascript to the app but the store pages likely do not have a <meta name="csrf-token">
 @require_POST
-@cors_allow()
 def save_tracking(request):
     try:
         print("ENTERED THE TRACKING FUNCTION")
