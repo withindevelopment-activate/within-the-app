@@ -138,7 +138,7 @@
         formData.append("end_time", endTime);
 
         $.ajax({
-            url: "{% url 'process_marketing_report' %}",
+            url: "{% url 'Demo:process_marketing_report' %}",
             type: 'POST',
             data: formData,
             processData: false,
