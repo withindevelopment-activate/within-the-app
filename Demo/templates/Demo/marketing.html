@@ -9,46 +9,47 @@
         <!-- Date Selection -->
         <div class="date-selection">
             <label for="start_time">Start Date:</label>
-            <input type="date" id="start_time" name="start_time" required>
+            <input type="date" id="start_time" name="start_time" class="form-control" required>
             
             <label for="end_time">End Date:</label>
-            <input type="date" id="end_time" name="end_time" required>
+            <input type="date" id="end_time" name="end_time" class="form-control" required>
         </div><br><br>
 
         <!-- File Uploads -->
         <div class="file-upload-form">
             <label for="file1">Facebook File:</label>
-            <input type="file" id="file1" name="file1" accept=".xlsx" required>
+            <input type="file" id="file1" name="file1" class="form-control" accept=".xlsx" required>
         </div>
         
         <div class="file-upload-form">
             <label for="file2">Tiktok File:</label>
-            <input type="file" id="file2" name="file2" accept=".xlsx" required>
+            <input type="file" id="file2" name="file2" class="form-control" accept=".xlsx" required>
         </div>
         
         <div class="file-upload-form">
             <label for="file3">Snapchat File:</label>
-            <input type="file" id="file3" name="file3" accept=".xlsx" required>
+            <input type="file" id="file3" name="file3" class="form-control" accept=".xlsx" required>
         </div>
         
         <div class="file-upload-form">
             <label for="file4">Google ADS File:</label>
-            <input type="file" id="file4" name="file4" accept=".xlsx" required>
+            <input type="file" id="file4" name="file4" class="form-control" accept=".xlsx" required>
         </div>
         
         <div class="file-upload-form">
             <label for="file5">Zid File:</label>
-            <input type="file" id="file5" name="file5" accept=".xlsx" required>
+            <input type="file" id="file5" name="file5" class="form-control" accept=".xlsx" required>
         </div>
 
         <div class="file-upload-form">
             <label for="file6">Google Analytics File:</label>
-            <input type="file" id="file6" name="file6" accept=".xlsx" required>
+            <input type="file" id="file6" name="file6" class="form-control" accept=".xlsx" required>
         </div>
         
         <!-- Submit all button -->
         <button type="submit" id="global-submit" class="btn btn-primary">Submit</button>
     </form>
+
 
 {% if sheets %}
   <ul class="nav nav-tabs" id="myTab" role="tablist">

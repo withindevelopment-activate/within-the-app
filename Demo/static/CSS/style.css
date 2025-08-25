@@ -256,3 +256,10 @@ nav {
   margin-right: 8px;
   border-radius: 100%;
 }
+
+.form-control{
+    width: 95%;
+    direction: rtl;
+    background-color: #f5f5f5;
+    border: 1px solid #00000050;
+}
