@@ -5,155 +5,136 @@
 {% block content %}
 <div class="container py-4">
     <h2 class="mb-4">رفع ملفات السوشل ميديا</h2>
+
+    <!-- File Upload Form -->
     <form id="marketing-report-form" enctype="multipart/form-data">
+        {% csrf_token %}
         <!-- Date Selection -->
-        <div class="date-selection">
+        <div class="date-selection mb-3">
             <label for="start_time">Start Date:</label>
             <input type="date" id="start_time" name="start_time" class="form-control" required>
-            
+
             <label for="end_time">End Date:</label>
             <input type="date" id="end_time" name="end_time" class="form-control" required>
-        </div><br><br>
+        </div>
 
         <!-- File Uploads -->
-        <div class="file-upload-form">
+        <div class="file-upload-form mb-2">
             <label for="file1">Facebook File:</label>
             <input type="file" id="file1" name="file1" class="form-control" accept=".xlsx" required>
         </div>
-        
-        <div class="file-upload-form">
+        <div class="file-upload-form mb-2">
             <label for="file2">Tiktok File:</label>
             <input type="file" id="file2" name="file2" class="form-control" accept=".xlsx" required>
         </div>
-        
-        <div class="file-upload-form">
+        <div class="file-upload-form mb-2">
             <label for="file3">Snapchat File:</label>
             <input type="file" id="file3" name="file3" class="form-control" accept=".xlsx" required>
         </div>
-        
-        <div class="file-upload-form">
+        <div class="file-upload-form mb-2">
             <label for="file4">Google ADS File:</label>
             <input type="file" id="file4" name="file4" class="form-control" accept=".xlsx" required>
         </div>
-        
-        <div class="file-upload-form">
+        <div class="file-upload-form mb-2">
             <label for="file5">Zid File:</label>
             <input type="file" id="file5" name="file5" class="form-control" accept=".xlsx" required>
         </div>
-
-        <div class="file-upload-form">
+        <div class="file-upload-form mb-3">
             <label for="file6">Google Analytics File:</label>
             <input type="file" id="file6" name="file6" class="form-control" accept=".xlsx" required>
         </div>
-        
-        <!-- Submit all button -->
+
+        <!-- Submit Button -->
         <button type="submit" id="global-submit" class="btn btn-primary">Submit</button>
     </form>
 
+    <!-- Processed Data Section -->
+    <div id="sheets-container" class="mt-5">
+        {% if sheets %}
+            <ul class="nav nav-tabs" id="myTab" role="tablist">
+                {% for sheet, data in sheets.items %}
+                    <li class="nav-item">
+                        <button class="nav-link {% if forloop.first %}active{% endif %}" 
+                                data-bs-toggle="tab" data-bs-target="#{{ data.safe_name }}">
+                            {{ data.safe_name }}
+                        </button>
+                    </li>
+                {% endfor %}
+            </ul>
 
-{% if sheets %}
-  <ul class="nav nav-tabs" id="myTab" role="tablist">
-    {% for sheet, data in sheets.items %}
-      <li class="nav-item">
-        <button class="nav-link {% if forloop.first %}active{% endif %}" 
-                data-bs-toggle="tab" data-bs-target="#{{ data.safe_name }}">
-          {{ data.safe_name }}
-        </button>
-      </li>
-    {% endfor %}
-  </ul>
-
-   <!-- Tab Content -->
-  <div class="tab-content mt-3">
-    {% for sheet, data in sheets.items %}
-      <div class="tab-pane fade {% if forloop.first %}show active{% endif %}" id="{{ data.safe_name }}">
-        
-        <!-- Table Section -->
-        <div class="data-wrap">
-            <div class="data-viewport">
-                <div class="data-scroller" role="region" aria-label="Scrollable data table" tabindex="0">
-                    <table class="data-table" role="table" aria-label="Analytics dataset">
-                        <thead>
-                            <tr>
-                                {% for col in data.columns %}
-                                <th>{{ col }}</th>
-                                {% endfor %}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for row in data.rows %}
-                            <tr>
-                                {% for cell in row %}
-                                <td>{{ cell }}</td>
-                                {% endfor %}
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
+            <div class="tab-content mt-3">
+                {% for sheet, data in sheets.items %}
+                    <div class="tab-pane fade {% if forloop.first %}show active{% endif %}" id="{{ data.safe_name }}">
+                        <div class="data-wrap">
+                            <div class="data-viewport">
+                                <div class="data-scroller" role="region" aria-label="Scrollable data table" tabindex="0">
+                                    <table class="data-table table table-bordered" role="table" aria-label="Analytics dataset">
+                                        <thead>
+                                            <tr>
+                                                {% for col in data.columns %}
+                                                    <th>{{ col }}</th>
+                                                {% endfor %}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for row in data.rows %}
+                                                <tr>
+                                                    {% for cell in row %}
+                                                        <td>{{ cell }}</td>
+                                                    {% endfor %}
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        {% include "charts.html" with data=data %}
+                    </div>
+                {% endfor %}
             </div>
-        </div>
-
-        <!-- Include the Charts file -->
-        {% include "charts.html" with data=data %}
-
-      </div>
-    {% endfor %}
-  </div>
-{% endif %}
+        {% endif %}
+    </div>
 </div>
 
-<script>
-    // The script for the AJAX call for the marketing report
-    $('#marketing-report-form').on('submit', function (event) {
-        event.preventDefault();
-
-        let allFilesSelected = true;
-        let missingFileForm = null;
-
-        $('.file-upload-form').each(function () {
-            const fileInput = $(this).find('input[type="file"]');
-            if (!fileInput[0].files.length) {
-                allFilesSelected = false;
-                missingFileForm = $(this);
-                return false;
-            }
-        });
-
-        if (!allFilesSelected) {
-            const formId = missingFileForm.find('input[type="file"]').attr('name');
-            alert(`Form with ID ${formId} does not have a file uploaded.`);
-            return;
-        }
-
-        const startTime = $('#start_time').val();
-        const endTime = $('#end_time').val();
-
-        if (!startTime || !endTime) {
-            alert("Please select both start and end dates.");
-            return;
-        }
-
-        const formData = new FormData(this);
-        formData.append("start_time", startTime);
-        formData.append("end_time", endTime);
-
-        $.ajax({
-            url: "{% url 'Demo:process_marketing_report' %}",
-            type: 'POST',
-            data: formData,
-            processData: false,
-            contentType: false,
-            success: function (response) {
-                window.location.href = response.download_url;
-            },
-            error: function (xhr, status, error) {
-                alert(`Error uploading files: ${xhr.responseText}`);
-            }
-        });
-    });
-</script>
-
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
+<script>
+$('#marketing-report-form').on('submit', function (event) {
+    event.preventDefault();
+
+    const startTime = $('#start_time').val();
+    const endTime = $('#end_time').val();
+
+    if (!startTime || !endTime) {
+        alert("Please select both start and end dates.");
+        return;
+    }
+
+    const formData = new FormData(this);
+    formData.append("start_time", startTime);
+    formData.append("end_time", endTime);
+
+    // Include CSRF token
+    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+    $.ajax({
+        url: "{% url 'Demo:process_marketing_report' %}",
+        type: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: function (response) {
+            // Replace the sheets container with returned HTML
+            const html = $(response).find('#sheets-container').html();
+            $('#sheets-container').html(html);
+        },
+        error: function (xhr) {
+            alert(`Error uploading files: ${xhr.responseText}`);
+        }
+    });
+});
+</script>
 {% endblock %}

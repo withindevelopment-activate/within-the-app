@@ -141,6 +141,8 @@ def home(request):
 
         # Extract orders and calculate totals
         orders = orders_data.get('orders', [])
+        for order in orders[:5]:
+            print(order)
         total_orders = round(orders_data.get('total_order_count', len(orders)), 2)
         total_revenue = sum(float(o.get('order_total' , 0)) for o in orders)
         total_revenue = round(total_revenue, 2)
