@@ -557,36 +557,54 @@ def orders_page(request):
         'X-MANAGER-TOKEN': token,
     }
 
+    all_orders = []
+    page = 1
+    per_page = 100
+
     try:
-        orders_res = requests.get(f"{settings.ZID_API_BASE}/managers/store/orders", headers=headers)
-        orders_res.raise_for_status()
-        orders_data = orders_res.json()
-        orders = orders_data.get('orders', [])
+        while True:
+            params = {"page": page, "page_size": per_page}
+            order_res = requests.get(f"{settings.ZID_API_BASE}/managers/store/orders",
+                               headers=headers, params=params)
+            order_res.raise_for_status()
+            order_data = order_res.json()
 
-        # process dates + totals
-        for order in orders:
-            order['order_total'] = float(order.get('order_total', 0))
-            order['display_status'] = order.get('order_status', {}).get('name', 'unknown')
+            orders_list = order_data.get("orders", [])
+            if not orders_list:
+                break
 
-            created_str = order.get("created_at")
-            updated_str = order.get("updated_at")
-            if created_str:
-                try:
-                    order["created_at"] = datetime.strptime(created_str, "%Y-%m-%d %H:%M:%S")
-                    order["updated_at"] = datetime.strptime(updated_str, "%Y-%m-%d %H:%M:%S") if updated_str else order["created_at"]
-                except ValueError:
-                    order["created_at"] = None
-                    order["updated_at"] = None
+            # Process orders_list (dates + totals)
+            for order in orders_list:
+                order['order_total'] = float(order.get('order_total', 0))
+                order['display_status'] = order.get('order_status', {}).get('name', 'unknown')
+
+                created_str = order.get("created_at")
+                updated_str = order.get("updated_at")
+                if created_str:
+                    try:
+                        order["created_at"] = datetime.strptime(created_str, "%Y-%m-%d %H:%M:%S")
+                        order["updated_at"] = datetime.strptime(updated_str, "%Y-%m-%d %H:%M:%S") if updated_str else order["created_at"]
+                    except ValueError:
+                        order["created_at"] = None
+                        order["updated_at"] = None
+
+            all_orders.extend(orders_list)
+
+            # Stop if we already got everything
+            if len(all_orders) >= order_data.get("total_orders_count", 0):
+                break
+
+            page += 1
 
     except requests.RequestException as e:
         traceback.print_exc()
         messages.error(request, f"⚠️ Error fetching orders: {str(e)}")
-        orders = []
+        all_orders = []
 
     return render(request, 'Demo/orders.html', {
-        'orders': orders,
-        'total_orders': len(orders),
-        'total_revenue': sum(float(order['transaction_amount']) for order in orders)
+        'orders': all_orders,
+        'total_orders': len(all_orders),
+        'total_revenue': sum(float(order.get('transaction_amount', 0)) for order in all_orders)
     })
 
 def products_page(request):
@@ -606,27 +624,39 @@ def products_page(request):
         'Role': 'Manager',
     }
 
-    products_res = requests.get(f"{settings.ZID_API_BASE}/products", headers=headers_product)
-    products_res.raise_for_status()
-    products_data = products_res.json()
-    print("Products data fetched successfully:", products_data)
+    all_products = []
+    page = 1
+    per_page = 50
+
+    while True:
+        params = {'page': page, 'page_size': per_page}
+        products_res = requests.get(f"{settings.ZID_API_BASE}/products", headers=headers_product, params=params)
+        products_res.raise_for_status()
+        products_data = products_res.json()
+        products_list = products_data.get('results', [])
+        if not products_list:
+            break
+        all_products.extend(products_list)
+        # Optional: break if you've fetched as many as reported by the API
+        if len(all_products) >= products_data.get('total_products_count', 0):
+            break
+        page += 1
 
     # Extract product list safely
-    products_list = products_data.get("results", [])  # ✅ correct key
-    total_products = products_data.get("total_products_count", len(products_list))
+    total_products = products_data.get("total_products_count", len(all_products))
 
     # KPIs
-    published_count = sum(1 for p in products_list if p.get("is_published"))
+    published_count = sum(1 for p in all_products if p.get("is_published"))
     avg_rating = (
-        round(sum(p.get("rating", {}).get("average", 0) for p in products_list) / total_products, 2)
+        round(sum(p.get("rating", {}).get("average", 0) for p in all_products) / total_products, 2)
         if total_products > 0 else 0
     )
     on_sale_count = sum(
-        1 for p in products_list if p.get("sale_price") and p.get("price") and p["sale_price"] < p["price"]
+        1 for p in all_products if p.get("sale_price") and p.get("price") and p["sale_price"] < p["price"]
     )
 
     context = {
-        "products": products_list,  # send all products
+        "products": all_products,  # send all products
         "total_products": total_products,
         "published_count": published_count,
         "avg_rating": avg_rating,
