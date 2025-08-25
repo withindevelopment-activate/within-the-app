@@ -14,6 +14,7 @@ urlpatterns = [
     path('zid/products/', views.products_page, name='products_page'),
     path("search/", views.search_view, name="search"),
     path("marketing/", views.marketing_page, name="marketing"), # Marketing report section
+    path("marketing_ready/", views.marketing_page_ready, name="marketing_ready"),
     path("process_marketing_report/", views.process_marketing_report, name="process_marketing_report"),
     path("save_tracking/", views.save_tracking, name="save_tracking"), # Tracking
     path("tracking_snippet.js", views.tracking_snippet, name="tracking_snippet"),

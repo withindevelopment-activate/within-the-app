@@ -144,7 +144,7 @@ def home(request):
         for order in orders[:5]:
             print(order)
         total_orders = round(orders_data.get('total_order_count', len(orders)), 2)
-        total_revenue = sum(float(o.get('order_total' , 0)) for o in orders)
+        total_revenue = sum(float(o.get('transaction_amount' , 0)) for o in orders)
         total_revenue = round(total_revenue, 2)
 
         # Process orders to extract total and status
@@ -647,7 +647,8 @@ def safe_numeric(value):
 
 #############################################################################
 ############################ Marketing Report Section #######################
-'''def marketing_page(request):
+def marketing_page_ready(request):
+    # This function is made to process the ready reporting file since the system cannot perform the full operation
     context = {}
     if request.method == "POST" and request.FILES.get("excel_file"):
         excel_file = request.FILES["excel_file"]
@@ -688,7 +689,10 @@ def safe_numeric(value):
 
         context["sheets"] = sheets_data
 
-    return render(request, "Demo/marketing.html", context)'''
+    return render(request, "Demo/marketing_ready.html", context)
+
+####### The marketing report creation from scratch #############
+################################################################
 ### A function just to view
 def marketing_page(request):
     return render(request, "Demo/marketing.html", {})
