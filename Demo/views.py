@@ -145,7 +145,7 @@ def home(request):
         for order in orders[:5]:
             print(order)
         total_orders = round(orders_data.get('total_order_count', len(orders)), 2)
-        total_revenue = sum(float(o.get('transaction_amount' , 0)) for o in orders)
+        total_revenue = sum(float(order['transaction_amount'] for order in orders))
         total_revenue = round(total_revenue, 2)
 
         # Process orders to extract total and status
