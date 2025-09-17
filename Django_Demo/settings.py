@@ -13,7 +13,6 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 import dj_database_url
 import os 
-import re
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -33,7 +32,7 @@ ALLOWED_HOSTS = ['localhost', '127.0.0.1', '.onrender.com']
 # Application definition
 
 INSTALLED_APPS = [
-    'corsheaders',
+    "corsheaders",
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -44,7 +43,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
+    "corsheaders.middleware.CorsMiddleware",
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -52,17 +51,17 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    "whitenoise.middleware.WhiteNoiseMiddleware"
+    "whitenoise.middleware.WhiteNoiseMiddleware",
 ]
 
-CORS_ALLOWED_ORIGIN_REGEXES = [
-    r"^https://.*\.zid\.store$",
-]
+CORS_ALLOW_ALL_ORIGINS = True
+
+# CORS_ALLOWED_ORIGINS = [
+#     "https://jzvzvq.zid.store",
+#     "https://zid.store"
+# ]
 
 CORS_ALLOW_CREDENTIALS = True
-# Disable CORS for everything by default -- allow only for selected routes
-
-
 
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
@@ -154,14 +153,64 @@ LOGOUT_REDIRECT_URL = '/login/'
 
 LOGIN_URL = '/login/'
 
+BACKEND_URL = 'https://zid-sleepy-test.onrender.com'
+
 ZID_AUTH_URL = 'https://oauth.zid.sa/oauth/authorize'
 ZID_TOKEN_URL = 'https://oauth.zid.sa/oauth/token'
 ZID_API_BASE = 'https://api.zid.sa/v1'
 
 ZID_CLIENT_ID = os.environ.get('ZID_CLIENT_ID')
 ZID_CLIENT_SECRET = os.environ.get('ZID_CLIENT_SECRET')
-ZID_REDIRECT_URI = 'https://testing-within.onrender.com/zid/callback'
+ZID_REDIRECT_URI = 'https://zid-sleepy-test.onrender.com/callback'
 
-
-SESSION_COOKIE_AGE = 3600  # 1 hour
+SESSION_COOKIE_AGE = 24*3600  # 1 day
 SESSION_SAVE_EVERY_REQUEST = True
+
+# settings.py
+OAUTH_PROVIDERS = {
+    "google": {
+        "client_id": "...",
+        "client_secret": "...",
+        "redirect_uri": "https://yourapp.com/oauth/google/callback/",
+        "auth_url": "https://accounts.google.com/o/oauth2/v2/auth",
+        "token_url": "https://oauth2.googleapis.com/token",
+        "scope": "openid email profile",
+    },
+    "facebook": {
+        "client_id": "...",
+        "client_secret": "...",
+        "redirect_uri": "https://yourapp.com/oauth/facebook/callback/",
+        "auth_url": "https://www.facebook.com/v18.0/dialog/oauth",
+        "token_url": "https://graph.facebook.com/v18.0/oauth/access_token",
+        "scope": "email,public_profile",
+    },
+    "tiktok": {
+        "client_id": "...",
+        "client_secret": "...",
+        "redirect_uri": "https://yourapp.com/oauth/tiktok/callback/",
+        "auth_url": "https://www.tiktok.com/v2/auth/authorize/",
+        "token_url": "https://open.tiktokapis.com/v2/oauth/token/",
+        "scope": "user.info.basic,video.list",
+    },
+    "snapchat": {
+        "client_id": "b9312a42-dc70-4dde-9cce-515e4dd3bcb2",
+        "client_secret": "760a09521ee7ed47e84d",
+        "redirect_uri": "https://zid-sleepy-test.onrender.com/oauth/snapchat/callback",
+        "auth_url": "https://accounts.snapchat.com/login/oauth2/authorize",
+        "token_url": "https://accounts.snapchat.com/login/oauth2/access_token",
+        "scope": "snapchat-profile-api snapchat-marketing-api snapchat-offline-conversions-api"
+    },
+}
+SNAPCHAT_CLIENT_ID = "ff633b59-bba4-4661-9f22-5178e6f1529a"
+SNAPCHAT_CLIENT_SECRET = "21b8b156f26731290105"
+SNAPCHAT_REDIRECT_URI = "https://zid-sleepy-test.onrender.com/oauth/snapchat/callback"
+SNAPCHAT_OAUTH_SCOPE = "snapchat-profile-api snapchat-marketing-api snapchat-offline-conversions-api"
+
+# SNAPCHAT_CLIENT_ID = "4f9c1908-b9ec-4440-a5c4-9b038fcb95b4"
+# SNAPCHAT_CLIENT_SECRET = "HNFS0DJwUtGiJKhfI2eKY_JxkhEo-ic0vGeDjLal1UM"
+
+TIKTOK_CLIENT_KEY = "your-app-id"
+TIKTOK_CLIENT_SECRET = "your-app-secret"
+TIKTOK_REDIRECT_URI = "https://zid-sleepy-test.onrender.com/oauth/tiktok/callback/"
+TIKTOK_ADVERTISER_ID = "your-advertiser-id"
+TIKTOK_OAUTH_SCOPE = "user.info.basic,video.list,video.upload,ad.account,ad.campaign,ad.adgroup,ad.ad,report.campaign,report.adgroup,report.ad"

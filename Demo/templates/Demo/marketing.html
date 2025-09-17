@@ -1,140 +1,189 @@
 {% extends "Demo/base.html" %}
 
 {% block title %} Marketing {% endblock title %}
+{% load custom_filters %}
 
 {% block content %}
 <div class="container py-4">
-    <h2 class="mb-4">رفع ملفات السوشل ميديا</h2>
-
-    <!-- File Upload Form -->
-    <form id="marketing-report-form" enctype="multipart/form-data">
+    <h2 class="mb-4">Upload Excel File</h2>
+    <form method="POST" enctype="multipart/form-data" class="mb-4">
         {% csrf_token %}
-        <!-- Date Selection -->
-        <div class="date-selection mb-3">
-            <label for="start_time">Start Date:</label>
-            <input type="date" id="start_time" name="start_time" class="form-control" required>
-
-            <label for="end_time">End Date:</label>
-            <input type="date" id="end_time" name="end_time" class="form-control" required>
+        <div class="mb-3">
+            <input type="file" name="excel_file" class="form-control" required>
         </div>
-
-        <!-- File Uploads -->
-        <div class="file-upload-form mb-2">
-            <label for="file1">Facebook File:</label>
-            <input type="file" id="file1" name="file1" class="form-control" accept=".xlsx" required>
-        </div>
-        <div class="file-upload-form mb-2">
-            <label for="file2">Tiktok File:</label>
-            <input type="file" id="file2" name="file2" class="form-control" accept=".xlsx" required>
-        </div>
-        <div class="file-upload-form mb-2">
-            <label for="file3">Snapchat File:</label>
-            <input type="file" id="file3" name="file3" class="form-control" accept=".xlsx" required>
-        </div>
-        <div class="file-upload-form mb-2">
-            <label for="file4">Google ADS File:</label>
-            <input type="file" id="file4" name="file4" class="form-control" accept=".xlsx" required>
-        </div>
-        <div class="file-upload-form mb-2">
-            <label for="file5">Zid File:</label>
-            <input type="file" id="file5" name="file5" class="form-control" accept=".xlsx" required>
-        </div>
-        <div class="file-upload-form mb-3">
-            <label for="file6">Google Analytics File:</label>
-            <input type="file" id="file6" name="file6" class="form-control" accept=".xlsx" required>
-        </div><br>
-
-        <!-- Submit Button -->
-        <button type="submit" id="global-submit" class="btn btn-primary">Submit</button>
+        <button type="submit" class="btn btn-primary">Upload</button>
     </form>
 
-    <!-- Processed Data Section -->
-    <div id="sheets-container" class="mt-5">
-        {% if sheets %}
-            <ul class="nav nav-tabs" id="myTab" role="tablist">
-                {% for sheet, data in sheets.items %}
-                    <li class="nav-item">
-                        <button class="nav-link {% if forloop.first %}active{% endif %}" 
-                                data-bs-toggle="tab" data-bs-target="#{{ data.safe_name }}">
-                            {{ data.safe_name }}
-                        </button>
-                    </li>
-                {% endfor %}
-            </ul>
+{% if sheets %}
+  <ul class="nav nav-tabs" id="myTab" role="tablist">
+    {% for sheet, data in sheets.items %}
+      <li class="nav-item">
+        <button class="nav-link {% if forloop.first %}active{% endif %}" 
+                data-bs-toggle="tab" data-bs-target="#{{ data.safe_name }}">
+          {{ data.safe_name }}
+        </button>
+      </li>
+    {% endfor %}
+  </ul>
 
-            <div class="tab-content mt-3">
-                {% for sheet, data in sheets.items %}
-                    <div class="tab-pane fade {% if forloop.first %}show active{% endif %}" id="{{ data.safe_name }}">
-                        <div class="data-wrap">
-                            <div class="data-viewport">
-                                <div class="data-scroller" role="region" aria-label="Scrollable data table" tabindex="0">
-                                    <table class="data-table table table-bordered" role="table" aria-label="Analytics dataset">
-                                        <thead>
-                                            <tr>
-                                                {% for col in data.columns %}
-                                                    <th>{{ col }}</th>
-                                                {% endfor %}
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {% for row in data.rows %}
-                                                <tr>
-                                                    {% for cell in row %}
-                                                        <td>{{ cell }}</td>
-                                                    {% endfor %}
-                                                </tr>
-                                            {% endfor %}
-                                        </tbody>
-                                    </table>
+  <div class="tab-content mt-3">
+    {% for sheet, data in sheets.items %}
+      <div class="tab-pane fade {% if forloop.first %}show active{% endif %}" id="{{ data.safe_name }}">
+        
+        <div class="data-wrap">
+            <div class="data-viewport">
+                <div class="data-scroller" role="region" aria-label="Scrollable data table" tabindex="0">
+                    <table class="data-table" role="table" aria-label="Analytics dataset">
+                        <thead>
+                            <tr>
+                                {% for col in data.columns %}
+                                <th>{{ col }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in data.rows %}
+                            <tr>
+                                {% for cell in row %}
+                                <td>{{ cell }}</td>
+                                {% endfor %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="row mt-4">
+            {% for chart in data.charts %}
+                <div class="col-lg-6 col-md-10 mb-4">
+                    <div class="card shadow-sm">
+                        <div class="card-body" style="padding-right: 8rem;">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h6>{{ chart.column }}</h6>
+                                <select id="chartType-{{ data.safe_name }}-{{ forloop.counter }}" class="form-select form-select-sm" style="width:120px;">
+                                <option value="bar" selected>Bar</option>
+                                <option value="line">Line</option>
+                                <option value="pie">Pie</option>
+                                <option value="doughnut">Doughnut</option>
+                                </select>
+                            </div>
+                            <div class="chart-wrapper d-flex" style="height: 300px;">
+                                <canvas id="chart-{{ data.safe_name }}-{{ forloop.counter }}" class="flex-grow-1"></canvas>
+                                <div id="legend-{{ data.safe_name }}-{{ forloop.counter }}" 
+                                    class="legend-container"
+                                    style="max-height: 380px; overflow-y: auto; min-width: 180px;">
                                 </div>
                             </div>
                         </div>
-                        {% include "charts.html" with data=data %}
                     </div>
-                {% endfor %}
+                </div>
+            {% endfor %}
             </div>
-        {% endif %}
+
+            <script>
+                document.addEventListener("DOMContentLoaded", function() {
+                    const chartColors = [
+                        "#3366CC", // Blue
+                        "#DC3912", // Red
+                        "#FF9900", // Orange
+                        "#109618", // Green
+                        "#990099", // Purple
+                        "#0099C6", // Cyan
+                        "#DD4477", // Pink
+                        "#66AA00", // Lime
+                        "#B82E2E", // Dark Red
+                        "#316395", // Navy Blue
+                        "#994499", // Violet
+                        "#22AA99"  // Teal
+                        ];
+
+                    const labels_{{ data.safe_name }} = {{ data.labels|safe }};
+                    {% for chart in data.charts %}
+                        const values_{{ data.safe_name }}_{{ forloop.counter }} = {{ chart.values|safe }};
+                        const ctx_{{ data.safe_name }}_{{ forloop.counter }} = document.getElementById("chart-{{ data.safe_name }}-{{ forloop.counter }}");
+
+                        function renderLegend(chart, legendId) {
+                            const legendContainer = document.getElementById(legendId);
+                            if (!legendContainer) return;
+
+                            const items = Chart.helpers
+                                .toFont
+                                ? chart.options.plugins.legend.labels.generateLabels(chart)
+                                : [];
+
+                            legendContainer.innerHTML = items.map(item => `
+                                <div class="legend-item d-flex align-items-center mb-1">
+                                    <span class="legend-box" style="
+                                        background:${item.fillStyle};
+                                        border:1px solid ${item.strokeStyle};
+                                        width:12px; height:12px; display:inline-block; margin-right:6px;">
+                                    </span>
+                                    <span>${item.text}</span>
+                                </div>
+                            `).join("");
+                        }
+
+
+                        let chartInstance_{{ data.safe_name }}_{{ forloop.counter }} = new Chart(ctx_{{ data.safe_name }}_{{ forloop.counter }}, {
+                            type: 'bar',
+                            data: {
+                                labels: labels_{{ data.safe_name }},
+                                datasets: [{ 
+                                    label: '{{ chart.column }}', 
+                                    data: values_{{ data.safe_name }}_{{ forloop.counter }}, 
+                                    hoverOffset: 70, 
+                                    borderRadius: 10, 
+                                    backgroundColor: labels_{{ data.safe_name }}.map((_, i) => chartColors[i % chartColors.length]), 
+                                    borderColor: labels_{{ data.safe_name }}.map((_, i) => chartColors[i % chartColors.length]), 
+                                    borderWidth: 0, }] 
+                            },
+                            options: {
+                            maintainAspectRatio: false,
+                            responsive: true,
+                            plugins: { legend: { display: false } }, // disable default legend
+                            layout: { padding: { right: 30 } }
+                        }
+                        });
+
+                        renderLegend(chartInstance_{{ data.safe_name }}_{{ forloop.counter }}, "legend-{{ data.safe_name }}-{{ forloop.counter }}");
+
+                        document.getElementById("chartType-{{ data.safe_name }}-{{ forloop.counter }}").addEventListener("change", function(e) {
+                            ChartType = e.target.value;
+                            chartInstance_{{ data.safe_name }}_{{ forloop.counter }}.destroy();
+                            chartInstance_{{ data.safe_name }}_{{ forloop.counter }} = new Chart(ctx_{{ data.safe_name }}_{{ forloop.counter }}, {
+                                type: ChartType,
+                                data: {
+                                    labels: labels_{{ data.safe_name }},
+                                    datasets: [{ 
+                                        label: '{{ chart.column }}', 
+                                        data: values_{{ data.safe_name }}_{{ forloop.counter }}, 
+                                        hoverOffset: 70, 
+                                        borderRadius: 10, 
+                                        backgroundColor: ChartType === 'line' ? "#0099C6" : labels_{{ data.safe_name }}.map((_, i) => chartColors[i % chartColors.length]), // for bar/pie/doughnut
+                                        borderColor: ChartType === 'line' ? "#3366CC" : labels_{{ data.safe_name }}.map((_, i) => chartColors[i % chartColors.length]), // for line chart
+                                        borderWidth: ChartType === 'line' ? 3 : 0, 
+                                        spacing: ChartType === 'doughnut' ? 10 : 0
+                                    }] 
+                                },
+                                options: {
+                                    maintainAspectRatio: false,
+                                    responsive: true,
+                                    plugins: { legend: { display: false } },
+                                    layout: { padding: { right: 30 } }
+                                }
+                            });
+                            renderLegend(chartInstance_{{ data.safe_name }}_{{ forloop.counter }}, "legend-{{ data.safe_name }}-{{ forloop.counter }}");
+                        });
+                    {% endfor %}
+                });
+                </script>
+
+        </div>
+    {% endfor %}
     </div>
+{% endif %}
 </div>
-
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-<script>
-$('#marketing-report-form').on('submit', function (event) {
-    event.preventDefault();
-
-    const startTime = $('#start_time').val();
-    const endTime = $('#end_time').val();
-
-    if (!startTime || !endTime) {
-        alert("Please select both start and end dates.");
-        return;
-    }
-
-    const formData = new FormData(this);
-    formData.append("start_time", startTime);
-    formData.append("end_time", endTime);
-
-    // Include CSRF token
-    formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
-
-    $.ajax({
-        url: "{% url 'Demo:process_marketing_report' %}",
-        type: 'POST',
-        data: formData,
-        processData: false,
-        contentType: false,
-        success: function (response) {
-            // Replace the sheets container with returned HTML
-            const html = $(response).find('#sheets-container').html();
-            $('#sheets-container').html(html);
-        },
-        error: function (xhr) {
-            alert(`Error uploading files: ${xhr.responseText}`);
-        }
-    });
-});
-</script>
 {% endblock %}

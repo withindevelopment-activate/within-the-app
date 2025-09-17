@@ -1,0 +1,174 @@
+{% extends "Demo/base.html" %}
+
+{% block title %} Customers {% endblock title %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <!-- KPI Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-center shadow-sm">
+                <div class="card-body">
+                    <h5>Total Customers</h5>
+                    <h3>{{ total_customers }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center shadow-sm">
+                <div class="card-body">
+                    <h5>Verified</h5>
+                    <h3>{{ verified_count }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center shadow-sm">
+                <div class="card-body">
+                    <h5>Blocked</h5>
+                    <h3>{{ blocked_count }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center shadow-sm">
+                <div class="card-body">
+                    <h5>Avg. Orders / Customer</h5>
+                    <h3>{{ avg_orders }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Customers Table -->
+    <div class="data-wrap">
+        <div class="data-viewport">
+            <div class="data-scroller" role="region" aria-label="Customers dataset" tabindex="0">
+                <table class="data-table table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Phone</th>
+                            <th>Orders</th>
+                            <th>Verified</th>
+                            <th>Blocked</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in customers %}
+                        <tr class="customer-row" data-id="{{ c.id }}" style="cursor:pointer;">
+                            <td>{{ c.id }}</td>
+                            <td>{{ c.name }}</td>
+                            <td>{{ c.email|default:"-" }}</td>
+                            <td>{{ c.mobile|default:"-" }}</td>
+                            <td>{{ c.order_counts }}</td>
+                            <td>{% if c.is_verified %} ✅ {% else %} ❌ {% endif %}</td>
+                            <td>{% if c.is_blocked %} 🚫 {% else %} ✅ {% endif %}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Customer Details Modal -->
+<div class="modal fade" id="customerModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Customer Details</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="customerDetails">Loading...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.querySelectorAll(".customer-row").forEach(row => {
+    row.addEventListener("click", function() {
+        let id = this.dataset.id;
+        let modal = new bootstrap.Modal(document.getElementById('customerModal'));
+        document.getElementById("customerDetails").innerHTML = "Loading...";
+        modal.show();
+
+        fetch(`/zid/customer-detail/${id}/`)  // <-- API route
+            .then(res => res.json())
+            .then(c => {
+                if (c.error) {
+                    document.getElementById("customerDetails").innerHTML = "⚠️ " + c.error;
+                    return;
+                }
+
+                let profileHtml = `
+                    <h5>👤 Profile</h5>
+                    <p><b>ID:</b> ${c.id}</p>
+                    <p><b>Name:</b> ${c.name} (${c.nickname || "-"})</p>
+                    <p><b>Email:</b> ${c.email || "-"}</p>
+                    <p><b>Mobile:</b> ${c.mobile || "-"}</p>
+                    <p><b>Gender:</b> ${c.gender || "-"}</p>
+                    <p><b>Birth Date:</b> ${c.birth_date || "-"}</p>
+                    <p><b>City:</b> ${c.city?.name || "-"} (${c.city?.country_name || ""})</p>
+                    <p><b>Verified:</b> ${c.verified ? "✅" : "❌"}</p>
+                    <p><b>Active:</b> ${c.is_active ? "✅" : "❌"}</p>
+                    <p><b>COD Enabled:</b> ${c.is_cod_enabled ? "✅" : "❌"}</p>
+                    <p><b>Orders Count:</b> ${c.order_counts || 0}</p>
+                    <p><b>Total Payments:</b> ${c.total_payments?.toFixed(2) || 0}</p>
+                    <p><b>Avg. Order Value:</b> ${c.orders_cost_average?.toFixed(2) || 0}</p>
+                `;
+
+                let ordersHtml = "";
+                if (c.orders && c.orders.length > 0) {
+                    ordersHtml = `
+                        <h5 class="mt-4">🛒 Recent Orders</h5>
+                        <div class="data-wrap">
+                            <div class="data-viewport">
+                                <div class="data-scroller" role="region" aria-label="Scrollable data table" tabindex="0">
+                                    <table class="data-table" role="table" aria-label="Analytics dataset">
+                                        <thead>
+                                            <tr>
+                                                <th>ID</th>
+                                                <th>Status</th>
+                                                <th>Total</th>
+                                                <th>Payment</th>
+                                                <th>Created At</th>
+                                                <th>Link</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${c.orders.map(o => `
+                                                <tr>
+                                                    <td>${o.id}</td>
+                                                    <td>${o.order_status?.name || "-"}</td>
+                                                    <td>${o.order_total_string || o.order_total}</td>
+                                                    <td>${o.payment_status}</td>
+                                                    <td>${o.created_at}</td>
+                                                    <td><a href="${o.order_url}" target="_blank">View</a></td>
+                                                </tr>
+                                            `).join("")}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    ordersHtml = `<p class="mt-4">No orders found.</p>`;
+                }
+
+                document.getElementById("customerDetails").innerHTML = profileHtml + ordersHtml;
+            })
+            .catch(err => {
+                document.getElementById("customerDetails").innerHTML = "⚠️ " + err;
+            });
+    });
+});
+</script>
+
+{% endblock %}

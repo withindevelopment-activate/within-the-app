@@ -1,0 +1,147 @@
+{% extends "Demo/base.html" %}
+
+{% block title %} Tracking {% endblock title %}
+
+{% block content %}
+<div class="container py-4">
+  <h2 class="mb-4">Tracking Overview (Store {{ track_id }})</h2>
+
+  <!-- Summary Cards -->
+  <div class="row text-center mb-4">
+    <div class="col-md-4">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">Total Visitors</h5>
+          <h3>{{ total_visitors }}</h3>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">Unique Sessions</h5>
+          <h3>{{ total_sessions }}</h3>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">Pageviews</h5>
+          <h3>{{ total_pageviews }}</h3>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <form method="get" class="mb-4 row">
+    <div class="col-md-3">
+      <input type="text" class="form-control" name="visitor" placeholder="Visitor ID" value="{{ request.GET.visitor }}">
+    </div>
+    <div class="col-md-3">
+      <input type="text" class="form-control" name="session" placeholder="Session ID" value="{{ request.GET.session }}">
+    </div>
+    <div class="col-md-3">
+      <input type="date" class="form-control" name="from" value="{{ request.GET.from }}">
+    </div>
+    <div class="col-md-3">
+      <input type="date" class="form-control" name="to" value="{{ request.GET.to }}">
+    </div>
+    <div class="col-md-12 mt-2">
+      <button class="btn btn-primary w-100">Apply</button>
+    </div>
+  </form>
+
+  <!-- Tracking Table -->
+  <div class="data-wrap">
+    <div class="data-viewport">
+      <div class="data-scroller" role="region" aria-label="Scrollable data table" tabindex="0">
+        <table class="data-table" role="table" aria-label="Tracking dataset">
+          <thead>
+            <tr>
+              <th>Distinct ID</th>
+              <th class="sticky-col">Visitor ID</th>
+              <th>Session ID</th>
+              <th>Store URL</th>
+              <th>Event Type</th>
+              <th>Event Details</th>
+              <th>Page URL</th>
+              <th>Visited At</th>
+              <th>UTM Source</th>
+              <th>UTM Medium</th>
+              <th>UTM Campaign</th>
+              <th>UTM Term</th>
+              <th>UTM Content</th>
+              <th>Referrer</th>
+              <th>Traffic Source</th>
+              <th>Traffic Medium</th>
+              <th>Traffic Campaign</th>
+              <th>Customer ID</th>
+              <th>Customer Name</th>
+              <th>Customer Email</th>
+              <th>Customer Mobile</th>
+              <th>User Agent</th>
+              <th>Language</th>
+              <th>Timezone</th>
+              <th>Platform</th>
+              <th>Screen Resolution</th>
+              <th>Device Memory</th>
+              <th>IP Address</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in rows %}
+            <tr>
+              <td>{{ r.Distinct_ID }}</td>
+              <td class="sticky-col">{{ r.Visitor_ID }}</td>
+              <td>{{ r.Session_ID }}</td>
+              <td>{{ r.Store_URL }}</td>
+              <td>{{ r.Event_Type }}</td>
+              <td>{{ r.Event_Details }}</td>
+              <td>{{ r.Page_URL }}</td>
+              <td>{{ r.Visited_at }}</td>
+              <td>{{ r.UTM_Source }}</td>
+              <td>{{ r.UTM_Medium }}</td>
+              <td>{{ r.UTM_Campaign }}</td>
+              <td>{{ r.UTM_Term }}</td>
+              <td>{{ r.UTM_Content }}</td>
+              <td>{{ r.Referrer_Platform }}</td>
+              <td>{{ r.Traffic_Source }}</td>
+              <td>{{ r.Traffic_Medium }}</td>
+              <td>{{ r.Traffic_Campaign }}</td>
+              <td>{{ r.Customer_ID }}</td>
+              <td>{{ r.Customer_Name }}</td>
+              <td>{{ r.Customer_Email }}</td>
+              <td>{{ r.Customer_Mobile }}</td>
+              <td>{{ r.User_Agent }}</td>
+              <td>{{ r.Language }}</td>
+              <td>{{ r.Timezone }}</td>
+              <td>{{ r.Platform }}</td>
+              <td>{{ r.Screen_Resolution }}</td>
+              <td>{{ r.Device_Memory }}</td>
+              <td>{{ r.IP_Address }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="28" class="text-center text-muted">No tracking data found</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Charts -->
+  <div class="row mt-5">
+    <div class="col-md-6">
+      <canvas id="visitsByDay"></canvas>
+    </div>
+    <div class="col-md-6">
+      <canvas id="visitsBySource"></canvas>
+    </div>
+  </div>
+</div>
+{% endblock %}

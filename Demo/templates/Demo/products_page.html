@@ -15,8 +15,31 @@
                 </div>
             </div>
         </div>
+        <div class="col-md-3">
+            <div class="card text-center shadow-sm">
+                <div class="card-body">
+                    <h5>Published</h5>
+                    <h3>{{ published_count }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center shadow-sm">
+                <div class="card-body">
+                    <h5>Avg. Rating</h5>
+                    <h3>{{ avg_rating }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center shadow-sm">
+                <div class="card-body">
+                    <h5>On Sale</h5>
+                    <h3>{{ on_sale_count }}</h3>
+                </div>
+            </div>
+        </div>
     </div>
-    
 
     <!-- Filter -->
     <form method="GET" class="mb-3">
@@ -44,20 +67,30 @@
                 <table class="data-table" role="table" aria-label="Analytics dataset">
                     <thead class="table-light">
                         <tr>
+                            <th>ID</th>
                             <th>Name</th>
                             <th>Price</th>
                             <th>Sale Price</th>
                             <th>Rating</th>
+                            <th>Stock</th>
                             <th>Published</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for p in products %}
                         <tr>
+                            <td>{{ p.id }}</td>
                             <td>{{ p.name.en }}</td>
                             <td>{{ p.price }}</td>
                             <td>{{ p.sale_price }}</td>
                             <td>{{ p.rating.average }} ⭐ ({{ p.rating.total_count }})</td>
+                            <td>
+                                {% if p.stocks %}
+                                {{ p.stocks.0.available_quantity|default:"∞" }}
+                                {% else %}
+                                N/A
+                                {% endif %}
+                            </td>
                             <td>{% if p.is_published %} ✅ {% else %} ❌ {% endif %}</td>
                         </tr>
                         {% endfor %}

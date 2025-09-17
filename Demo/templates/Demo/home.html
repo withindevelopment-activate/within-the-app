@@ -136,9 +136,9 @@
     datasets: [{
       label: 'Order Total (AED)',
       data: [{% for o in orders %}{{ o.order_total|floatformat:2 }}, {% endfor %}],
-      backgroundColor: 'rgba(54, 162, 235, 0.6)',
-      borderColor: 'rgba(54, 162, 235, 1)',
-      hoverBackgroundColor: "rgba(54, 162, 235, 1)",
+      backgroundColor: '#0099C699',
+      borderColor: '#0099C6ff',
+      hoverBackgroundColor: "#0099C6ff",
       borderRadius: {
         topLeft: 20,
         topRight: 20,
@@ -158,9 +158,9 @@
     datasets: [{
       label: 'Product Prices (AED)',
       data: [{% for p in products %}{{ p.price|floatformat:2 }}, {% endfor %}],
-      backgroundColor: 'rgba(255, 99, 132, 0.6)',
-      borderColor: 'rgba(255, 99, 132, 1)',
-      hoverBackgroundColor: "rgba(255, 99, 132, 1)",
+      backgroundColor: '#99009999',
+      borderColor: '#990099ff',
+      hoverBackgroundColor: "#990099ff",
         borderRadius: {
           topLeft: 20,
           topRight: 20,
@@ -244,6 +244,7 @@
           }
         },
         grid: {
+          display: false,
           color: 'rgba(200, 200, 200, 0.2)'
         }
       }

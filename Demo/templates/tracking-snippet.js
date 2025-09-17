@@ -1,3 +1,6 @@
+const STORE_ID = "{{ store_id }}";
+const BACKEND_URL = "{{ backend_url }}";
+
 (function() {
     // ------------------- Helper Functions -------------------
     function getOrCreateCookie(name, days = 365) {
@@ -68,25 +71,20 @@
         return {};
     }
 
-    // ------------------- Tracking -------------------
-    const BACKEND_URL = "https://testing-within.onrender.com";
-
-    function sendPageview() {
+    // ------------------- Generic Event Sender -------------------
+    function sendTrackingEvent(eventType, eventDetails = {}) {
         const storeUrl = window.location.origin;
-        if (!storeUrl) {
-            console.warn('tracking.js: store_url not found');
-            return;
-        }
         const utmParams = getUTMParams();
         const referrer = getReferrer();
         const traffic = inferTrafficSource(utmParams, referrer);
 
         const trackingData = {
+            store_id: STORE_ID,
             visitor_id: getVisitorId(),
             session_id: getOrCreateSessionId(),
             store_url: storeUrl,
-            event_type: 'pageview',
-            event_details: {},
+            event_type: eventType,
+            event_details: eventDetails,
             utm_params: utmParams,
             referrer: referrer,
             traffic_source: traffic,
@@ -96,13 +94,51 @@
             timestamp: new Date().toISOString()
         };
 
-        fetch(`${BACKEND_URL}/save_tracking`, {
+        console.log(`DEBUG: Sending event '${eventType}'`, trackingData);
+
+        fetch(`${BACKEND_URL}/save_tracking/`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(trackingData)
-        }).catch(err => console.error('Tracking failed:', err));
+        })
+        .then(response => response.json())
+        .then(data => console.log('DEBUG: Tracking response:', data))
+        .catch(err => console.error('DEBUG: Tracking failed:', err));
+    }
+    window.addEventListener('load', function() {
+        sendTrackingEvent("pageview");
+    });
+
+    window.addToCartEvent = function(productInfo) {
+        console.log("🛒 Add to Cart detected:", productInfo);
+        sendTrackingEvent("add_to_cart", productInfo);
+    };
+
+    window.addToWishlist = function(productId) {
+        console.log("🛒 Add to Wishlist detected:", productId);
+        sendTrackingEvent("add_to_wishlist", productId);
+    };
+
+    // ------------------- Purchase Tracking -------------------
+    function sendPurchaseIfExists() {
+        if (window.sendPurchaseTrackingEventObj && window.sendPurchaseTrackingEventObj.order) {
+            const o = window.sendPurchaseTrackingEventObj.order;
+            const orderInfo = {
+                order_id: o.id,
+                customer_id: o.customer?.id || "Unknown",
+                order_total_string: o.order_total_string,
+                issue_date: o.issue_date,
+                payment_method_name: o.payment?.method?.name,
+                products_name: o.products?.map(p => p.name).join(", "),
+                products_count: o.products_count
+            };
+
+            console.log("✅ Purchase detected:", orderInfo);
+            sendTrackingEvent("purchase", orderInfo);
+        }
     }
 
-    // ------------------- Event Listener -------------------
-    window.addEventListener('load', sendPageview);
+    // Run once after page load
+    window.addEventListener('load', sendPurchaseIfExists);
+
 })();

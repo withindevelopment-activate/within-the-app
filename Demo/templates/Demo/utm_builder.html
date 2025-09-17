@@ -1,0 +1,86 @@
+{% extends "Demo/base.html" %}
+
+{% block title %}UTM Builder{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <h2 class="mb-4">UTM Link Builder</h2>
+
+  <!-- UTM Form -->
+  <form id="utmForm" class="row g-3">
+    <div class="col-md-6">
+      <label class="form-label">Base URL</label>
+      <input type="url" class="form-control" id="baseUrl" placeholder="https://example.com/page" required>
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">Campaign Source (utm_source)</label>
+      <input type="text" class="form-control" id="utmSource" placeholder="google, newsletter, etc.">
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">Campaign Medium (utm_medium)</label>
+      <input type="text" class="form-control" id="utmMedium" placeholder="cpc, email, banner">
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">Campaign Name (utm_campaign)</label>
+      <input type="text" class="form-control" id="utmCampaign" placeholder="summer_sale">
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">Campaign Term (utm_term)</label>
+      <input type="text" class="form-control" id="utmTerm" placeholder="optional">
+    </div>
+    <div class="col-md-6">
+      <label class="form-label">Campaign Content (utm_content)</label>
+      <input type="text" class="form-control" id="utmContent" placeholder="optional">
+    </div>
+  </form>
+
+  <!-- Result -->
+  <div class="mt-4">
+    <h5>Generated UTM Link</h5>
+    <div class="input-group">
+      <input type="text" class="form-control" id="utmResult" readonly>
+      <button class="btn btn-outline-secondary" type="button" id="copyBtn">Copy</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function buildUTM() {
+  let base = document.getElementById("baseUrl").value.trim();
+  let params = new URLSearchParams();
+
+  let source = document.getElementById("utmSource").value.trim();
+  let medium = document.getElementById("utmMedium").value.trim();
+  let campaign = document.getElementById("utmCampaign").value.trim();
+  let term = document.getElementById("utmTerm").value.trim();
+  let content = document.getElementById("utmContent").value.trim();
+
+  if (source) params.append("utm_source", source);
+  if (medium) params.append("utm_medium", medium);
+  if (campaign) params.append("utm_campaign", campaign);
+  if (term) params.append("utm_term", term);
+  if (content) params.append("utm_content", content);
+
+  let url = base;
+  if (params.toString()) {
+    url += (base.includes("?") ? "&" : "?") + params.toString();
+  }
+
+  document.getElementById("utmResult").value = url;
+}
+
+// Listen for input changes
+document.querySelectorAll("#utmForm input").forEach(input => {
+  input.addEventListener("input", buildUTM);
+});
+
+// Copy button
+document.getElementById("copyBtn").addEventListener("click", function() {
+  let field = document.getElementById("utmResult");
+  field.select();
+  document.execCommand("copy");
+  this.textContent = "Copied!";
+  setTimeout(() => this.textContent = "Copy", 1500);
+});
+</script>
+{% endblock %}

@@ -12,6 +12,7 @@ charset-normalizer==3.4.2
 deprecation==2.1.0
 dj-database-url==3.0.1
 Django==5.2.4
+django-cors-headers==4.7.0
 et_xmlfile==2.0.0
 frozenlist==1.7.0
 gotrue==2.12.3
@@ -56,4 +57,3 @@ urllib3==2.5.0
 websockets==15.0.1
 whitenoise==6.9.0
 yarl==1.20.1
-django-cors-headers==4.5.0

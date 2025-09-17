@@ -1,30 +1,23 @@
-from datetime import datetime
-import pandas as pd
-import requests
+from datetime import datetime, timedelta, timezone
 from django.conf import settings
 from django.shortcuts import redirect, render
+from django.contrib import messages
+from django.http import JsonResponse, HttpResponseBadRequest, HttpResponse
+import pandas as pd
+from rapidfuzz import fuzz
+import json, re, os, sqlite3, pytz, requests, traceback, uuid
+from django.core.files.storage import FileSystemStorage
+from .supporting_functions import get_uae_current_date
+from django.template.loader import render_to_string
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
-from django.contrib import messages
-import traceback
-from django.http import JsonResponse, HttpResponseBadRequest, HttpResponse
-from django.template.loader import render_to_string
-from rapidfuzz import fuzz
+from pathlib import Path
+from django.db import connection
 from urllib.parse import urlencode
-import json
-from django.core.files.storage import FileSystemStorage
-import re
-import asyncio
-from io import BytesIO
 
-# Supabase & Supporting imports
-from .supabase_functions import batch_insert_to_supabase, get_next_id_from_supabase_compatible_all
-from .supporting_functions import get_uae_current_date
-# Marketing Report functions
-from .marketing_report import create_general_analysis, create_product_percentage_amount_spent, landing_performance_5_async, column_check
 
-# Redirect user to Zid OAuth page
-'''def zid_login(request):
+# Step 1: Redirect user to Zid OAuth page
+def zid_login(request):
     params = {
             'client_id': settings.ZID_CLIENT_ID,
             'redirect_uri': settings.ZID_REDIRECT_URI,
@@ -33,20 +26,9 @@ from .marketing_report import create_general_analysis, create_product_percentage
     
     # Add optional parameters if they exist
     query_string = '&'.join([f'{k}={v}' for k, v in params.items()])
-    return redirect(f'{settings.ZID_AUTH_URL}?{query_string}')'''
+    return redirect(f'{settings.ZID_AUTH_URL}?{query_string}')
 
-def zid_login(request):
-    params = {
-        "client_id": settings.ZID_CLIENT_ID,
-        "redirect_uri": settings.ZID_REDIRECT_URI,
-        "response_type": "code",
-    }
-    url = settings.ZID_AUTH_URL
-    auth_url = f"{url}?{urlencode(params)}"
-    return redirect(auth_url)
-
-
-# Handle callback and exchange code for access_token
+# Step 2: Handle callback and exchange code for access_token
 def zid_callback(request):
     code = request.GET.get('code')
     if not code:
@@ -70,24 +52,26 @@ def zid_callback(request):
         refresh_token = token_data.get('refresh_token')
         authorization_token = token_data.get('authorization')
 
-        print("Retrieved Token data:", token_data)
+        # ✅ Save token to session
+        request.session['access_token'] = token_data.get('access_token')
+        request.session['refresh_token'] = token_data.get('refresh_token')
+        request.session['authorization_token'] = token_data.get('authorization')
 
-        # Save tokens to session
-        request.session['access_token'] = access_token
-        request.session['refresh_token'] = refresh_token
-        request.session['authorization_token'] = authorization_token
+        # # Log the tokens for debugging
+        headers = {
+            'Authorization': f'Bearer {authorization_token}',
+            'X-MANAGER-TOKEN': access_token,  # Sometimes needed depending on endpoint
+        }
 
-        ''' 
-        # Commented this part since it is redundant ----
         # Fetch user profile to get store ID
         profile_response = requests.get(f"{settings.ZID_API_BASE}/managers/account/profile", headers=headers)
         profile = profile_response.json() if profile_response.status_code == 200 else {}
         store_id = profile.get('user', {}).get('store', {}).get('id')
+
         if store_id:
             request.session['store_id'] = store_id
-            print("Store ID saved to session: - views.py:61", store_id)
         else:
-            print("⚠️ Store ID not found in profile response. - views.py:63")'''
+            print("⚠️ Store ID not found in profile response.")
         return redirect('Demo:home')  # go to the home view
 
     except requests.RequestException as e:
@@ -100,15 +84,22 @@ def home(request):
     auth_token = request.session.get('authorization_token')
     store_id = request.session.get('store_id')
 
-    '''print("The access token is:", token)
-    print("The authorization token is:", auth_token)
-    print("The retrieved store id is:", store_id)
-'''
+    if not token:
+        return redirect('Demo:zid_login')
 
     headers = {
         'Authorization': f'Bearer {auth_token}',
         'X-MANAGER-TOKEN': token,
     }
+
+    headers_product = {
+            'Authorization': f'Bearer {auth_token}',
+            'X-MANAGER-TOKEN': token,  # Sometimes needed depending on endpoint
+            'accept': 'application/json',
+            'Accept-Language': 'all-languages',
+            'Store-Id': f'{store_id}',
+            'Role': 'Manager',
+        }
 
     profile = {}
     orders = []
@@ -122,18 +113,16 @@ def home(request):
         profile_res = requests.get(f"{settings.ZID_API_BASE}/managers/account/profile", headers=headers)
         profile_res.raise_for_status()
         profile = profile_res.json()
-        user_name = profile.get('user', {}).get('name') or profile.get('username', 'Default')
-        #user_name = 'Default'
-        if not user_name:
-            print("Couldn't retrieve username")
-            user_name = 'Default'
+        # print(f"✅ Profile fetched successfully: {profile}")
+        user_name = profile.get('user', {}).get('name') or profile.get('username')
         store_title = profile.get('user', {}).get('store', {}).get('title', 'Unknown Store')
+        store_uuid = profile.get('user', {}).get('store', {}).get('uuid')
+        
+        request.session['store_uuid'] = store_uuid
 
-        # Get the Store ID
-        store_id = profile.get('user', {}).get('store', {}).get('id')
-        if store_id:
-            request.session['store_id'] = store_id
-
+        if not user_name:
+            return redirect('Demo:zid_login')
+        
         # Fetch orders
         orders_res = requests.get(f"{settings.ZID_API_BASE}/managers/store/orders", headers=headers)
         orders_res.raise_for_status()
@@ -141,11 +130,8 @@ def home(request):
 
         # Extract orders and calculate totals
         orders = orders_data.get('orders', [])
-        #print("The orders payload is:", orders)
-        '''for order in orders[:5]:
-            print(order)'''
         total_orders = round(orders_data.get('total_order_count', len(orders)), 2)
-        total_revenue = sum(float(order['transaction_amount']) for order in orders)
+        total_revenue = sum(float(o.get('order_total' , 0)) for o in orders)
         total_revenue = round(total_revenue, 2)
 
         # Process orders to extract total and status
@@ -166,21 +152,9 @@ def home(request):
             order["display_status"] = status_obj.get("name") or status_obj.get("code") or "unknown"
 
         # Fetch products
-        # Define the headers to retrieve the products
-        headers_product = {
-            'Authorization': f'Bearer {auth_token}',
-            'X-MANAGER-TOKEN': token, 
-            'accept': 'application/json',
-            'Accept-Language': 'all-languages',
-            'Store-Id': f'{store_id}',
-            'Role': 'Manager',
-        }
-
-        # Call the products --
         products_res = requests.get(f"{settings.ZID_API_BASE}/products", headers=headers_product)
         products_res.raise_for_status()
         products_data = products_res.json()
-        #print("Products data fetched successfully:", products_data)
         products = products_data.get('results', [])
         total_products = products_data.get('count', len(products))
         # Process products to extract price and display name
@@ -198,7 +172,7 @@ def home(request):
     # Handle any request errors       
     except requests.RequestException as e:
         traceback.print_exc()
-        messages.error(request, f"Something went wrong: {str(e)}")
+        messages.error(request, f"⚠️ Something went wrong: {str(e)}")
     
     context= {
         'profile': profile,
@@ -213,13 +187,13 @@ def home(request):
 
     return render(request, 'Demo/home.html', context)
 
-# Logout and clear session
+# Step 4: Logout and clear session
 def zid_logout(request):
     request.session.flush()
     messages.success(request, "You have been logged out.")
     return redirect('Demo:zid_login')
 
-# Refresh access token using stored refresh token
+# Step 5: Refresh access token using stored refresh token
 def zid_refresh_token(request):
     """Refresh the access token using session-stored refresh token"""
     refresh_token = request.session.get('refresh_token')
@@ -247,15 +221,6 @@ def zid_refresh_token(request):
 
     return JsonResponse({'status': 'refreshed', 'new_access_token': new_tokens.get('access_token')})
 
-
-
-###############################################################################
-################# ZID ORDERS + GOOGLE ANALYTICS ###############################
-'''
-This section takes in the data from Google Analytics and:
-1- Extracts the Order ID from the Analytics data, locates this order in the store through the API connection.
-2- Performs analysis on pulled information. 
-'''
 def normalize_campaign(name):
     if not isinstance(name, str):
         return ""
@@ -294,6 +259,9 @@ def clean_source(source):
         return "Direct"
     else:
         return source.title()
+
+def safe_name(name):
+    return re.sub(r'[^0-9a-zA-Z_]', '_', str(name))
 
 def get_order_from_zid(order_id , headers):
     """
@@ -432,99 +400,10 @@ def match_orders_with_analytics(request):
         "unmatched_order_total": round(unmatched_order_total, 2),
         "unmatched_analytics_total": round(unmatched_analytics_total, 2),
         "unmatched_merchant_admin_total": round(unmatched_merchant_admin_total, 2),
-        "source_metrics": source_metrics,
+        "source_metrics": json.dumps(source_metrics),
         "campaign_product_sales": campaign_product_sales,
     })
 
-
-#############################################################################################################
-################################## The Visitor Tracking Section #############################################
-@csrf_exempt  # This is added because we are adding the tracking javascript to the app but the store pages likely do not have a <meta name="csrf-token">
-@require_POST
-def save_tracking(request):
-    try:
-        print("ENTERED THE TRACKING FUNCTION")
-
-        import json
-        try:
-            data = json.loads(request.body)
-        except Exception:
-            return JsonResponse({"status": "error", "message": "Invalid JSON payload"}, status=400)
-
-        print("The data received is:", data)
-        if not data:
-            return JsonResponse({"status": "error", "message": "No JSON payload received"}, status=400)
-
-        # Generate unique ID
-        distinct_id = int(get_next_id_from_supabase_compatible_all(name='Tracking_Visitors', column='Distinct_ID'))
-
-        # Flatten visitor info
-        visitor_info = data.get('visitor_info', {}) or {}
-        client_info = data.get('client_info', {}) or {}
-        utm_params = data.get('utm_params', {}) or {}
-        traffic_source = data.get('traffic_source', {}) or {}
-
-        tracking_entry = {
-            'Distinct_ID': distinct_id,
-            'Visitor_ID': data.get('visitor_id'),
-            'Session_ID': data.get('session_id'),
-            'Store_URL': data.get('store_url'),
-            'Event_Type': data.get('event_type'),
-            'Event_Details': str(data.get('event_details', {})),
-            'Page_URL': data.get('page_url'),
-            'Visited_at': get_uae_current_date(),
-
-            # UTM Parameters
-            'UTM_Source': utm_params.get('utm_source'),
-            'UTM_Medium': utm_params.get('utm_medium'),
-            'UTM_Campaign': utm_params.get('utm_campaign'),
-            'UTM_Term': utm_params.get('utm_term'),
-            'UTM_Content': utm_params.get('utm_content'),
-
-            # Referrer
-            'Referrer_Platform': data.get('referrer'),
-
-            # Traffic Source
-            'Traffic_Source': traffic_source.get('source'),
-            'Traffic_Medium': traffic_source.get('medium'),
-            'Traffic_Campaign': traffic_source.get('campaign'),
-
-            # Visitor Info
-            'Customer_ID': visitor_info.get('customer_id'),
-            'Customer_Name': visitor_info.get('name'),
-            'Customer_Email': visitor_info.get('email'),
-            'Customer_Mobile': visitor_info.get('mobile'),
-
-            # Client Info
-            'User_Agent': client_info.get('user_agent'),
-            'Language': client_info.get('language'),
-            'Timezone': client_info.get('timezone'),
-            'Platform': client_info.get('platform'),
-            'Screen_Resolution': client_info.get('screen_resolution'),
-            'Device_Memory': client_info.get('device_memory')
-        }
-
-        print("ABOUT TO BATCH INSERT")
-
-        try:
-            tracking_entry_df = pd.DataFrame([tracking_entry])
-            batch_insert_to_supabase(tracking_entry_df, 'Tracking_Visitors')
-        except Exception as e:
-            print("Failed to insert tracking entry into Supabase:", e)
-            traceback.print_exc()
-
-        return JsonResponse({"status": "success"})
-    
-    except Exception as e:
-        print("TRACKING FUNCTION ERROR:", e)
-        return JsonResponse({"status": "error", "message": str(e)}, status=500)
-
-# The route to render the tracking javascript -- 
-def tracking_snippet(request):
-    js_content = render_to_string("tracking-snippet.js")
-    return HttpResponse(js_content, content_type="application/javascript")
-###################################################################################################################3
-###########################################
 def search_view(request):
     query = request.GET.get("q", "").lower()
     results = []
@@ -535,10 +414,6 @@ def search_view(request):
             {"title": "Dashboard", "url": "/"},
             {"title": "Analytics", "url": "/zid_orders/"},
             {"title": "Logout", "url": "/zid_logout/"},
-            {"title": "Marketing", "url": "/marketing/"},
-            {"title": "Products", "url": "/zid/products//"},
-            {"title": "Orders", "url": "/zid/orders//"},
-            {"title": "Analytics", "url": "/zid/match_google//"},
         ]
         results = [p for p in pages if query in p["title"].lower()]
 
@@ -564,16 +439,16 @@ def orders_page(request):
     try:
         while True:
             params = {"page": page, "page_size": per_page}
-            order_res = requests.get(f"{settings.ZID_API_BASE}/managers/store/orders",
+            orders_res = requests.get(f"{settings.ZID_API_BASE}/managers/store/orders",
                                headers=headers, params=params)
-            order_res.raise_for_status()
-            order_data = order_res.json()
+            orders_res.raise_for_status()
+            orders_data = orders_res.json()
 
-            orders_list = order_data.get("orders", [])
+            orders_list = orders_data.get("orders", [])
             if not orders_list:
                 break
 
-            # Process orders_list (dates + totals)
+            # Process orders (dates + totals)
             for order in orders_list:
                 order['order_total'] = float(order.get('order_total', 0))
                 order['display_status'] = order.get('order_status', {}).get('name', 'unknown')
@@ -591,7 +466,7 @@ def orders_page(request):
             all_orders.extend(orders_list)
 
             # Stop if we already got everything
-            if len(all_orders) >= order_data.get("total_orders_count", 0):
+            if len(all_orders) >= orders_data.get("total_orders_count", 0):
                 break
 
             page += 1
@@ -604,7 +479,8 @@ def orders_page(request):
     return render(request, 'Demo/orders.html', {
         'orders': all_orders,
         'total_orders': len(all_orders),
-        'total_revenue': sum(float(order.get('transaction_amount', 0)) for order in all_orders)
+        'total_revenue': sum(float(order.get('transaction_amount', 2)) for order in all_orders),
+        'avg_order': (sum(float(order.get('transaction_amount', 2)) for order in all_orders) / len(all_orders) if all_orders else 0),
     })
 
 def products_page(request):
@@ -627,20 +503,24 @@ def products_page(request):
     all_products = []
     page = 1
     per_page = 50
-
-    while True:
-        params = {'page': page, 'page_size': per_page}
-        products_res = requests.get(f"{settings.ZID_API_BASE}/products", headers=headers_product, params=params)
-        products_res.raise_for_status()
-        products_data = products_res.json()
-        products_list = products_data.get('results', [])
-        if not products_list:
-            break
-        all_products.extend(products_list)
-        # Optional: break if you've fetched as many as reported by the API
-        if len(all_products) >= products_data.get('total_products_count', 0):
-            break
-        page += 1
+    try:
+        while True:
+            params = {'page': page, 'page_size': per_page}
+            products_res = requests.get(f"{settings.ZID_API_BASE}/products", headers=headers_product, params=params)
+            products_res.raise_for_status()
+            products_data = products_res.json()
+            products_list = products_data.get('results', [])
+            if not products_list:
+                break
+            all_products.extend(products_list)
+            # Optional: break if you've fetched as many as reported by the API
+            if len(all_products) >= products_data.get('total_products_count', 0):
+                break
+            page += 1
+    except requests.RequestException as e:
+        traceback.print_exc()
+        messages.error(request, f"⚠️ Error fetching products: {str(e)}")
+        all_products = []
 
     # Extract product list safely
     total_products = products_data.get("total_products_count", len(all_products))
@@ -665,9 +545,141 @@ def products_page(request):
 
     return render(request, "Demo/products_page.html", context)
 
-def safe_name(name):
-    return re.sub(r'[^0-9a-zA-Z_]', '_', str(name))
+def abandoned_carts_page(request):
+    token = request.session.get('access_token')
+    auth_token = request.session.get('authorization_token')
+    store_id = request.session.get('store_id')
 
+    if not token:
+        return redirect('Demo:zid_login')
+
+    headers_cart = {
+        'Authorization': f'Bearer {auth_token}',
+        'X-MANAGER-TOKEN': token,
+        'accept': 'application/json',
+        'Accept-Language': 'all-languages',
+        'Store-Id': f'{store_id}',
+        'Role': 'Manager',
+    }
+
+    all_carts = []
+    page = 1
+    per_page = 100
+    try:
+        while True:
+            params = {'page': page, 'page_size': per_page}
+            carts_res = requests.get(f"{settings.ZID_API_BASE}/managers/store/abandoned-carts", headers=headers_cart, params=params)
+            carts_res.raise_for_status()
+            carts_data = carts_res.json()
+            carts_list = carts_data.get('results', [])
+            if not carts_list:
+                break
+            all_carts.extend(carts_list)
+            if len(all_carts) >= carts_data.get('count', 0):  # Zid uses 'count'
+                break
+            page += 1
+    except requests.RequestException as e:
+        traceback.print_exc()
+        messages.error(request, f"⚠️ Error fetching abandoned carts: {str(e)}")
+        all_carts = []
+
+    total_carts = len(all_carts)
+
+    # KPIs
+    recovered_count = sum(1 for c in all_carts if c.get("is_recovered"))
+    total_value = sum(float(c.get("total", 0)) for c in all_carts)
+    avg_cart_value = round(total_value / total_carts, 2) if total_carts > 0 else 0
+
+    context = {
+        "carts": all_carts,
+        "total_carts": total_carts,
+        "recovered_count": recovered_count,
+        "avg_cart_value": avg_cart_value,
+        "total_value": total_value,
+    }
+
+    return render(request, "Demo/abandoned_carts_page.html", context)
+
+def customers_page(request):
+    token = request.session.get('access_token')
+    auth_token = request.session.get('authorization_token')
+    store_id = request.session.get('store_id')
+
+    if not token:
+        return redirect('Demo:zid_login')
+
+    headers_customer = {
+        'Authorization': f'Bearer {auth_token}',
+        'X-MANAGER-TOKEN': token,
+        'accept': 'application/json',
+        'Accept-Language': 'all-languages',
+        'Store-Id': f'{store_id}',
+        'Role': 'Manager',
+    }
+
+    all_customers = []
+    page = 1
+    per_page = 10
+    try:
+        while True:
+            params = {'page': page, 'page_size': per_page}
+            res = requests.get(f"{settings.ZID_API_BASE}/managers/store/customers", headers=headers_customer, params=params)
+            res.raise_for_status()
+            data = res.json()
+            customers_list = data.get('customers', [])  # ✅ FIXED
+            if not customers_list:
+                break
+
+            all_customers.extend(customers_list)
+
+            if len(all_customers) >= data.get('total_customers_count', 0):  # ✅ FIXED
+                break
+            page += 1
+    except requests.RequestException as e:
+        traceback.print_exc()
+        messages.error(request, f"⚠️ Error fetching customers: {str(e)}")
+        all_customers = []
+
+    total_customers = len(all_customers)
+
+    # KPIs (note: Zid uses `verified` not `is_verified`)
+    verified_count = sum(1 for c in all_customers if c.get("verified"))
+    blocked_count = sum(1 for c in all_customers if not c.get("is_active"))  # inactive means blocked
+    avg_orders = round(
+        sum(c.get("order_counts", 0) for c in all_customers) / total_customers, 2
+    ) if total_customers > 0 else 0
+
+    context = {
+        "customers": all_customers,
+        "total_customers": data.get("total_customers_count", total_customers),
+        "verified_count": verified_count,
+        "blocked_count": blocked_count,
+        "avg_orders": avg_orders,
+    }
+    return render(request, "Demo/customers_page.html", context)
+
+# AJAX endpoint for customer details popup
+def customer_detail_api(request, customer_id):
+    token = request.session.get('access_token')
+    auth_token = request.session.get('authorization_token')
+    store_id = request.session.get('store_id')
+
+    headers_customer = {
+        'Authorization': f'Bearer {auth_token}',
+        'X-MANAGER-TOKEN': token,
+        'accept': 'application/json',
+        'Accept-Language': 'all-languages',
+        'Store-Id': f'{store_id}',
+        'Role': 'Manager',
+    }
+
+    try:
+        res = requests.get(f"{settings.ZID_API_BASE}/managers/store/customers/{customer_id}", headers=headers_customer)
+        res.raise_for_status()
+        data = res.json()
+        return JsonResponse(data.get("customer", {}), safe=False)
+    except requests.RequestException as e:
+        return JsonResponse({"error": str(e)}, status=400)
 
 def safe_numeric(value):
     try:
@@ -675,11 +687,7 @@ def safe_numeric(value):
     except (ValueError, TypeError):
         return 0  # fallback if non-numeric
 
-
-#############################################################################
-############################ Marketing Report Section #######################
-def marketing_page_ready(request):
-    # This function is made to process the ready reporting file since the system cannot perform the full operation
+def marketing_page(request):
     context = {}
     if request.method == "POST" and request.FILES.get("excel_file"):
         excel_file = request.FILES["excel_file"]
@@ -720,106 +728,576 @@ def marketing_page_ready(request):
 
         context["sheets"] = sheets_data
 
-    return render(request, "Demo/marketing_ready.html", context)
-
-####### The marketing report creation from scratch #############
-################################################################
-### A function just to view
-def marketing_page(request):
-    return render(request, "Demo/marketing.html", {})
-
-@csrf_exempt
-def process_marketing_report(request):
-    # A dictionary to store the data
-    context = {}
-    # Mehtod check
-    if request.method != "POST":
-        return JsonResponse({'status': 'error', 'message': 'Invalid request method'}, status=405)
-
-    uploaded_files = []
-    missing_files = []
-    dataframes = {}
-
-    # Get start and end dates
-    start_time = request.POST.get("start_time")
-    end_time = request.POST.get("end_time")
-
-    # Check uploaded files
-    for i in range(1, 7):
-        file = request.FILES.get(f'file{i}')
-        if file:
-            message, response, file_1, file_2, file_3, file_4, file_5, file_6 = column_check(file, i)
-            if not response:
-                return JsonResponse({'status': 'error', 'message': message}, status=400)
-
-            if i == 1:
-                dataframes[i] = file_1
-            elif i == 2:
-                dataframes[i] = file_2
-            elif i == 3:
-                dataframes[i] = file_3
-            elif i == 4:
-                dataframes[i] = file_4
-            elif i == 5:
-                dataframes[i] = file_5
-            elif i == 6:
-                dataframes[i] = file_6
-
-            uploaded_files.append(file.name)
-        else:
-            missing_files.append(f'file{i}')
-
-    if missing_files:
-        return JsonResponse({'status': 'error', 'message': f'Missing files: {", ".join(missing_files)}'}, status=400)
-
-    # Process data
-    subsheet_one, subsheet_two, facebook, tiktok, snapchat, google, zid, analytics, orders_breakdown, zid_unfiltered = create_general_analysis(dataframes, start_time, end_time)
-    subsheet_three, subsheet_four, facebook_detailed, snapchat_detailed, tiktok_detailed, full_detailed, facebook, tiktok, snapchat, zid, analytics, vanilla_db, advertised_prods, orders_count_unfiltered, advertised_prods_copied = create_product_percentage_amount_spent(facebook, tiktok, snapchat, zid, analytics, zid_unfiltered)
-    landing = asyncio.run(landing_performance_5_async(analytics, vanilla_db, advertised_prods_copied, full_detailed, orders_count_unfiltered))
-
-    # Collect all sheets into a dictionary for template
-    sheets_data = {
-            "General_Analysis": subsheet_one,
-            "Orders Analysis": orders_breakdown,
-            "Platforms_Summary": subsheet_two,
-            "Percentages(Orders)": subsheet_three,
-            "AD Amount Spent": subsheet_four,
-            "Facebook Detailed": facebook_detailed,
-            "Snapchat Detailed": snapchat_detailed,
-            "Tiktok Detailed": tiktok_detailed,
-            "Full Detailed": full_detailed,
-            "Landing Performance Main_Vars": landing
-    }
-
-    template_sheets = {}
-
-    for sheet_name, df in sheets_data.items():
-            safe_sheet = safe_name(sheet_name)
-
-            # Extract labels (first column)
-            labels = df.iloc[:, 0].fillna("").astype(str).tolist()
-
-            # Extract numeric columns after the first one
-            charts = []
-            for col in df.columns[1:]:
-                values = [safe_numeric(v) for v in df[col].tolist()]
-                charts.append({
-                    "column": col,
-                    "values": values
-                })
-
-            template_sheets[sheet_name] = {
-                "columns": df.columns.tolist(),
-                "safe_name": safe_sheet,
-                "rows": df.values.tolist(),
-                "labels": json.dumps(labels, ensure_ascii=False),
-                "charts": charts
-            }
-
-    context["sheets"] = template_sheets
-    context["start_time"] = start_time
-    context["end_time"] = end_time
-
     return render(request, "Demo/marketing.html", context)
 
+def utm_builder(request):
+    return render(request, "Demo/utm_builder.html")
 
+# Path to Django default SQLite DB
+DB_PATH = os.path.join(settings.BASE_DIR, "db.sqlite3")
+
+# helper to make safe SQL table name
+def get_table_name(store_id: str) -> str:
+    safe_id = re.sub(r'[^0-9a-zA-Z_]', '_', str(store_id))  # sanitize
+    return f"Tracking_Visitors_{safe_id}"
+
+def init_user_table(store_id: str):
+    table = get_table_name(store_id)
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.cursor()
+        cur.execute(f"""
+            CREATE TABLE IF NOT EXISTS {table} (
+                Distinct_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                Visitor_ID TEXT,
+                Session_ID TEXT,
+                Store_URL TEXT,
+                Event_Type TEXT,
+                Event_Details TEXT,
+                Page_URL TEXT,
+                Visited_at TEXT,
+                UTM_Source TEXT,
+                UTM_Medium TEXT,
+                UTM_Campaign TEXT,
+                UTM_Term TEXT,
+                UTM_Content TEXT,
+                Referrer_Platform TEXT,
+                Traffic_Source TEXT,
+                Traffic_Medium TEXT,
+                Traffic_Campaign TEXT,
+                Customer_ID TEXT,
+                Customer_Name TEXT,
+                Customer_Email TEXT,
+                Customer_Mobile TEXT,
+                User_Agent TEXT,
+                Language TEXT,
+                Timezone TEXT,
+                Platform TEXT,
+                Screen_Resolution TEXT,
+                IP_Address TEXT,
+                Device_Memory TEXT
+            )
+        """)
+        conn.commit()
+    return table
+
+@csrf_exempt
+@require_POST
+def save_tracking(request):
+    try:
+        data = json.loads(request.body)
+    except Exception:
+        return JsonResponse({"status": "error", "message": "Invalid JSON"}, status=400)
+
+    store_id = data.get("store_id")
+    if not store_id:
+        return JsonResponse({"status": "error", "message": "No store_id provided"}, status=403)
+
+    # ensure table exists
+    table = init_user_table(store_id)
+    client_ip = get_client_ip(request)
+
+    tracking_entry = (
+        data.get('visitor_id'),
+        data.get('session_id'),
+        data.get('store_url'),
+        data.get('event_type'),
+        json.dumps(data.get('event_details', {}), ensure_ascii=False),
+        data.get('page_url'),
+        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        data.get('utm_params', {}).get('utm_source'),
+        data.get('utm_params', {}).get('utm_medium'),
+        data.get('utm_params', {}).get('utm_campaign'),
+        data.get('utm_params', {}).get('utm_term'),
+        data.get('utm_params', {}).get('utm_content'),
+        data.get('referrer'),
+        data.get('traffic_source', {}).get('source'),
+        data.get('traffic_source', {}).get('medium'),
+        data.get('traffic_source', {}).get('campaign'),
+        data.get('visitor_info', {}).get('customer_id'),
+        data.get('visitor_info', {}).get('name'),
+        data.get('visitor_info', {}).get('email'),
+        data.get('visitor_info', {}).get('mobile'),
+        data.get('client_info', {}).get('user_agent'),
+        data.get('client_info', {}).get('language'),
+        data.get('client_info', {}).get('timezone'),
+        data.get('client_info', {}).get('platform'),
+        data.get('client_info', {}).get('screen_resolution'),
+        client_ip,
+        data.get('client_info', {}).get('device_memory'),
+    )
+
+    columns = """Visitor_ID, Session_ID, Store_URL, Event_Type, Event_Details, Page_URL, Visited_at,
+                 UTM_Source, UTM_Medium, UTM_Campaign, UTM_Term, UTM_Content,
+                 Referrer_Platform, Traffic_Source, Traffic_Medium, Traffic_Campaign,
+                 Customer_ID, Customer_Name, Customer_Email, Customer_Mobile,
+                 User_Agent, Language, Timezone, Platform, Screen_Resolution, IP_Address, Device_Memory"""
+
+    placeholders = ",".join(["?"] * 27)
+
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            cur = conn.cursor()
+            cur.execute(
+                f"INSERT INTO {table} ({columns}) VALUES ({placeholders})",
+                tracking_entry
+            )
+            conn.commit()
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({"status": "error", "message": str(e)}, status=500)
+
+    return JsonResponse({"status": "success"})
+
+def view_tracking(request):
+    # get store_id from querystring or session
+    store_id = request.GET.get("store_id") or request.session.get("store_uuid")
+    if not store_id:
+        return HttpResponse("❌ store_id is required", status=400)
+
+    # path to the default Django DB
+    db_path = os.path.join(settings.BASE_DIR, "db.sqlite3")
+
+    # get table name
+    table = get_table_name(store_id)
+
+    # ensure table exists
+    init_user_table(store_id)
+
+    rows = []
+    total_visitors = total_sessions = total_pageviews = 0
+
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+
+        # build query with filters
+        query = f"SELECT * FROM {table} WHERE 1=1"
+        params = []
+
+        if request.GET.get("visitor"):
+            query += " AND Visitor_ID = ?"
+            params.append(request.GET["visitor"])
+
+        if request.GET.get("session"):
+            query += " AND Session_ID = ?"
+            params.append(request.GET["session"])
+
+        if request.GET.get("from"):
+            query += " AND date(Visited_at) >= date(?)"
+            params.append(request.GET["from"])
+
+        if request.GET.get("to"):
+            query += " AND date(Visited_at) <= date(?)"
+            params.append(request.GET["to"])
+
+        query += " ORDER BY Visited_at DESC LIMIT 200"
+        cur.execute(query, params)
+        rows = cur.fetchall()
+
+        # stats
+        cur.execute(f"SELECT COUNT(DISTINCT Visitor_ID) FROM {table}")
+        total_visitors = cur.fetchone()[0]
+
+        cur.execute(f"SELECT COUNT(DISTINCT Session_ID) FROM {table}")
+        total_sessions = cur.fetchone()[0]
+
+        cur.execute(f"SELECT COUNT(*) FROM {table}")
+        total_pageviews = cur.fetchone()[0]
+
+    return render(request, "Demo/tracking_view.html", {
+        "store_id": store_id,
+        "rows": rows,
+        "total_visitors": total_visitors,
+        "total_sessions": total_sessions,
+        "total_pageviews": total_pageviews,
+    })
+
+# The route to render the tracking javascript -- 
+def tracking_snippet(request):
+    store_id = request.GET.get("store_id")
+    if not store_id:
+        return HttpResponse("❌ store_id is required", status=400)
+
+    # Ensure the store table exists before serving snippet
+    init_user_table(store_id)
+
+    js_content = render_to_string("tracking-snippet.js", {
+        "store_id": store_id,
+        "backend_url": settings.BACKEND_URL.rstrip("/"),
+    })
+    return HttpResponse(js_content, content_type="application/javascript")
+
+def get_client_ip(request):
+    x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
+    if x_forwarded_for:
+        return x_forwarded_for.split(",")[0].strip()
+    return request.META.get("REMOTE_ADDR")
+
+def snapchat_login(request):
+    """
+    Initiates the Snapchat Marketing API OAuth 2.0 flow by creating a unique state
+    and storing it in the user's session.
+    """
+    # Generate a unique state to prevent CSRF attacks.
+    state = str(uuid.uuid4())
+    print(f"Generated OAuth state: {state}")
+    # Store the state in the Django session. It's automatically saved
+    # and tied to the user's browser session.
+    request.session['snapchat_oauth_state'] = state
+    
+    # Construct the authorization URL
+    auth_url = 'https://accounts.snapchat.com/login/oauth2/authorize'
+    params = {
+        'response_type': 'code',
+        'client_id': settings.SNAPCHAT_CLIENT_ID,
+        'redirect_uri': settings.SNAPCHAT_REDIRECT_URI,
+        'scope': settings.SNAPCHAT_OAUTH_SCOPE,
+        'state': state
+    }
+    
+    auth_request_url = requests.Request('GET', auth_url, params=params).prepare().url
+    print(f"Redirecting to Snapchat OAuth URL: {auth_request_url}")
+    return redirect(auth_request_url)
+
+def snapchat_callback(request):
+    """
+    Handles the redirect from Snapchat, validates the state, and exchanges
+    the authorization code for an access token.
+    """
+    code = request.GET.get('code')
+    state_from_snapchat = request.GET.get('state')
+
+    # 1. Retrieve the state from the session.
+    state_from_session = request.session.get('snapchat_oauth_state')
+
+    # 2. Validate the state to prevent CSRF attacks.
+    if not state_from_session or state_from_snapchat != state_from_session:
+        return HttpResponse('State mismatch: Potential CSRF attack.', status=400)
+
+    # Delete the state from the session after successful validation.
+    del request.session['snapchat_oauth_state']
+
+    # 3. Exchange the authorization code for an access token
+    cfg = settings.OAUTH_PROVIDERS["snapchat"]
+    token_url = cfg["token_url"]
+
+    data = {
+        "grant_type": "authorization_code",
+        "code": code,
+        'client_id': settings.SNAPCHAT_CLIENT_ID,
+        "client_secret": settings.SNAPCHAT_CLIENT_SECRET,
+        "redirect_uri": settings.SNAPCHAT_REDIRECT_URI,
+    }
+
+    try:
+        response = requests.post(token_url, data=data)
+        response.raise_for_status()
+        token_data = response.json()
+
+        # 4. Store the tokens securely in the session.
+        request.session["snapchat_access_token"] = token_data["access_token"]
+        request.session["snapchat_refresh_token"] = token_data.get("refresh_token")
+
+        expires_in_seconds = token_data.get("expires_in", 3600)
+        expiry_datetime = datetime.now() + timedelta(seconds=expires_in_seconds)
+        request.session["snapchat_token_expires_at"] = expiry_datetime.isoformat()
+
+        # 5. Redirect the user to the campaigns overview page.
+        return redirect("Demo:campaigns_overview")
+
+    except requests.RequestException as e:
+        return HttpResponse(f"Failed to get access token: {e}", status=500)
+
+def refresh_snapchat_token(request):
+    """
+    Refreshes the Snapchat access token using the refresh token.
+    """
+    refresh_token = request.session.get("snapchat_refresh_token")
+    if not refresh_token:
+        return None
+
+    cfg = settings.OAUTH_PROVIDERS["snapchat"]
+    data = {
+        "grant_type": "refresh_token",
+        "refresh_token": refresh_token,
+        "client_id": settings.SNAPCHAT_CLIENT_ID,
+        "client_secret": settings.SNAPCHAT_CLIENT_SECRET,
+    }
+
+    try:
+        resp = requests.post(cfg["token_url"], data=data)
+        resp.raise_for_status()
+        token_data = resp.json()
+
+        # Update session with new tokens
+        request.session["snapchat_access_token"] = token_data["access_token"]
+        request.session["snapchat_refresh_token"] = token_data.get("refresh_token", refresh_token)
+
+        expires_in = token_data.get("expires_in", 3600)
+        expiry_datetime = datetime.now() + timedelta(seconds=expires_in)
+        request.session["snapchat_token_expires_at"] = expiry_datetime.isoformat()
+
+        return token_data["access_token"]
+    except requests.RequestException as e:
+        print(f"Token refresh failed: {e}")
+        return None
+    
+from dateutil import parser
+
+def snapchat_api_call(request, endpoint, params=None):
+    """
+    Helper function to make an authenticated API call, handling token refresh.
+    """
+    access_token = request.session.get('snapchat_access_token')
+
+    # Parse expiry from ISO string
+    expires_at_str = request.session.get("snapchat_token_expires_at")
+    expires_at = parser.isoparse(expires_at_str) if expires_at_str else None
+
+    if not access_token or (expires_at and datetime.now() > expires_at - timedelta(minutes=5)):
+        access_token = refresh_snapchat_token(request)
+        if not access_token:
+            return None
+
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Content-Type': 'application/json',
+    }
+    
+    url = f'https://adsapi.snapchat.com/v1/{endpoint}'
+    
+    try:
+        response = requests.get(url, headers=headers, params=params)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"API request failed to {endpoint}: {e}")
+        return None
+
+def campaigns_overview(request):
+    status = request.GET.get("status") or "ACTIVE"   # default = ACTIVE
+    from_date = request.GET.get("from")  # yyyy-mm-dd
+    to_date = request.GET.get("to") 
+    ZeroSpent = request.GET.get("ZeroSpent")
+    access_token = request.session.get('snapchat_access_token')
+
+    tz_offset_minutes = int(request.GET.get("tz_offset", 0))  # in minutes
+
+    from_dt = datetime.strptime(from_date, "%Y-%m-%d") if from_date else datetime.now() - timedelta(days=8)
+    to_dt = datetime.strptime(to_date, "%Y-%m-%d") if to_date else (datetime.now())
+
+    # Adjust start/end for user's timezone
+    from_dt = from_dt.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(minutes=tz_offset_minutes)
+    to_dt = to_dt.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(minutes=tz_offset_minutes)
+
+    if from_dt > to_dt:
+        from_dt, to_dt = to_dt, from_dt
+
+    # Attach timezone offset instead of Z
+    start_time = from_dt.isoformat(timespec="milliseconds") + 'Z'
+    end_time = to_dt.isoformat(timespec="milliseconds") + 'Z'
+
+    
+
+    if not access_token:
+        return redirect('Demo:snapchat_login')
+    
+    params = {
+        "fields": "impressions,spend,conversion_purchases,conversion_purchases_value",
+        "granularity": "TOTAL",
+        "start_time": start_time,
+        "end_time": end_time,
+    }
+
+    # Step 1: Get org & ad account
+    orgs = snapchat_api_call(request, "me/organizations")
+    if not orgs or not orgs.get("organizations"):
+        return HttpResponse("No organizations found", status=404)
+    organization_id = orgs["organizations"][0]["organization"]["id"]
+
+    accounts = snapchat_api_call(request, f"organizations/{organization_id}/adaccounts")
+    if not accounts or not accounts.get("adaccounts"):
+        return HttpResponse("No ad accounts found", status=404)
+    ad_account_id = accounts["adaccounts"][0]["adaccount"]["id"]
+
+    # Step 2: Get campaigns
+    campaigns_data = snapchat_api_call(request, f"adaccounts/{ad_account_id}/campaigns")
+    raw_campaigns = campaigns_data.get("campaigns", [])
+    processed_campaigns, total_spend, total_revenue = [], 0, 0
+
+
+    if status and status != "all":
+        raw_campaigns = [
+            c for c in raw_campaigns
+            if c["campaign"]["status"] == status
+        ]
+    else:
+        raw_campaigns = campaigns_data.get("campaigns", [])
+    
+    # Step 3: Loop per campaign for stats
+    for c in raw_campaigns:
+        campaign = c["campaign"]
+        stats_resp = snapchat_api_call(request, f"campaigns/{campaign['id']}/stats", params=params)
+        print("Stats response:", stats_resp)
+        adsquads_data = snapchat_api_call(request, f"campaigns/{campaign['id']}/adsquads")
+        adsquads_raw = adsquads_data.get("adsquads", [])
+        daily_budget = 0
+        if adsquads_raw:
+            for adsquad in adsquads_raw:
+                daily_budget += adsquad["adsquad"].get("daily_budget_micro", 0) / 1_000_000.0
+
+        # print("adsquads_data -----------",adsquads_data)
+        # print("stats_resp -----------",stats_resp)
+        stats = {}
+        if stats_resp and "total_stats" in stats_resp:
+            stats = stats_resp["total_stats"][0]["total_stat"].get("stats", {})
+
+        spend = stats.get("spend", 0) / 1_000_000.0
+        purchases = stats.get("conversion_purchases", 0)
+        revenue = stats.get("conversion_purchases_value", 0) / 1_000_000.0
+        roas = (revenue / spend) if spend > 0 else 0
+
+        total_spend += spend
+        total_revenue += revenue
+
+        if ZeroSpent and int(spend) > 0:
+            processed_campaigns.append({
+                "id": campaign["id"],
+                "name": campaign["name"],
+                "status": campaign["status"],
+                "spend": spend,
+                "daily_budget": daily_budget,
+                "impressions": stats.get("impressions", 0),
+                "purchases": purchases,
+                "revenue": revenue,
+                "roas": roas,
+                "start_time": campaign["start_time"],
+            })
+
+        elif not ZeroSpent:
+            processed_campaigns.append({
+                "id": campaign["id"],
+                "name": campaign["name"],
+                "status": campaign["status"],
+                "spend": spend,
+                "daily_budget": daily_budget,
+                "impressions": stats.get("impressions", 0),
+                "purchases": purchases,
+                "revenue": revenue,
+                "roas": roas,
+                "start_time": campaign["start_time"],
+            })
+
+    # Step 4: Summary
+    total_campaigns = len(processed_campaigns)
+    avg_spend = total_spend / total_campaigns if total_campaigns else 0
+    avg_roas = total_revenue / total_spend if total_spend > 0 else 0
+
+    return render(request, "Demo/campaigns_overview.html", {
+        "campaigns": processed_campaigns,
+        "total_campaigns": total_campaigns,
+        "total_spend": total_spend,
+        "total_revenue": total_revenue,
+        "avg_spend": avg_spend,
+        "avg_roas": avg_roas,
+        "from_date": from_dt.strftime("%Y-%m-%d"),
+        "to_date": to_dt.strftime("%Y-%m-%d"),
+        "ZeroSpent": ZeroSpent,
+    })
+
+# TikTok API constants
+CLIENT_KEY = settings.TIKTOK_CLIENT_KEY
+CLIENT_SECRET = settings.TIKTOK_CLIENT_SECRET
+REDIRECT_URI = settings.TIKTOK_REDIRECT_URI   # must match TikTok app settings
+
+AUTH_BASE = "https://business-api.tiktokglobalshop.com/open_api/v1.3"  # Marketing API base
+OAUTH_URL = "https://business-api.tiktokglobalshop.com/oauth"
+TOKEN_URL = "https://business-api.tiktokglobalshop.com/oauth2/access_token/"
+
+# --- LOGIN VIEW ---
+def tiktok_login(request):
+    auth_url = (
+        f"{OAUTH_URL}/authorize?"
+        f"app_id={settings.TIKTOK_CLIENT_KEY}"
+        f"&redirect_uri={settings.TIKTOK_REDIRECT_URI}"
+        f"&state=xyz123"
+        f"&scope={settings.TIKTOK_OAUTH_SCOPE}"   # add required scopes
+    )
+    return redirect(auth_url)
+
+# --- CALLBACK VIEW ---
+def tiktok_callback(request):
+    code = request.GET.get("auth_code")
+    if not code:
+        return HttpResponse("No auth_code returned", status=400)
+
+    data = {
+        "app_id": settings.TIKTOK_CLIENT_KEY,
+        "secret": settings.TIKTOK_CLIENT_SECRET,
+        "auth_code": code,
+    }
+    resp = requests.post(TOKEN_URL, data=data)
+    tokens = resp.json()
+
+    if "data" not in tokens:
+        return JsonResponse(tokens, status=400)
+
+    # Save tokens in session or DB
+    request.session["tiktok_access_token"] = tokens["data"]["access_token"]
+    request.session["tiktok_refresh_token"] = tokens["data"]["refresh_token"]
+    request.session["tiktok_token_expiry"] = (
+        datetime.datetime.utcnow()
+        + datetime.timedelta(seconds=tokens["data"]["expires_in"])
+    ).isoformat()
+
+    return redirect("tiktok_campaigns")
+
+# --- REFRESH TOKEN ---
+def tiktok_refresh_token(request):
+    refresh_token = request.session.get("tiktok_refresh_token")
+    if not refresh_token:
+        return HttpResponse("No refresh token", status=400)
+
+    data = {
+        "app_id": settings.TIKTOK_CLIENT_KEY,
+        "secret": settings.TIKTOK_CLIENT_SECRET,
+        "grant_type": "refresh_token",
+        "refresh_token": refresh_token,
+    }
+    resp = requests.post(TOKEN_URL, data=data)
+    tokens = resp.json()
+
+    if "data" not in tokens:
+        return JsonResponse(tokens, status=400)
+
+    request.session["tiktok_access_token"] = tokens["data"]["access_token"]
+    request.session["tiktok_refresh_token"] = tokens["data"]["refresh_token"]
+    request.session["tiktok_token_expiry"] = (
+        datetime.datetime.utcnow()
+        + datetime.timedelta(seconds=tokens["data"]["expires_in"])
+    ).isoformat()
+
+    return JsonResponse({"status": "refreshed"})
+
+# --- FETCH CAMPAIGNS ---
+def tiktok_campaigns(request):
+    access_token = request.session.get("tiktok_access_token")
+    if not access_token:
+        return redirect("tiktok_login")
+
+    # You need advertiser_id (from your TikTok Ads Manager account)
+    advertiser_id = settings.TIKTOK_ADVERTISER_ID
+
+    url = f"{AUTH_BASE}/campaign/get/"
+    params = {
+        "advertiser_id": advertiser_id,
+        "page_size": 10,
+        "page": 1,
+    }
+    headers = {"Access-Token": access_token}
+    resp = requests.get(url, headers=headers, params=params)
+    data = resp.json()
+
+    # Render campaigns in a template
+    return render(request, "tiktok/campaigns.html", {"campaigns": data})

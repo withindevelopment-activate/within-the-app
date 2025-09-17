@@ -20,7 +20,7 @@
       <div class="card shadow-sm">
         <div class="card-body">
           <h5 class="card-title">Total Revenue</h5>
-          <h3>AED {{ total_revenue|floatformat:2 }}</h3>
+          <h3>AED {{ total_revenue }}</h3>
         </div>
       </div>
     </div>
@@ -28,7 +28,7 @@
       <div class="card shadow-sm">
         <div class="card-body">
           <h5 class="card-title">Average Order</h5>
-          <h3>AED {{ total_revenue|divisibleby:total_orders|floatformat:2 }}</h3>
+          <h3>AED {{ avg_order }}</h3>
         </div>
       </div>
     </div>
