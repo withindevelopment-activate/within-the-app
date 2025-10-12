@@ -82,11 +82,12 @@
         const traffic = inferTrafficSource(utmParams, referrer);
 
         const trackingData = {
+            store_id: STORE_ID,
             visitor_id: getVisitorId(),
             session_id: getOrCreateSessionId(),
             store_url: storeUrl,
-            event_type: 'pageview',
-            event_details: {},
+            event_type: eventType,
+            event_details: eventDetails,
             utm_params: utmParams,
             referrer: referrer,
             traffic_source: traffic,
@@ -104,5 +105,39 @@
     }
 
     // ------------------- Event Listener -------------------
-    window.addEventListener('load', sendPageview);
+    window.addEventListener('load', function() {
+        sendPageview("pageview");
+    });
+
+    window.addToCartEvent = function(productInfo) {
+        console.log("🛒 Add to Cart detected:", productInfo);
+        sendPageview("add_to_cart", productInfo);
+    };
+
+    window.addToWishlist = function(productId) {
+        console.log("🛒 Add to Wishlist detected:", productId);
+        sendPageview("add_to_wishlist", productId);
+    };
+
+    // ------------------- Purchase Tracking -------------------
+    function sendPurchaseIfExists() {
+        if (window.sendPurchaseTrackingEventObj && window.sendPurchaseTrackingEventObj.order) {
+            const o = window.sendPurchaseTrackingEventObj.order;
+            const orderInfo = {
+                order_id: o.id,
+                customer_id: o.customer?.id || "Unknown",
+                order_total_string: o.order_total_string,
+                issue_date: o.issue_date,
+                payment_method_name: o.payment?.method?.name,
+                products_name: o.products?.map(p => p.name).join(", "),
+                products_count: o.products_count
+            };
+
+            console.log("✅ Purchase detected:", orderInfo);
+            sendPageview("purchase", orderInfo);
+        }
+    }
+
+    // Run once after page load
+    window.addEventListener('load', sendPurchaseIfExists);
 })();

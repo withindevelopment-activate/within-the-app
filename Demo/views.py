@@ -104,10 +104,12 @@ def home(request):
     print("The authorization token is:", auth_token)
     print("The retrieved store id is:", store_id)
 '''
+    if not token:
+        return redirect('Demo:zid_login')
 
     headers = {
-        'Authorization': f'Bearer {auth_token}',
-        'X-MANAGER-TOKEN': token,
+    'Authorization': f'Bearer {auth_token}',
+    'X-MANAGER-TOKEN': token,
     }
 
     profile = {}
@@ -122,18 +124,15 @@ def home(request):
         profile_res = requests.get(f"{settings.ZID_API_BASE}/managers/account/profile", headers=headers)
         profile_res.raise_for_status()
         profile = profile_res.json()
-        user_name = profile.get('user', {}).get('name') or profile.get('username', 'Default')
-        #user_name = 'Default'
-        if not user_name:
-            print("Couldn't retrieve username")
-            user_name = 'Default'
+        user_name = profile.get('user', {}).get('name') or profile.get('username')
         store_title = profile.get('user', {}).get('store', {}).get('title', 'Unknown Store')
+        store_uuid = profile.get('user', {}).get('store', {}).get('uuid')
+        
+        request.session['store_uuid'] = store_uuid
 
-        # Get the Store ID
-        store_id = profile.get('user', {}).get('store', {}).get('id')
-        if store_id:
-            request.session['store_id'] = store_id
-
+        if not user_name:
+            return redirect('Demo:zid_login')
+        
         # Fetch orders
         orders_res = requests.get(f"{settings.ZID_API_BASE}/managers/store/orders", headers=headers)
         orders_res.raise_for_status()
@@ -463,6 +462,7 @@ def save_tracking(request):
         client_info = data.get('client_info', {}) or {}
         utm_params = data.get('utm_params', {}) or {}
         traffic_source = data.get('traffic_source', {}) or {}
+        client_ip = get_client_ip(request)
 
         tracking_entry = {
             'Distinct_ID': distinct_id,
@@ -501,7 +501,8 @@ def save_tracking(request):
             'Timezone': client_info.get('timezone'),
             'Platform': client_info.get('platform'),
             'Screen_Resolution': client_info.get('screen_resolution'),
-            'Device_Memory': client_info.get('device_memory')
+            'Device_Memory': client_info.get('device_memory'),
+            'Client_IP': client_ip,
         }
 
         print("ABOUT TO BATCH INSERT")
@@ -525,6 +526,13 @@ def tracking_snippet(request):
     return HttpResponse(js_content, content_type="application/javascript")
 ###################################################################################################################3
 ###########################################
+
+def get_client_ip(request):
+    x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
+    if x_forwarded_for:
+        return x_forwarded_for.split(",")[0].strip()
+    return request.META.get("REMOTE_ADDR")
+
 def search_view(request):
     query = request.GET.get("q", "").lower()
     results = []
@@ -792,4 +800,201 @@ def process_marketing_report(request):
 
     return render(request, "Demo/marketing.html", context)
 
+from supabase import create_client, Client
+import logging , traceback
+from django.views.decorators.csrf import csrf_exempt
 
+url_1 = "https://owhmgadiwrkugqqhjohr.supabase.co"
+key_1 = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93aG1nYWRpd3JrdWdxcWhqb2hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAyMjA5MzcsImV4cCI6MjA3NTc5NjkzN30.ja3nCcKApB_U8u-WjA0u7XXkoiwkCehVwaIAtqgbmSk"
+
+supabase_1: Client = create_client(url_1, key_1)
+
+def create_table_if_not_exists(table_name, columns):
+    """
+    Create a table in Supabase if it does not already exist.
+
+    Parameters:
+        table_name (str): The name of the table to create.
+        columns (dict): A dictionary where keys are column names and values are their data types.
+    """
+    try:
+        # Define the table schema
+        schema = [{"name": col, "type": col_type} for col, col_type in columns.items()]
+
+        # Use supabase_1 to create the table
+        response = supabase_1.table(table_name).create(schema).execute()
+
+        if response.get("error"):
+            logging.error(f"Error creating table '{table_name}': {response['error']}")
+        else:
+            logging.info(f"Table '{table_name}' created successfully.")
+    except Exception as e:
+        logging.error(f"Failed to create table '{table_name}': {str(e)}")
+
+
+@csrf_exempt  # This is added because we are adding the tracking javascript to the app but the store pages likely do not have a <meta name="csrf-token">
+@require_POST
+def save_tracking_1(request):
+    try:
+        print("ENTERED THE TRACKING FUNCTION")
+
+        import json
+        try:
+            data = json.loads(request.body)
+        except Exception:
+            return JsonResponse({"status": "error", "message": "Invalid JSON payload"}, status=400)
+
+        print("The data received is:", data)
+        if not data:
+            return JsonResponse({"status": "error", "message": "No JSON payload received"}, status=400)
+
+        # Generate unique ID
+        distinct_id = int(get_next_id_from_supabase_compatible_all(name='Tracking_Visitors', column='Distinct_ID'))
+
+        # Flatten visitor info
+        visitor_info = data.get('visitor_info', {}) or {}
+        client_info = data.get('client_info', {}) or {}
+        utm_params = data.get('utm_params', {}) or {}
+        traffic_source = data.get('traffic_source', {}) or {}
+        client_ip = get_client_ip(request)
+
+        tracking_entry = {
+            'Distinct_ID': distinct_id,
+            'Visitor_ID': data.get('visitor_id'),
+            'Session_ID': data.get('session_id'),
+            'Store_URL': data.get('store_url'),
+            'Event_Type': data.get('event_type'),
+            'Event_Details': str(data.get('event_details', {})),
+            'Page_URL': data.get('page_url'),
+            'Visited_at': get_uae_current_date(),
+
+            # UTM Parameters
+            'UTM_Source': utm_params.get('utm_source'),
+            'UTM_Medium': utm_params.get('utm_medium'),
+            'UTM_Campaign': utm_params.get('utm_campaign'),
+            'UTM_Term': utm_params.get('utm_term'),
+            'UTM_Content': utm_params.get('utm_content'),
+
+            # Referrer
+            'Referrer_Platform': data.get('referrer'),
+
+            # Traffic Source
+            'Traffic_Source': traffic_source.get('source'),
+            'Traffic_Medium': traffic_source.get('medium'),
+            'Traffic_Campaign': traffic_source.get('campaign'),
+
+            # Visitor Info
+            'Customer_ID': visitor_info.get('customer_id'),
+            'Customer_Name': visitor_info.get('name'),
+            'Customer_Email': visitor_info.get('email'),
+            'Customer_Mobile': visitor_info.get('mobile'),
+
+            # Client Info
+            'User_Agent': client_info.get('user_agent'),
+            'Language': client_info.get('language'),
+            'Timezone': client_info.get('timezone'),
+            'Platform': client_info.get('platform'),
+            'Screen_Resolution': client_info.get('screen_resolution'),
+            'Device_Memory': client_info.get('device_memory'),
+            'Client_IP': client_ip,
+        }
+
+        # Define the table schema based on the tracking_entry keys
+        table_name = "Tracking_Visitors"
+        columns = {
+            "Distinct_ID": "bigint",
+            "Visitor_ID": "text",
+            "Session_ID": "text",
+            "Store_URL": "text",
+            "Event_Type": "text",
+            "Event_Details": "text",
+            "Page_URL": "text",
+            "Visited_at": "timestamp",
+            "UTM_Source": "text",
+            "UTM_Medium": "text",
+            "UTM_Campaign": "text",
+            "UTM_Term": "text",
+            "UTM_Content": "text",
+            "Referrer_Platform": "text",
+            "Traffic_Source": "text",
+            "Traffic_Medium": "text",
+            "Traffic_Campaign": "text",
+            "Customer_ID": "text",
+            "Customer_Name": "text",
+            "Customer_Email": "text",
+            "Customer_Mobile": "text",
+            "User_Agent": "text",
+            "Language": "text",
+            "Timezone": "text",
+            "Platform": "text",
+            "Screen_Resolution": "text",
+            "Device_Memory": "text",
+            "Client_IP": "text",
+        }
+
+        # Create the table if it doesn't exist
+        create_table_if_not_exists(table_name, columns)
+
+        print("ABOUT TO BATCH INSERT")
+
+        try:
+            tracking_entry_df = pd.DataFrame([tracking_entry])
+            batch_insert_to_supabase(tracking_entry_df, table_name)
+        except Exception as e:
+            print("Failed to insert tracking entry into Supabase:", e)
+            traceback.print_exc()
+
+        return JsonResponse({"status": "success"})
+    
+    except Exception as e:
+        print("TRACKING FUNCTION ERROR:", e)
+        return JsonResponse({"status": "error", "message": str(e)}, status=500)
+
+def view_tracking(request):
+    store_id = request.GET.get("store_id") or request.session.get("store_uuid")
+    if not store_id:
+        return HttpResponse("❌ store_id is required", status=400)
+
+    table_name = "Tracking_Visitors"
+
+    rows = []
+    total_visitors = total_sessions = total_pageviews = 0
+
+    try:
+        # Build the query with filters
+        query = supabase_1.table(table_name).select("*")
+
+        if request.GET.get("visitor"):
+            query = query.eq("Visitor_ID", request.GET["visitor"])
+
+        if request.GET.get("session"):
+            query = query.eq("Session_ID", request.GET["session"])
+
+        if request.GET.get("from"):
+            query = query.gte("Visited_at", request.GET["from"])
+
+        if request.GET.get("to"):
+            query = query.lte("Visited_at", request.GET["to"])
+
+        query = query.order("Visited_at", desc=True).limit(200)
+        response = query.execute()
+
+        if response.get("data"):
+            rows = response["data"]
+
+        # Fetch stats
+        total_visitors = supabase_1.table(table_name).select("Visitor_ID", count="exact").execute()["count"]
+        total_sessions = supabase_1.table(table_name).select("Session_ID", count="exact").execute()["count"]
+        total_pageviews = supabase_1.table(table_name).select("*", count="exact").execute()["count"]
+
+    except Exception as e:
+        logging.error(f"Error fetching tracking data: {str(e)}")
+        return HttpResponse("❌ Error fetching tracking data", status=500)
+
+    return render(request, "Demo/tracking_view.html", {
+        "store_id": store_id,
+        "rows": rows,
+        "total_visitors": total_visitors,
+        "total_sessions": total_sessions,
+        "total_pageviews": total_pageviews,
+    })
