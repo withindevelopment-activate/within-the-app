@@ -82,7 +82,7 @@
         const traffic = inferTrafficSource(utmParams, referrer);
 
         const trackingData = {
-            store_id: STORE_ID,
+            // store_id: STORE_ID,
             visitor_id: getVisitorId(),
             session_id: getOrCreateSessionId(),
             store_url: storeUrl,

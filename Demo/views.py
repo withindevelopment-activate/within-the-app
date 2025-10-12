@@ -800,9 +800,7 @@ def process_marketing_report(request):
 
     return render(request, "Demo/marketing.html", context)
 
-from supabase import create_client, Client
-import logging , traceback
-from django.views.decorators.csrf import csrf_exempt
+import logging 
 
 def view_tracking(request):
     store_id = request.GET.get("store_id") or request.session.get("store_uuid")
