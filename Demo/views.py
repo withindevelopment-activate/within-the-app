@@ -463,6 +463,7 @@ def save_tracking(request):
         utm_params = data.get('utm_params', {}) or {}
         traffic_source = data.get('traffic_source', {}) or {}
         client_ip = get_client_ip(request)
+        print("The client IP is:", client_ip)
 
         tracking_entry = {
             'Distinct_ID': distinct_id,
