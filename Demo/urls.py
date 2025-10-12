@@ -16,7 +16,7 @@ urlpatterns = [
     path("marketing/", views.marketing_page, name="marketing"), # Marketing report section
     path("marketing_ready/", views.marketing_page_ready, name="marketing_ready"),
     path("process_marketing_report/", views.process_marketing_report, name="process_marketing_report"),
-    path("save_tracking/", views.save_tracking_1, name="save_tracking"), # Tracking
+    path("save_tracking/", views.save_tracking, name="save_tracking"), # Tracking
     path("tracking_snippet.js", views.tracking_snippet, name="tracking_snippet"),
     path("view_tracking/", views.view_tracking, name="view_tracking"),
 
