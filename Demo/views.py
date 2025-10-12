@@ -18,7 +18,7 @@ import asyncio
 from io import BytesIO
 
 # Supabase & Supporting imports
-from .supabase_functions import batch_insert_to_supabase, get_next_id_from_supabase_compatible_all, fetch_data_from_supabase
+from .supabase_functions import batch_insert_to_supabase, get_next_id_from_supabase_compatible_all, fetch_data_from_supabase, get_tracking_df, build_customer_dictionary, calculate_campaign_attribution, summarize_campaign_performance
 from .supporting_functions import get_uae_current_date
 # Marketing Report functions
 from .marketing_report import create_general_analysis, create_product_percentage_amount_spent, landing_performance_5_async, column_check
@@ -808,38 +808,48 @@ def view_tracking(request):
     if not store_id:
         return HttpResponse("❌ store_id is required", status=400)
 
-    table_name = "Tracking_Visitors"
-
     rows = []
     total_visitors = total_sessions = total_pageviews = 0
+    customer_dict = {}
+    campaigns_summary = []
+    chart_labels = []
+    chart_data = []
 
     try:
-        # Fetch all data from the table using fetch_data_from_supabase
-        df = fetch_data_from_supabase(table_name)
+        df = get_tracking_df()
 
-        # Apply filters if provided in the request
-        if request.GET.get("visitor"):
-            df = df[df["Visitor_ID"] == request.GET["visitor"]]
+        # Apply filters (visitor, session, from, to)
+        visitor_filter = request.GET.get("visitor")
+        session_filter = request.GET.get("session")
+        from_date = request.GET.get("from")
+        to_date = request.GET.get("to")
 
-        if request.GET.get("session"):
-            df = df[df["Session_ID"] == request.GET["session"]]
+        if visitor_filter:
+            df = df[df["Visitor_ID"] == visitor_filter]
+        if session_filter:
+            df = df[df["Session_ID"] == session_filter]
+        if from_date:
+            df = df[df["Visited_at"] >= from_date]
+        if to_date:
+            df = df[df["Visited_at"] <= to_date]
 
-        if request.GET.get("from"):
-            df = df[df["Visited_at"] >= request.GET["from"]]
-
-        if request.GET.get("to"):
-            df = df[df["Visited_at"] <= request.GET["to"]]
-
-        # Sort and limit the data
         df = df.sort_values(by="Visited_at", ascending=False).head(200)
-
-        # Convert the filtered DataFrame to a list of dictionaries
         rows = df.to_dict(orient="records")
 
-        # Calculate stats
         total_visitors = df["Visitor_ID"].nunique()
         total_sessions = df["Session_ID"].nunique()
         total_pageviews = len(df)
+
+        # Customer dictionary
+        customer_dict = build_customer_dictionary(df)
+
+        # Campaign attribution
+        attribution_df = calculate_campaign_attribution(df)
+        campaigns_summary = summarize_campaign_performance(attribution_df).to_dict(orient="records")
+
+        # Prepare chart data in backend
+        chart_labels = [c["campaign"] for c in campaigns_summary]
+        chart_data = [c["total_credit"] for c in campaigns_summary]
 
     except Exception as e:
         logging.error(f"Error fetching tracking data: {str(e)}")
@@ -851,4 +861,9 @@ def view_tracking(request):
         "total_visitors": total_visitors,
         "total_sessions": total_sessions,
         "total_pageviews": total_pageviews,
+        "customer_dict": customer_dict,
+        "campaigns": campaigns_summary,
+        "chart_labels": chart_labels,
+        "chart_data": chart_data,
+        "request": request,
     })

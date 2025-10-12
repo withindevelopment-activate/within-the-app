@@ -160,7 +160,7 @@ nav {
 .data-table td.sticky-col {
   position: sticky;
   left: 0;
-  z-index: 2;
+  z-index: 4;
   background: var(--tbl-sticky-col-bg);
   box-shadow: 1px 0 0 0 var(--tbl-border);
   /* divider on the right edge */

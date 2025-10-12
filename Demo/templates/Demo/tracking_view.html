@@ -133,15 +133,99 @@
     </div>
   </div>
 
+  <!-- Campaign Attribution Table -->
+  <div class="mt-5">
+    <h4>Campaign Attribution</h4>
+    <table class="table table-bordered table-striped">
+      <thead>
+        <tr>
+          <th>Campaign</th>
+          <th>Conversions</th>
+          <th>Attributed Revenue</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in campaigns %}
+        <tr>
+          <td>{{ c.campaign }}</td>
+          <td>{{ c.conversions }}</td>
+          <td>{{ c.total_credit }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="3" class="text-center text-muted">No campaign data found</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 
-  <!-- Charts -->
-  <div class="row mt-5">
-    <div class="col-md-6">
-      <canvas id="visitsByDay"></canvas>
-    </div>
-    <div class="col-md-6">
-      <canvas id="visitsBySource"></canvas>
+  <!-- Campaign Attribution Chart -->
+  <div class="row mt-4">
+    <div class="col-md-12">
+      <canvas id="campaignChart"></canvas>
     </div>
   </div>
+<!-- Customer Dictionary Table -->
+<div class="mt-5">
+  <h4>Customer Dictionary</h4>
+  <table class="table table-bordered table-striped">
+    <thead>
+      <tr>
+        <th>Customer Key</th>
+        <th>Name</th>
+        <th>Email</th>
+        <th>Mobile</th>
+        <th>Visitor IDs</th>
+        <th>Session IDs</th>
+        <th>Campaigns</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for key, c in customer_dict.items %}
+      <tr>
+        <td>{{ key }}</td>
+        <td>{{ c.user_info.name }}</td>
+        <td>{{ c.user_info.email }}</td>
+        <td>{{ c.user_info.mobile }}</td>
+        <td>{{ c.visitor_ids|join:", " }}</td>
+        <td>{{ c.sessions|join:", " }}</td>
+        <td>{{ c.campaigns|join:", " }}</td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="7" class="text-center text-muted">No customer data found</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    const ctx = document.getElementById('campaignChart').getContext('2d');
+    const campaignChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: {{ chart_labels|safe }},
+            datasets: [{
+                label: 'Attributed Revenue',
+                data: {{ chart_data|safe }},
+                backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { display: false },
+                title: { display: true, text: 'Campaign Attributed Revenue' }
+            },
+            scales: { y: { beginAtZero: true } }
+        }
+    });
+
+  </script>
 </div>
 {% endblock %}
