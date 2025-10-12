@@ -55,9 +55,10 @@ MIDDLEWARE = [
     "whitenoise.middleware.WhiteNoiseMiddleware"
 ]
 
-CORS_ALLOWED_ORIGIN_REGEXES = [
-    r"^https://.*\.zid\.store$",
-]
+# CORS_ALLOWED_ORIGIN_REGEXES = [
+#     r"^https://.*\.zid\.store$",
+# ]
+CORS_ALLOW_ALL_ORIGINS = True
 
 CORS_ALLOW_CREDENTIALS = True
 # Disable CORS for everything by default -- allow only for selected routes
