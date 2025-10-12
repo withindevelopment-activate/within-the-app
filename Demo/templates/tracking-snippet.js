@@ -71,7 +71,7 @@
     // ------------------- Tracking -------------------
     const BACKEND_URL = "https://testing-within.onrender.com";
 
-    function sendPageview() {
+    function sendPageview(eventType, eventDetails = {}) {
         const storeUrl = window.location.origin;
         if (!storeUrl) {
             console.warn('tracking.js: store_url not found');
