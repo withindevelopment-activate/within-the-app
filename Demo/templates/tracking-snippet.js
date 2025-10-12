@@ -97,7 +97,7 @@
             timestamp: new Date().toISOString()
         };
 
-        fetch(`${BACKEND_URL}/save_tracking`, {
+        fetch(`${BACKEND_URL}/save_tracking/`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(trackingData)
