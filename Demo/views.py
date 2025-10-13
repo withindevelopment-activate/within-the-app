@@ -831,7 +831,7 @@ def view_tracking(request):
         df = df.sort_values(by="Visited_at", ascending=False)
         rows = df.to_dict(orient="records")
 
-        df["Visited_at"] = pd.to_datetime(df["Visited_at"], utc=True)
+        df["Visited_at"] = pd.to_datetime(df["Visited_at"])
 
         # 🕒 Filter to last 30 minutes by default
         thirty_minutes_ago = datetime.now() - timedelta(minutes=30)

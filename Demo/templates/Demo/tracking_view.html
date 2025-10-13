@@ -136,29 +136,34 @@
   <!-- Campaign Attribution Table -->
   <div class="mt-5">
     <h4>Campaign Attribution</h4>
-    <table class="table table-bordered table-striped">
-      <thead>
-        <tr>
-          <th>Campaign</th>
-          <th>Conversions</th>
-          <th>Attributed Revenue</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for c in campaigns %}
-        <tr>
-          <td>{{ c.campaign }}</td>
-          <td>{{ c.conversions }}</td>
-          <td>{{ c.total_credit }}</td>
-        </tr>
-        {% empty %}
-        <tr>
-          <td colspan="3" class="text-center text-muted">No campaign data found</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+    <div class="data-wrap">
+      <div class="data-viewport">
+        <div class="data-scroller" role="region" aria-label="Scrollable data table" tabindex="0">
+          <table class="data-table" role="table" aria-label="Tracking dataset">
+            <thead>
+              <tr>
+                <th>Campaign</th>
+                <th>Conversions</th>
+                <th>Attributed Revenue</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for c in campaigns %}
+              <tr>
+                <td>{{ c.campaign }}</td>
+                <td>{{ c.conversions }}</td>
+                <td>{{ c.total_credit }}</td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="3" class="text-center text-muted">No campaign data found</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
 
   <!-- Campaign Attribution Chart -->
   <div class="row mt-4">
@@ -169,37 +174,42 @@
 <!-- Customer Dictionary Table -->
 <div class="mt-5">
   <h4>Customer Dictionary</h4>
-  <table class="table table-bordered table-striped">
-    <thead>
-      <tr>
-        <th>Customer Key</th>
-        <th>Name</th>
-        <th>Email</th>
-        <th>Mobile</th>
-        <th>Visitor IDs</th>
-        <th>Session IDs</th>
-        <th>Campaigns</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for key, c in customer_dict.items %}
-      <tr>
-        <td>{{ key }}</td>
-        <td>{{ c.user_info.name }}</td>
-        <td>{{ c.user_info.email }}</td>
-        <td>{{ c.user_info.mobile }}</td>
-        <td>{{ c.visitor_ids|join:", " }}</td>
-        <td>{{ c.sessions|join:", " }}</td>
-        <td>{{ c.campaigns|join:", " }}</td>
-      </tr>
-      {% empty %}
-      <tr>
-        <td colspan="7" class="text-center text-muted">No customer data found</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
+  <div class="data-wrap">
+    <div class="data-viewport">
+      <div class="data-scroller" role="region" aria-label="Scrollable data table" tabindex="0">
+        <table class="data-table" role="table" aria-label="Tracking dataset">
+          <thead>
+            <tr>
+              <th>Customer Key</th>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Mobile</th>
+              <th>Visitor IDs</th>
+              <th>Session IDs</th>
+              <th>Campaigns</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for key, c in customer_dict.items %}
+            <tr>
+              <td>{{ key }}</td>
+              <td>{{ c.user_info.name }}</td>
+              <td>{{ c.user_info.email }}</td>
+              <td>{{ c.user_info.mobile }}</td>
+              <td>{{ c.visitor_ids|join:", " }}</td>
+              <td>{{ c.sessions|join:", " }}</td>
+              <td>{{ c.campaigns|join:", " }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="7" class="text-center text-muted">No customer data found</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
