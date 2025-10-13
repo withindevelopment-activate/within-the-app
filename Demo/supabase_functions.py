@@ -365,13 +365,13 @@ def calculate_campaign_results(df: pd.DataFrame) -> pd.DataFrame:
     without linking to individual customers.
 
     Returns a DataFrame with columns:
-    [campaign, pageviews, add_to_cart, purchases, total_value]
+    [campaign, pageviews, add_to_cart, purchases, total_value, events_count]
     """
 
-    # Keep only rows that have a campaign
+    # Keep only rows with a campaign
     df = df[df["UTM_Campaign"].notna() & (df["UTM_Campaign"].str.strip() != "")]
     if df.empty:
-        return pd.DataFrame(columns=["campaign", "pageviews", "add_to_cart", "purchases", "total_value"])
+        return pd.DataFrame(columns=["campaign", "pageviews", "add_to_cart", "purchases", "total_value", "events_count"])
 
     # Prepare event value column
     def get_value(row):
@@ -396,76 +396,15 @@ def calculate_campaign_results(df: pd.DataFrame) -> pd.DataFrame:
         )
         .reset_index()
         .rename(columns={"UTM_Campaign": "campaign"})
-        .sort_values("total_value", ascending=False)
     )
 
+    # Total events count per campaign
+    summary["events_count"] = summary["pageviews"] + summary["add_to_cart"] + summary["purchases"]
+
+    # Sort by total value
+    summary = summary.sort_values("total_value", ascending=False)
+
     return summary
-
-
-def calculate_campaign_attribution(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Calculate partial attribution for campaigns per purchase.
-    Returns a DataFrame with columns: [customer_key, purchase_date, campaign, credit_value]
-    """
-    def get_customer_key(row):
-        if pd.notna(row.get("Customer_Email")) and row["Customer_Email"].strip():
-            return row["Customer_Email"].lower().strip()
-        elif pd.notna(row.get("Customer_Mobile")) and row["Customer_Mobile"].strip():
-            return row["Customer_Mobile"].strip()
-        elif pd.notna(row.get("Customer_ID")) and str(row["Customer_ID"]).strip():
-            return str(row["Customer_ID"])
-        return None
-
-    df["customer_key"] = df.apply(get_customer_key, axis=1)
-
-    # Extract purchases
-    purchases = df[df["Event_Type"] == "purchase"].copy()
-    if purchases.empty:
-        return pd.DataFrame(columns=["customer_key", "purchase_date", "campaign", "credit_value"])
-
-    purchases["purchase_date"] = purchases["Visited_at"].dt.date
-
-    attribution_rows = []
-
-    for _, purchase in purchases.iterrows():
-        key = purchase["customer_key"]
-        if not key:
-            continue
-
-        purchase_date = purchase["purchase_date"]
-        purchase_value = 1.0
-
-        # Optional: read value from Event_Details JSON if exists
-        details = purchase.get("Event_Details")
-        if pd.notna(details):
-            try:
-                data = json.loads(details)
-                purchase_value = float(data.get("value", 1.0))
-            except Exception:
-                pass
-
-        # Find campaigns visited the same day
-        campaigns_today = df[
-            (df["customer_key"] == key) &
-            (df["UTM_Campaign"].notna()) &
-            (df["Visited_at"].dt.date == purchase_date)
-        ]["UTM_Campaign"].unique()
-
-        if len(campaigns_today) == 0:
-            continue
-
-        credit_per_campaign = purchase_value / len(campaigns_today)
-
-        for campaign in campaigns_today:
-            attribution_rows.append({
-                "customer_key": key,
-                "purchase_date": purchase_date,
-                "campaign": campaign,
-                "credit_value": credit_per_campaign
-            })
-
-    return pd.DataFrame(attribution_rows)
-
 
 def summarize_campaign_performance(df: pd.DataFrame, attribution_df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -513,3 +452,67 @@ def summarize_campaign_performance(df: pd.DataFrame, attribution_df: pd.DataFram
     campaign_summary = campaign_summary.sort_values("total_credit", ascending=False)
 
     return campaign_summary
+
+# def calculate_campaign_attribution(df: pd.DataFrame) -> pd.DataFrame:
+#     """
+#     Calculate partial attribution for campaigns per purchase.
+#     Returns a DataFrame with columns: [customer_key, purchase_date, campaign, credit_value]
+#     """
+#     def get_customer_key(row):
+#         if pd.notna(row.get("Customer_Email")) and row["Customer_Email"].strip():
+#             return row["Customer_Email"].lower().strip()
+#         elif pd.notna(row.get("Customer_Mobile")) and row["Customer_Mobile"].strip():
+#             return row["Customer_Mobile"].strip()
+#         elif pd.notna(row.get("Customer_ID")) and str(row["Customer_ID"]).strip():
+#             return str(row["Customer_ID"])
+#         return None
+
+#     df["customer_key"] = df.apply(get_customer_key, axis=1)
+
+#     # Extract purchases
+#     purchases = df[df["Event_Type"] == "purchase"].copy()
+#     if purchases.empty:
+#         return pd.DataFrame(columns=["customer_key", "purchase_date", "campaign", "credit_value"])
+
+#     purchases["purchase_date"] = purchases["Visited_at"].dt.date
+
+#     attribution_rows = []
+
+#     for _, purchase in purchases.iterrows():
+#         key = purchase["customer_key"]
+#         if not key:
+#             continue
+
+#         purchase_date = purchase["purchase_date"]
+#         purchase_value = 1.0
+
+#         # Optional: read value from Event_Details JSON if exists
+#         details = purchase.get("Event_Details")
+#         if pd.notna(details):
+#             try:
+#                 data = json.loads(details)
+#                 purchase_value = float(data.get("value", 1.0))
+#             except Exception:
+#                 pass
+
+#         # Find campaigns visited the same day
+#         campaigns_today = df[
+#             (df["customer_key"] == key) &
+#             (df["UTM_Campaign"].notna()) &
+#             (df["Visited_at"].dt.date == purchase_date)
+#         ]["UTM_Campaign"].unique()
+
+#         if len(campaigns_today) == 0:
+#             continue
+
+#         credit_per_campaign = purchase_value / len(campaigns_today)
+
+#         for campaign in campaigns_today:
+#             attribution_rows.append({
+#                 "customer_key": key,
+#                 "purchase_date": purchase_date,
+#                 "campaign": campaign,
+#                 "credit_value": credit_per_campaign
+#             })
+
+#     return pd.DataFrame(attribution_rows)

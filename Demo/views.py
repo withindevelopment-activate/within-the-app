@@ -848,12 +848,20 @@ def view_tracking(request):
         # Customer dictionary
         customer_dict = build_customer_dictionary(df)
 
-        # Campaign attribution
-        attribution_df = calculate_campaign_results(df)
-        # campaigns_summary_df = summarize_campaign_performance(attribution_df)
+        # Campaign summary
+        campaigns_summary_df = calculate_campaign_results(df)
 
-        campaigns_summary = attribution_df.to_dict(orient="records")
-        # Prepare chart data in backend
+        # Rename columns to match template expectations
+        campaigns_summary_df = campaigns_summary_df.rename(
+            columns={
+                "purchases": "conversions",
+                "total_value": "total_credit"  # matches your template
+            }
+        )
+
+        campaigns_summary = campaigns_summary_df.to_dict(orient="records")
+
+        # Chart data
         chart_labels = [c["campaign"] for c in campaigns_summary]
         chart_data = [c["total_credit"] for c in campaigns_summary]
 

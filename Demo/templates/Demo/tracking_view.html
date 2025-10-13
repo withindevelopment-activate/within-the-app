@@ -145,6 +145,10 @@
                 <th>Campaign</th>
                 <th>Conversions</th>
                 <th>Attributed Revenue</th>
+                <th>Pageviews</th>
+                <th>Add to Cart</th>
+                <th>Purchases</th>
+                <th>Total Events</th>
               </tr>
             </thead>
             <tbody>
@@ -153,6 +157,10 @@
                 <td>{{ c.campaign }}</td>
                 <td>{{ c.conversions }}</td>
                 <td>{{ c.total_credit }}</td>
+                <td>{{ c.pageviews }}</td>
+                <td>{{ c.add_to_cart }}</td>
+                <td>{{ c.conversions }}</td>
+                <td>{{ c.events_count }}</td>
               </tr>
               {% empty %}
               <tr>
