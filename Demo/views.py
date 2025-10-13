@@ -839,7 +839,7 @@ def view_tracking(request):
         df["Visited_at"] = pd.to_datetime(df["Visited_at"])
 
         # 🕒 Filter to last 30 minutes by default
-        thirty_minutes_ago = datetime.timetz() - timedelta(minutes=30)
+        thirty_minutes_ago = datetime.now() - timedelta(minutes=30)
         df_last_30min = df[df["Visited_at"] >= thirty_minutes_ago]
 
         df_last_30min = df_last_30min.sort_values(by="Visited_at", ascending=False)
