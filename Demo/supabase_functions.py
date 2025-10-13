@@ -359,6 +359,48 @@ def build_customer_dictionary(df: pd.DataFrame) -> dict:
 
     return customer_dict
 
+def calculate_campaign_results(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Calculate campaign-level performance directly from tracking data
+    without linking to individual customers.
+
+    Returns a DataFrame with columns:
+    [campaign, pageviews, add_to_cart, purchases, total_value]
+    """
+
+    # Keep only rows that have a campaign
+    df = df[df["UTM_Campaign"].notna() & (df["UTM_Campaign"].str.strip() != "")]
+    if df.empty:
+        return pd.DataFrame(columns=["campaign", "pageviews", "add_to_cart", "purchases", "total_value"])
+
+    # Prepare event value column
+    def get_value(row):
+        if row["Event_Type"] == "purchase" and pd.notna(row.get("Event_Details")):
+            try:
+                details = json.loads(row["Event_Details"])
+                return float(details.get("value", 1.0))
+            except Exception:
+                return 1.0
+        return 0.0
+
+    df["event_value"] = df.apply(get_value, axis=1)
+
+    # Group by campaign and aggregate metrics
+    summary = (
+        df.groupby("UTM_Campaign")
+        .agg(
+            pageviews=pd.NamedAgg(column="Event_Type", aggfunc=lambda x: (x == "pageview").sum()),
+            add_to_cart=pd.NamedAgg(column="Event_Type", aggfunc=lambda x: (x == "add_to_cart").sum()),
+            purchases=pd.NamedAgg(column="Event_Type", aggfunc=lambda x: (x == "purchase").sum()),
+            total_value=pd.NamedAgg(column="event_value", aggfunc="sum"),
+        )
+        .reset_index()
+        .rename(columns={"UTM_Campaign": "campaign"})
+        .sort_values("total_value", ascending=False)
+    )
+
+    return summary
+
 
 def calculate_campaign_attribution(df: pd.DataFrame) -> pd.DataFrame:
     """

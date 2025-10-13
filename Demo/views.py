@@ -13,7 +13,7 @@ from django.core.files.storage import FileSystemStorage
 from io import BytesIO
 
 # Supabase & Supporting imports
-from .supabase_functions import batch_insert_to_supabase, get_next_id_from_supabase_compatible_all, fetch_data_from_supabase, get_tracking_df, build_customer_dictionary, calculate_campaign_attribution, summarize_campaign_performance
+from .supabase_functions import batch_insert_to_supabase, get_next_id_from_supabase_compatible_all, fetch_data_from_supabase, get_tracking_df, build_customer_dictionary, calculate_campaign_attribution, summarize_campaign_performance,calculate_campaign_results
 from .supporting_functions import get_uae_current_date
 # Marketing Report functions
 from .marketing_report import create_general_analysis, create_product_percentage_amount_spent, landing_performance_5_async, column_check
@@ -849,10 +849,10 @@ def view_tracking(request):
         customer_dict = build_customer_dictionary(df)
 
         # Campaign attribution
-        attribution_df = calculate_campaign_attribution(df)
-        campaigns_summary_df = summarize_campaign_performance(attribution_df)
+        attribution_df = calculate_campaign_results(df)
+        # campaigns_summary_df = summarize_campaign_performance(attribution_df)
 
-        campaigns_summary = campaigns_summary_df.to_dict(orient="records")
+        campaigns_summary = attribution_df.to_dict(orient="records")
         # Prepare chart data in backend
         chart_labels = [c["campaign"] for c in campaigns_summary]
         chart_data = [c["total_credit"] for c in campaigns_summary]
