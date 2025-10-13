@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import pandas as pd
 import requests
 from django.conf import settings
@@ -833,23 +833,37 @@ def view_tracking(request):
         if to_date:
             df = df[df["Visited_at"] <= to_date]
 
-        df = df.sort_values(by="Visited_at", ascending=False).head(200)
+        df = df.sort_values(by="Visited_at", ascending=False)
         rows = df.to_dict(orient="records")
 
-        total_visitors = df["Visitor_ID"].nunique()
-        total_sessions = df["Session_ID"].nunique()
-        total_pageviews = len(df)
+        df["Visited_at"] = pd.to_datetime(df["Visited_at"])
+
+        # 🕒 Filter to last 30 minutes by default
+        thirty_minutes_ago = datetime.timetz() - timedelta(minutes=30)
+        df_last_30min = df[df["Visited_at"] >= thirty_minutes_ago]
+
+        df_last_30min = df_last_30min.sort_values(by="Visited_at", ascending=False)
+        rows = df_last_30min.head(200).to_dict(orient="records")
+
+        # 📊 Stats (last 30 min)
+        total_visitors = df_last_30min["Visitor_ID"].nunique()
+        total_sessions = df_last_30min["Session_ID"].nunique()
+        total_pageviews = len(df_last_30min)
 
         # Customer dictionary
         customer_dict = build_customer_dictionary(df)
 
         # Campaign attribution
         attribution_df = calculate_campaign_attribution(df)
-        campaigns_summary = summarize_campaign_performance(attribution_df).to_dict(orient="records")
+        campaigns_summary_df = summarize_campaign_performance(attribution_df)
 
+        campaigns_summary = campaigns_summary_df.to_dict(orient="records")
         # Prepare chart data in backend
         chart_labels = [c["campaign"] for c in campaigns_summary]
         chart_data = [c["total_credit"] for c in campaigns_summary]
+
+        df = df.sort_values(by="Visited_at", ascending=False).head(200)
+        rows = df.to_dict(orient="records")
 
     except Exception as e:
         logging.error(f"Error fetching tracking data: {str(e)}")
