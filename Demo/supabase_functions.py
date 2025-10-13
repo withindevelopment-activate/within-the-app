@@ -1,7 +1,7 @@
 import os,json,ast,logging,pandas as pd
 from supabase import create_client, Client
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Import keys
 url: str = os.environ.get('SUPABASE_URL')
@@ -325,12 +325,12 @@ def build_customer_dictionary(df: pd.DataFrame) -> dict:
     customer_dict = {}
 
     def get_customer_key(row):
-        if pd.notna(row.get("Customer_Email")) and row["Customer_Email"].strip():
-            return row["Customer_Email"].lower().strip()
+        if pd.notna(row.get("Customer_ID")) and row["Customer_ID"].strip():
+            return row["Customer_ID"].lower().strip()
+        elif pd.notna(row.get("Customer_Email")) and str(row["Customer_Email"]).strip():
+            return str(row["Customer_Email"])
         elif pd.notna(row.get("Customer_Mobile")) and row["Customer_Mobile"].strip():
             return row["Customer_Mobile"].strip()
-        elif pd.notna(row.get("Customer_ID")) and str(row["Customer_ID"]).strip():
-            return str(row["Customer_ID"])
         return None
 
     df["customer_key"] = df.apply(get_customer_key, axis=1)
@@ -414,52 +414,114 @@ def calculate_campaign_results(df: pd.DataFrame) -> pd.DataFrame:
 
     return summary
 
-def summarize_campaign_performance(df: pd.DataFrame, attribution_df: pd.DataFrame) -> pd.DataFrame:
+def get_visitor_last_day_activity(df: pd.DataFrame, visitor_id: str) -> pd.DataFrame:
     """
-    Aggregate campaign performance including event counts, pageviews, add_to_cart, and purchases.
+    Get activity for a specific visitor in the last 24 hours.
+    Returns a DataFrame with event counts and campaigns visited.
     """
-    # --- Count events per campaign ---
-    events_summary = (
-        df[df["UTM_Campaign"].notna()]
-        .groupby("UTM_Campaign")["Event_Type"]
-        .value_counts()
-        .unstack(fill_value=0)
+    df["Visited_at"] = pd.to_datetime(df["Visited_at"])
+
+    # Filter for this visitor
+    visitor_df = df[df["Visitor_ID"] == visitor_id].copy()
+    if visitor_df.empty:
+        return pd.DataFrame(columns=["visitor_id", "campaign", "pageviews", "add_to_cart", "purchases", "events_count"])
+
+    # Filter for last 24 hours
+    last_day = datetime.now() - timedelta(days=1)
+    visitor_df = visitor_df[visitor_df["Visited_at"] >= last_day]
+
+    if visitor_df.empty:
+        return pd.DataFrame(columns=["visitor_id", "campaign", "pageviews", "add_to_cart", "purchases", "events_count"])
+
+    # Normalize campaign names
+    visitor_df["UTM_Campaign"] = visitor_df["UTM_Campaign"].fillna("").str.replace("+", " ", regex=False).str.strip()
+
+    # Prepare event value column
+    def get_value(row):
+        details = row.get("Event_Details")
+        if pd.notna(details):
+            try:
+                details_dict = json.loads(details.replace("'", '"'))
+                if row["Event_Type"] in ["purchase", "add_to_cart"]:
+                    price = float(details_dict.get("price", 1.0))
+                    quantity = int(details_dict.get("quantity", 1))
+                    return price * quantity
+            except Exception:
+                return 1.0
+        return 0.0
+
+    visitor_df["event_value"] = visitor_df.apply(get_value, axis=1)
+
+    # Group by campaign
+    summary = (
+        visitor_df.groupby("UTM_Campaign")
+        .agg(
+            pageviews=pd.NamedAgg(column="Event_Type", aggfunc=lambda x: (x == "pageview").sum()),
+            add_to_cart=pd.NamedAgg(column="Event_Type", aggfunc=lambda x: (x == "add_to_cart").sum()),
+            purchases=pd.NamedAgg(column="Event_Type", aggfunc=lambda x: (x == "purchase").sum()),
+            total_value=pd.NamedAgg(column="event_value", aggfunc="sum"),
+        )
         .reset_index()
         .rename(columns={"UTM_Campaign": "campaign"})
     )
 
-    # Rename for consistency
-    for col in ["pageview", "add_to_cart", "purchase"]:
-        if col not in events_summary.columns:
-            events_summary[col] = 0
+    # Total events count
+    summary["events_count"] = summary["pageviews"] + summary["add_to_cart"] + summary["purchases"]
+    summary["visitor_id"] = visitor_id
 
-    events_summary["events_count"] = events_summary.drop(columns=["campaign"]).sum(axis=1)
+    # Sort by total_value descending
+    summary = summary.sort_values("total_value", ascending=False)
 
-    # --- Purchase attribution summary ---
-    if not attribution_df.empty:
-        attribution_summary = (
-            attribution_df.groupby("campaign")
-            .agg(
-                total_credit=pd.NamedAgg(column="credit_value", aggfunc="sum"),
-                conversions=pd.NamedAgg(column="customer_key", aggfunc="count"),
-            )
-            .reset_index()
-        )
-    else:
-        attribution_summary = pd.DataFrame(columns=["campaign", "total_credit", "conversions"])
+    return summary
 
-    # --- Merge event counts with attribution ---
-    campaign_summary = pd.merge(
-        events_summary,
-        attribution_summary,
-        on="campaign",
-        how="outer"
-    ).fillna(0)
 
-    # Final ordering
-    campaign_summary = campaign_summary.sort_values("total_credit", ascending=False)
 
-    return campaign_summary
+# def summarize_campaign_performance(df: pd.DataFrame, attribution_df: pd.DataFrame) -> pd.DataFrame:
+#     """
+#     Aggregate campaign performance including event counts, pageviews, add_to_cart, and purchases.
+#     """
+#     # --- Count events per campaign ---
+#     events_summary = (
+#         df[df["UTM_Campaign"].notna()]
+#         .groupby("UTM_Campaign")["Event_Type"]
+#         .value_counts()
+#         .unstack(fill_value=0)
+#         .reset_index()
+#         .rename(columns={"UTM_Campaign": "campaign"})
+#     )
+
+#     # Rename for consistency
+#     for col in ["pageview", "add_to_cart", "purchase"]:
+#         if col not in events_summary.columns:
+#             events_summary[col] = 0
+
+#     events_summary["events_count"] = events_summary.drop(columns=["campaign"]).sum(axis=1)
+
+#     # --- Purchase attribution summary ---
+#     if not attribution_df.empty:
+#         attribution_summary = (
+#             attribution_df.groupby("campaign")
+#             .agg(
+#                 total_credit=pd.NamedAgg(column="credit_value", aggfunc="sum"),
+#                 conversions=pd.NamedAgg(column="customer_key", aggfunc="count"),
+#             )
+#             .reset_index()
+#         )
+#     else:
+#         attribution_summary = pd.DataFrame(columns=["campaign", "total_credit", "conversions"])
+
+#     # --- Merge event counts with attribution ---
+#     campaign_summary = pd.merge(
+#         events_summary,
+#         attribution_summary,
+#         on="campaign",
+#         how="outer"
+#     ).fillna(0)
+
+#     # Final ordering
+#     campaign_summary = campaign_summary.sort_values("total_credit", ascending=False)
+
+#     return campaign_summary
 
 # def calculate_campaign_attribution(df: pd.DataFrame) -> pd.DataFrame:
 #     """

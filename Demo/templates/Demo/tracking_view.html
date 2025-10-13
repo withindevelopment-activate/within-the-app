@@ -216,6 +216,36 @@
       </div>
     </div>
   </div>
+  {% if visitor_activity %}
+  <div class="mt-5">
+    <h4>Visitor {{ request.GET.visitor }} Activity (Last 24h)</h4>
+    <table class="table table-bordered">
+      <thead>
+        <tr>
+          <th>Campaign</th>
+          <th>Pageviews</th>
+          <th>Add to Cart</th>
+          <th>Purchases</th>
+          <th>Total Events</th>
+          <th>Total Value</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for v in visitor_activity %}
+        <tr>
+          <td>{{ v.campaign }}</td>
+          <td>{{ v.pageviews }}</td>
+          <td>{{ v.add_to_cart }}</td>
+          <td>{{ v.purchases }}</td>
+          <td>{{ v.events_count }}</td>
+          <td>{{ v.total_value }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
 
 <!--  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>

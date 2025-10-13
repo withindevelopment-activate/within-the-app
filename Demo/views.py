@@ -13,7 +13,7 @@ from django.core.files.storage import FileSystemStorage
 from io import BytesIO
 
 # Supabase & Supporting imports
-from .supabase_functions import batch_insert_to_supabase, get_next_id_from_supabase_compatible_all, fetch_data_from_supabase, get_tracking_df, build_customer_dictionary,calculate_campaign_results
+from .supabase_functions import batch_insert_to_supabase, get_next_id_from_supabase_compatible_all, fetch_data_from_supabase, get_tracking_df, build_customer_dictionary,calculate_campaign_results, get_visitor_last_day_activity
 from .supporting_functions import get_uae_current_date
 # Marketing Report functions
 from .marketing_report import create_general_analysis, create_product_percentage_amount_spent, landing_performance_5_async, column_check
@@ -807,12 +807,13 @@ def view_tracking(request):
     campaigns_summary = []
     chart_labels = []
     chart_data = []
+    visitor_activity_df = pd.DataFrame()
 
     try:
         df = get_tracking_df()
         df["Visited_at"] = pd.to_datetime(df["Visited_at"])
 
-        # Apply filters
+        # --- Apply filters ---
         visitor_filter = request.GET.get("visitor")
         session_filter = request.GET.get("session")
         from_date = request.GET.get("from")
@@ -827,39 +828,35 @@ def view_tracking(request):
         if to_date:
             df = df[df["Visited_at"] <= to_date]
 
-        # 🕒 Last 30 minutes
+        # --- Last 30 min stats ---
         thirty_minutes_ago = datetime.now() - timedelta(minutes=30)
         df_last_30min = df[df["Visited_at"] >= thirty_minutes_ago]
-
-        df_last_30min = df_last_30min.sort_values(by="Visited_at", ascending=False)
-        rows = df_last_30min.head(200).to_dict(orient="records")
-
-        # Stats (last 30 min)
         total_visitors = df_last_30min["Visitor_ID"].nunique()
         total_sessions = df_last_30min["Session_ID"].nunique()
         total_pageviews = len(df_last_30min)
 
-        # Customer dictionary
+        # --- Top 200 rows for display ---
+        rows = df.sort_values(by="Visited_at", ascending=False).head(200).to_dict(orient="records")
+
+        # --- Customer dictionary ---
         customer_dict = build_customer_dictionary(df)
 
-        # Campaign results (all events + total_value)
+        # --- Campaign results ---
         campaigns_summary_df = calculate_campaign_results(df)
-
-        # Rename for template
-        campaigns_summary_df = campaigns_summary_df.rename(
-            columns={
-                "purchases": "conversions",
-                "add_to_cart": "add_to_cart",
-                "pageviews": "pageviews",
-                "total_value": "total_credit"
-            }
-        )
-
+        campaigns_summary_df = campaigns_summary_df.rename(columns={"purchases": "conversions"})
         campaigns_summary = campaigns_summary_df.to_dict(orient="records")
 
-        # Chart data
-        chart_labels = campaigns_summary_df["campaign"].tolist()
-        chart_data = campaigns_summary_df["total_credit"].tolist()
+        # Prepare chart data
+        chart_labels = [c["campaign"] for c in campaigns_summary]
+        chart_data = [c["total_value"] for c in campaigns_summary]
+
+        # --- Visitor activity in last 24 hours ---
+        if visitor_filter:
+            visitor_activity_df = get_visitor_last_day_activity(df, visitor_filter)
+            # Convert to dict for template
+            visitor_activity = visitor_activity_df.to_dict(orient="records")
+        else:
+            visitor_activity = []
 
     except Exception as e:
         logging.error(f"Error fetching tracking data: {str(e)}")
@@ -875,5 +872,6 @@ def view_tracking(request):
         "campaigns": campaigns_summary,
         "chart_labels": chart_labels,
         "chart_data": chart_data,
+        "visitor_activity": visitor_activity,  # last day activity for the selected visitor
         "request": request,
     })
