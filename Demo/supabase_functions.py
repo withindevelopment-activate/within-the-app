@@ -371,19 +371,27 @@ def calculate_campaign_results(df: pd.DataFrame) -> pd.DataFrame:
     # Keep only rows with a campaign
     df = df[df["UTM_Campaign"].notna() & (df["UTM_Campaign"].str.strip() != "")]
     if df.empty:
-        return pd.DataFrame(columns=["campaign", "pageviews", "add_to_cart", "purchases", "events_count"])
+        return pd.DataFrame(columns=["campaign", "pageviews", "add_to_cart", "purchases", "total_value", "events_count"])
+
+    # Normalize campaign names
+    df["UTM_Campaign"] = df["UTM_Campaign"].str.replace("+", " ", regex=False).str.strip()
 
     # Prepare event value column
     def get_value(row):
-        if row["Event_Type"] == "purchase" and pd.notna(row.get("Event_Details")):
+        details = row.get("Event_Details")
+        if pd.notna(details):
             try:
-                details = json.loads(row["Event_Details"])
-                return float(details.get("value", 1.0))
+                details_dict = json.loads(details.replace("'", '"'))  # ensure valid JSON
+                if row["Event_Type"] in ["purchase", "add_to_cart"]:
+                    # Use price * quantity if available
+                    price = float(details_dict.get("price", 1.0))
+                    quantity = int(details_dict.get("quantity", 1))
+                    return price * quantity
             except Exception:
                 return 1.0
         return 0.0
 
-    # df["event_value"] = df.apply(get_value, axis=1)
+    df["event_value"] = df.apply(get_value, axis=1)
 
     # Group by campaign and aggregate metrics
     summary = (
@@ -392,7 +400,7 @@ def calculate_campaign_results(df: pd.DataFrame) -> pd.DataFrame:
             pageviews=pd.NamedAgg(column="Event_Type", aggfunc=lambda x: (x == "pageview").sum()),
             add_to_cart=pd.NamedAgg(column="Event_Type", aggfunc=lambda x: (x == "add_to_cart").sum()),
             purchases=pd.NamedAgg(column="Event_Type", aggfunc=lambda x: (x == "purchase").sum()),
-            # total_value=pd.NamedAgg(column="event_value", aggfunc="sum"),
+            total_value=pd.NamedAgg(column="event_value", aggfunc="sum"),
         )
         .reset_index()
         .rename(columns={"UTM_Campaign": "campaign"})
@@ -401,8 +409,8 @@ def calculate_campaign_results(df: pd.DataFrame) -> pd.DataFrame:
     # Total events count per campaign
     summary["events_count"] = summary["pageviews"] + summary["add_to_cart"] + summary["purchases"]
 
-    # Sort by total value
-    # summary = summary.sort_values("total_value", ascending=False)
+    # Sort by total_value descending
+    summary = summary.sort_values("total_value", ascending=False)
 
     return summary
 

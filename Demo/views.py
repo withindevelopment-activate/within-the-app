@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-import requests, pandas as pd, json, re, asyncio, traceback
+import requests, pandas as pd, json, re, asyncio, traceback, logging
 from django.conf import settings
 from django.shortcuts import redirect, render
 from django.views.decorators.csrf import csrf_exempt
@@ -796,8 +796,6 @@ def process_marketing_report(request):
 
     return render(request, "Demo/marketing.html", context)
 
-import logging 
-
 def view_tracking(request):
     store_id = request.GET.get("store_id") or request.session.get("store_uuid")
     if not store_id:
@@ -812,8 +810,9 @@ def view_tracking(request):
 
     try:
         df = get_tracking_df()
+        df["Visited_at"] = pd.to_datetime(df["Visited_at"])
 
-        # Apply filters (visitor, session, from, to)
+        # Apply filters
         visitor_filter = request.GET.get("visitor")
         session_filter = request.GET.get("session")
         from_date = request.GET.get("from")
@@ -828,19 +827,14 @@ def view_tracking(request):
         if to_date:
             df = df[df["Visited_at"] <= to_date]
 
-        df = df.sort_values(by="Visited_at", ascending=False)
-        rows = df.to_dict(orient="records")
-
-        df["Visited_at"] = pd.to_datetime(df["Visited_at"])
-
-        # 🕒 Filter to last 30 minutes by default
+        # 🕒 Last 30 minutes
         thirty_minutes_ago = datetime.now() - timedelta(minutes=30)
         df_last_30min = df[df["Visited_at"] >= thirty_minutes_ago]
 
         df_last_30min = df_last_30min.sort_values(by="Visited_at", ascending=False)
         rows = df_last_30min.head(200).to_dict(orient="records")
 
-        # 📊 Stats (last 30 min)
+        # Stats (last 30 min)
         total_visitors = df_last_30min["Visitor_ID"].nunique()
         total_sessions = df_last_30min["Session_ID"].nunique()
         total_pageviews = len(df_last_30min)
@@ -848,20 +842,24 @@ def view_tracking(request):
         # Customer dictionary
         customer_dict = build_customer_dictionary(df)
 
-        # Campaign summary
+        # Campaign results (all events + total_value)
         campaigns_summary_df = calculate_campaign_results(df)
 
-        # Rename columns to match template expectations
+        # Rename for template
         campaigns_summary_df = campaigns_summary_df.rename(
             columns={
                 "purchases": "conversions",
+                "add_to_cart": "add_to_cart",
+                "pageviews": "pageviews",
+                "total_value": "total_credit"
             }
         )
 
         campaigns_summary = campaigns_summary_df.to_dict(orient="records")
 
-        df = df.sort_values(by="Visited_at", ascending=False).head(200)
-        rows = df.to_dict(orient="records")
+        # Chart data
+        chart_labels = campaigns_summary_df["campaign"].tolist()
+        chart_data = campaigns_summary_df["total_credit"].tolist()
 
     except Exception as e:
         logging.error(f"Error fetching tracking data: {str(e)}")
