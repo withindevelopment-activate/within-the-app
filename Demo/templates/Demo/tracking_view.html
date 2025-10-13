@@ -144,7 +144,6 @@
               <tr>
                 <th>Campaign</th>
                 <th>Conversions</th>
-                <th>Attributed Revenue</th>
                 <th>Pageviews</th>
                 <th>Add to Cart</th>
                 <th>Purchases</th>
@@ -156,7 +155,6 @@
               <tr>
                 <td>{{ c.campaign }}</td>
                 <td>{{ c.conversions }}</td>
-                <td>{{ c.total_credit }}</td>
                 <td>{{ c.pageviews }}</td>
                 <td>{{ c.add_to_cart }}</td>
                 <td>{{ c.conversions }}</td>
@@ -174,11 +172,11 @@
     </div>
 
   <!-- Campaign Attribution Chart -->
-  <div class="row mt-4">
+  {% comment %} <div class="row mt-4">
     <div class="col-md-12">
       <canvas id="campaignChart"></canvas>
     </div>
-  </div>
+  </div> {% endcomment %}
 <!-- Customer Dictionary Table -->
 <div class="mt-5">
   <h4>Customer Dictionary</h4>
@@ -218,7 +216,7 @@
       </div>
     </div>
   </div>
-
+{% comment %} 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
     const ctx = document.getElementById('campaignChart').getContext('2d');
@@ -244,6 +242,6 @@
         }
     });
 
-  </script>
+  </script> {% endcomment %}
 </div>
 {% endblock %}

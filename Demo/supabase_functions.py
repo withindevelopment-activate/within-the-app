@@ -371,7 +371,7 @@ def calculate_campaign_results(df: pd.DataFrame) -> pd.DataFrame:
     # Keep only rows with a campaign
     df = df[df["UTM_Campaign"].notna() & (df["UTM_Campaign"].str.strip() != "")]
     if df.empty:
-        return pd.DataFrame(columns=["campaign", "pageviews", "add_to_cart", "purchases", "total_value", "events_count"])
+        return pd.DataFrame(columns=["campaign", "pageviews", "add_to_cart", "purchases", "events_count"])
 
     # Prepare event value column
     def get_value(row):
@@ -383,7 +383,7 @@ def calculate_campaign_results(df: pd.DataFrame) -> pd.DataFrame:
                 return 1.0
         return 0.0
 
-    df["event_value"] = df.apply(get_value, axis=1)
+    # df["event_value"] = df.apply(get_value, axis=1)
 
     # Group by campaign and aggregate metrics
     summary = (
@@ -392,7 +392,7 @@ def calculate_campaign_results(df: pd.DataFrame) -> pd.DataFrame:
             pageviews=pd.NamedAgg(column="Event_Type", aggfunc=lambda x: (x == "pageview").sum()),
             add_to_cart=pd.NamedAgg(column="Event_Type", aggfunc=lambda x: (x == "add_to_cart").sum()),
             purchases=pd.NamedAgg(column="Event_Type", aggfunc=lambda x: (x == "purchase").sum()),
-            total_value=pd.NamedAgg(column="event_value", aggfunc="sum"),
+            # total_value=pd.NamedAgg(column="event_value", aggfunc="sum"),
         )
         .reset_index()
         .rename(columns={"UTM_Campaign": "campaign"})
@@ -402,7 +402,7 @@ def calculate_campaign_results(df: pd.DataFrame) -> pd.DataFrame:
     summary["events_count"] = summary["pageviews"] + summary["add_to_cart"] + summary["purchases"]
 
     # Sort by total value
-    summary = summary.sort_values("total_value", ascending=False)
+    # summary = summary.sort_values("total_value", ascending=False)
 
     return summary
 

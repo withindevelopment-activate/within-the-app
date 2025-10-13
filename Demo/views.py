@@ -855,15 +855,10 @@ def view_tracking(request):
         campaigns_summary_df = campaigns_summary_df.rename(
             columns={
                 "purchases": "conversions",
-                "total_value": "total_credit"  # matches your template
             }
         )
 
         campaigns_summary = campaigns_summary_df.to_dict(orient="records")
-
-        # Chart data
-        chart_labels = [c["campaign"] for c in campaigns_summary]
-        chart_data = [c["total_credit"] for c in campaigns_summary]
 
         df = df.sort_values(by="Visited_at", ascending=False).head(200)
         rows = df.to_dict(orient="records")
