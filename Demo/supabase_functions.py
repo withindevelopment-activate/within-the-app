@@ -1,9 +1,8 @@
-import pandas as pd
-import os
-import logging
+import os,json,ast,logging,pandas as pd
 from supabase import create_client, Client
-import ast
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
+
 # Import keys
 url: str = os.environ.get('SUPABASE_URL')
 key: str = os.environ.get('SUPABASE_KEY')
@@ -316,6 +315,7 @@ def get_tracking_df():
         df["Visited_at"] = pd.to_datetime(df["Visited_at"], errors="coerce")
     return df
 
+
 def build_customer_dictionary(df: pd.DataFrame) -> dict:
     """
     Build a customer dictionary from the tracking DataFrame.
@@ -324,7 +324,6 @@ def build_customer_dictionary(df: pd.DataFrame) -> dict:
     """
     customer_dict = {}
 
-    # Helper to pick a key
     def get_customer_key(row):
         if pd.notna(row.get("Customer_Email")) and row["Customer_Email"].strip():
             return row["Customer_Email"].lower().strip()
@@ -332,8 +331,7 @@ def build_customer_dictionary(df: pd.DataFrame) -> dict:
             return row["Customer_Mobile"].strip()
         elif pd.notna(row.get("Customer_ID")) and str(row["Customer_ID"]).strip():
             return str(row["Customer_ID"])
-        else:
-            return None
+        return None
 
     df["customer_key"] = df.apply(get_customer_key, axis=1)
 
@@ -345,7 +343,6 @@ def build_customer_dictionary(df: pd.DataFrame) -> dict:
         session_ids = set(group["Session_ID"].dropna().unique())
         campaigns = set(group["UTM_Campaign"].dropna().unique())
 
-        # Pick latest known user info
         latest_row = group.sort_values("Visited_at").iloc[-1]
 
         customer_dict[key] = {
@@ -362,12 +359,12 @@ def build_customer_dictionary(df: pd.DataFrame) -> dict:
 
     return customer_dict
 
+
 def calculate_campaign_attribution(df: pd.DataFrame) -> pd.DataFrame:
     """
     Calculate partial attribution for campaigns per purchase.
     Returns a DataFrame with columns: [customer_key, purchase_date, campaign, credit_value]
     """
-    # Prepare customer key
     def get_customer_key(row):
         if pd.notna(row.get("Customer_Email")) and row["Customer_Email"].strip():
             return row["Customer_Email"].lower().strip()
@@ -375,13 +372,15 @@ def calculate_campaign_attribution(df: pd.DataFrame) -> pd.DataFrame:
             return row["Customer_Mobile"].strip()
         elif pd.notna(row.get("Customer_ID")) and str(row["Customer_ID"]).strip():
             return str(row["Customer_ID"])
-        else:
-            return None
+        return None
 
     df["customer_key"] = df.apply(get_customer_key, axis=1)
 
     # Extract purchases
     purchases = df[df["Event_Type"] == "purchase"].copy()
+    if purchases.empty:
+        return pd.DataFrame(columns=["customer_key", "purchase_date", "campaign", "credit_value"])
+
     purchases["purchase_date"] = purchases["Visited_at"].dt.date
 
     attribution_rows = []
@@ -392,20 +391,18 @@ def calculate_campaign_attribution(df: pd.DataFrame) -> pd.DataFrame:
             continue
 
         purchase_date = purchase["purchase_date"]
-        purchase_value = 0.0
+        purchase_value = 1.0
 
-        # If purchase value is stored in Event_Details JSON (optional)
-        if pd.notna(purchase.get("Event_Details")) and "value" in purchase["Event_Details"]:
+        # Optional: read value from Event_Details JSON if exists
+        details = purchase.get("Event_Details")
+        if pd.notna(details):
             try:
-                import json
-                details = json.loads(purchase["Event_Details"])
-                purchase_value = float(details.get("value", 1.0))
+                data = json.loads(details)
+                purchase_value = float(data.get("value", 1.0))
             except Exception:
-                purchase_value = 1.0
-        else:
-            purchase_value = 1.0  # fallback if not provided
+                pass
 
-        # Find campaigns visited same day
+        # Find campaigns visited the same day
         campaigns_today = df[
             (df["customer_key"] == key) &
             (df["UTM_Campaign"].notna()) &
@@ -427,21 +424,50 @@ def calculate_campaign_attribution(df: pd.DataFrame) -> pd.DataFrame:
 
     return pd.DataFrame(attribution_rows)
 
-def summarize_campaign_performance(attribution_df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Aggregate campaign attribution to produce campaign performance metrics.
-    """
-    if attribution_df.empty:
-        return pd.DataFrame(columns=["campaign", "total_credit", "conversions"])
 
-    summary = (
-        attribution_df.groupby("campaign")
-        .agg(
-            total_credit=pd.NamedAgg(column="credit_value", aggfunc="sum"),
-            conversions=pd.NamedAgg(column="customer_key", aggfunc="count"),
-        )
+def summarize_campaign_performance(df: pd.DataFrame, attribution_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Aggregate campaign performance including event counts, pageviews, add_to_cart, and purchases.
+    """
+    # --- Count events per campaign ---
+    events_summary = (
+        df[df["UTM_Campaign"].notna()]
+        .groupby("UTM_Campaign")["Event_Type"]
+        .value_counts()
+        .unstack(fill_value=0)
         .reset_index()
-        .sort_values("total_credit", ascending=False)
+        .rename(columns={"UTM_Campaign": "campaign"})
     )
 
-    return summary
+    # Rename for consistency
+    for col in ["pageview", "add_to_cart", "purchase"]:
+        if col not in events_summary.columns:
+            events_summary[col] = 0
+
+    events_summary["events_count"] = events_summary.drop(columns=["campaign"]).sum(axis=1)
+
+    # --- Purchase attribution summary ---
+    if not attribution_df.empty:
+        attribution_summary = (
+            attribution_df.groupby("campaign")
+            .agg(
+                total_credit=pd.NamedAgg(column="credit_value", aggfunc="sum"),
+                conversions=pd.NamedAgg(column="customer_key", aggfunc="count"),
+            )
+            .reset_index()
+        )
+    else:
+        attribution_summary = pd.DataFrame(columns=["campaign", "total_credit", "conversions"])
+
+    # --- Merge event counts with attribution ---
+    campaign_summary = pd.merge(
+        events_summary,
+        attribution_summary,
+        on="campaign",
+        how="outer"
+    ).fillna(0)
+
+    # Final ordering
+    campaign_summary = campaign_summary.sort_values("total_credit", ascending=False)
+
+    return campaign_summary

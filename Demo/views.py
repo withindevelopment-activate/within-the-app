@@ -1,20 +1,15 @@
-from datetime import datetime, timedelta
-import pandas as pd
-import requests
+from datetime import datetime, timedelta, timezone
+import requests, pandas as pd, json, re, asyncio, traceback
 from django.conf import settings
 from django.shortcuts import redirect, render
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.contrib import messages
-import traceback
 from django.http import JsonResponse, HttpResponseBadRequest, HttpResponse
 from django.template.loader import render_to_string
 from rapidfuzz import fuzz
 from urllib.parse import urlencode
-import json
 from django.core.files.storage import FileSystemStorage
-import re
-import asyncio
 from io import BytesIO
 
 # Supabase & Supporting imports
@@ -515,7 +510,7 @@ def save_tracking(request):
             print("Failed to insert tracking entry into Supabase:", e)
             traceback.print_exc()
 
-        return JsonResponse({"status": "success"})
+        return JsonResponse({"status": "success", "client_ip": client_ip})
     
     except Exception as e:
         print("TRACKING FUNCTION ERROR:", e)
@@ -836,10 +831,10 @@ def view_tracking(request):
         df = df.sort_values(by="Visited_at", ascending=False)
         rows = df.to_dict(orient="records")
 
-        df["Visited_at"] = pd.to_datetime(df["Visited_at"])
+        df["Visited_at"] = pd.to_datetime(df["Visited_at"], utc=True)
 
         # 🕒 Filter to last 30 minutes by default
-        thirty_minutes_ago = datetime.now() - timedelta(minutes=30)
+        thirty_minutes_ago = datetime.now(timezone.utc) - timedelta(minutes=30)
         df_last_30min = df[df["Visited_at"] >= thirty_minutes_ago]
 
         df_last_30min = df_last_30min.sort_values(by="Visited_at", ascending=False)
