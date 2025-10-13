@@ -179,7 +179,7 @@ def home(request):
         products_res = requests.get(f"{settings.ZID_API_BASE}/products", headers=headers_product)
         products_res.raise_for_status()
         products_data = products_res.json()
-        #print("Products data fetched successfully:", products_data)
+
         products = products_data.get('results', [])
         total_products = products_data.get('count', len(products))
         # Process products to extract price and display name
@@ -867,7 +867,7 @@ def view_tracking(request):
 
     except Exception as e:
         logging.error(f"Error fetching tracking data: {str(e)}")
-        return HttpResponse("❌ Error fetching tracking data", status=500)
+        return HttpResponse(f"❌ Error fetching tracking data: {str(e)}", status=500)
 
     return render(request, "Demo/tracking_view.html", {
         "store_id": store_id,
