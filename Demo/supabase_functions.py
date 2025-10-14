@@ -1,8 +1,7 @@
-import os,json,ast,logging,pandas as pd
+import os,json,ast,logging,pandas as pd, pytz
 from supabase import create_client, Client
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
-from .supporting_functions import get_uae_current_date
 
 # Import keys
 url: str = os.environ.get('SUPABASE_URL')
@@ -260,8 +259,7 @@ def map_skus(df):
     old_prods = fetch_and_clean("Generated_Skus_OLD")
     
     # Filter out oman
-    og_packages = fetch_data_from_supabase_specific("Package_Skus",
-                                                    filters={'Region': ('neq', ['OM'])})
+    og_packages = fetch_data_from_supabase_specific("Package_Skus",filters={'Region': ('neq', ['OM'])})
     og_packages['Indication'] = og_packages['Indication'].astype(str).str.strip()
     og_packages['Package SKU'] = og_packages['Package SKU'].str.strip().astype(str)
 
@@ -421,6 +419,7 @@ def get_visitor_last_day_activity(df: pd.DataFrame, visitor_id: str) -> pd.DataF
     Returns a DataFrame with event counts and campaigns visited.
     """
     df["Visited_at"] = pd.to_datetime(df["Visited_at"])
+    uae_timezone = pytz.timezone('Asia/Dubai')
 
     # Filter for this visitor
     visitor_df = df[df["Visitor_ID"] == visitor_id].copy()
@@ -428,7 +427,7 @@ def get_visitor_last_day_activity(df: pd.DataFrame, visitor_id: str) -> pd.DataF
         return pd.DataFrame(columns=["visitor_id", "campaign", "pageviews", "add_to_cart", "purchases", "events_count"])
 
     # Filter for last 24 hours
-    last_day = get_uae_current_date() - timedelta(days=1)
+    last_day = datetime.now(uae_timezone) - timedelta(days=1)
     visitor_df = visitor_df[visitor_df["Visited_at"] >= last_day]
 
     if visitor_df.empty:

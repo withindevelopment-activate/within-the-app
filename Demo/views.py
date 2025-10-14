@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-import requests, pandas as pd, json, re, asyncio, traceback, logging
+import requests, pandas as pd, json, re, asyncio, traceback, logging, pytz
 from django.conf import settings
 from django.shortcuts import redirect, render
 from django.views.decorators.csrf import csrf_exempt
@@ -811,7 +811,9 @@ def view_tracking(request):
     store_id = request.GET.get("store_id") or request.session.get("store_uuid")
     if not store_id:
         return redirect("Demo:home")
-
+    
+    uae_timezone = pytz.timezone('Asia/Dubai')
+    
     rows = []
     total_visitors = total_sessions = total_pageviews = 0
     customer_dict = {}
@@ -841,7 +843,7 @@ def view_tracking(request):
             df = df[df["Visited_at"] <= to_date]
 
         # --- Last 30 min stats ---
-        thirty_minutes_ago = get_uae_current_date() - timedelta(minutes=30)
+        thirty_minutes_ago = datetime.now(uae_timezone) - timedelta(minutes=30)
         df_last_30min = df[df["Visited_at"] >= thirty_minutes_ago]
         total_visitors = df_last_30min["Visitor_ID"].nunique()
         total_sessions = df_last_30min["Session_ID"].nunique()
