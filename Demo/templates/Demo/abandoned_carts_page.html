@@ -1,0 +1,77 @@
+{% extends "Demo/base.html" %}
+
+{% block title %} Abandoned Carts {% endblock title %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <!-- KPI Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-center shadow-sm">
+                <div class="card-body">
+                    <h5>Total Abandoned Carts</h5>
+                    <h3>{{ total_carts }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center shadow-sm">
+                <div class="card-body">
+                    <h5>Recovered</h5>
+                    <h3>{{ recovered_count }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center shadow-sm">
+                <div class="card-body">
+                    <h5>Total Value</h5>
+                    <h3>{{ total_value }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center shadow-sm">
+                <div class="card-body">
+                    <h5>Avg. Cart Value</h5>
+                    <h3>{{ avg_cart_value }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Abandoned Cart Table -->
+    <div class="data-wrap">
+        <div class="data-viewport">
+            <div class="data-scroller" role="region" aria-label="Scrollable data table" tabindex="0">
+                <table class="data-table" role="table" aria-label="Abandoned carts dataset">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>Customer</th>
+                            <th>Email</th>
+                            <th>Phone</th>
+                            <th>Total</th>
+                            <th>Recovered</th>
+                            <th>Created At</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in carts %}
+                        <tr>
+                            <td>{{ c.id }}</td>
+                            <td>{{ c.customer.name|default:"Guest" }}</td>
+                            <td>{{ c.customer.email|default:"-" }}</td>
+                            <td>{{ c.customer.mobile|default:"-" }}</td>
+                            <td>{{ c.total }}</td>
+                            <td>{% if c.is_recovered %} ✅ {% else %} ❌ {% endif %}</td>
+                            <td>{{ c.created_at }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

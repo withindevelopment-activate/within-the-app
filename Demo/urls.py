@@ -12,12 +12,18 @@ urlpatterns = [
     path('zid/match_google/', views.match_orders_with_analytics, name='match_google'),
     path('zid/orders/', views.orders_page, name='orders_page'),
     path('zid/products/', views.products_page, name='products_page'),
+    
     path("search/", views.search_view, name="search"),
+
     path("marketing/", views.marketing_page, name="marketing"), # Marketing report section
     path("marketing_ready/", views.marketing_page_ready, name="marketing_ready"),
     path("process_marketing_report/", views.process_marketing_report, name="process_marketing_report"),
+
     path("save_tracking/", views.save_tracking, name="save_tracking"), # Tracking
     path("tracking_snippet.js", views.tracking_snippet, name="tracking_snippet"),
     path("view_tracking/", views.view_tracking, name="view_tracking"),
-
+    
+    path('zid/abandoned_carts/', views.abandoned_carts_page, name='abandoned_carts_page'),
+    path('zid/customers/', views.customers_page, name='customers_page'),
+    path("zid/customer-detail/<int:customer_id>/", views.customer_detail_api, name="customer_detail_api"),
 ]

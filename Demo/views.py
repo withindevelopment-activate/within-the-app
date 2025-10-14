@@ -40,7 +40,6 @@ def zid_login(request):
     auth_url = f"{url}?{urlencode(params)}"
     return redirect(auth_url)
 
-
 # Handle callback and exchange code for access_token
 def zid_callback(request):
     code = request.GET.get('code')
@@ -241,8 +240,6 @@ def zid_refresh_token(request):
 
     return JsonResponse({'status': 'refreshed', 'new_access_token': new_tokens.get('access_token')})
 
-
-
 ###############################################################################
 ################# ZID ORDERS + GOOGLE ANALYTICS ###############################
 '''
@@ -430,7 +427,6 @@ def match_orders_with_analytics(request):
         "campaign_product_sales": campaign_product_sales,
     })
 
-
 #############################################################################################################
 ################################## The Visitor Tracking Section #############################################
 @csrf_exempt  # This is added because we are adding the tracking javascript to the app but the store pages likely do not have a <meta name="csrf-token">
@@ -458,7 +454,6 @@ def save_tracking(request):
         utm_params = data.get('utm_params', {}) or {}
         traffic_source = data.get('traffic_source', {}) or {}
         client_ip = get_client_ip(request)
-        print("The client IP is:", client_ip)
 
         tracking_entry = {
             'Distinct_ID': distinct_id,
@@ -510,7 +505,7 @@ def save_tracking(request):
             print("Failed to insert tracking entry into Supabase:", e)
             traceback.print_exc()
 
-        return JsonResponse({"status": "success", "client_ip": client_ip})
+        return JsonResponse({"status": "success"})
     
     except Exception as e:
         print("TRACKING FUNCTION ERROR:", e)
@@ -524,10 +519,28 @@ def tracking_snippet(request):
 ###########################################
 
 def get_client_ip(request):
-    x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
+    """
+    Returns the real client IP address, even behind proxies (e.g., Cloudflare, Nginx).
+    """
+    # 1. Cloudflare specific header (if you're using it)
+    cf_ip = request.META.get('HTTP_CF_CONNECTING_IP')
+    if cf_ip:
+        return cf_ip
+
+    # 2. Standard X-Forwarded-For header (can contain multiple IPs)
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
     if x_forwarded_for:
-        return x_forwarded_for.split(",")[0].strip()
-    return request.META.get("REMOTE_ADDR")
+        # X-Forwarded-For can contain multiple IPs, the first is the real one
+        ip = x_forwarded_for.split(',')[0].strip()
+        if ip:
+            return ip
+
+    # 3. Standard Django fallback
+    real_ip = request.META.get('REMOTE_ADDR')
+    if real_ip:
+        return real_ip
+
+    return "0.0.0.0"
 
 def search_view(request):
     query = request.GET.get("q", "").lower()
@@ -642,13 +655,11 @@ def products_page(request):
 def safe_name(name):
     return re.sub(r'[^0-9a-zA-Z_]', '_', str(name))
 
-
 def safe_numeric(value):
     try:
         return float(value)
     except (ValueError, TypeError):
         return 0  # fallback if non-numeric
-
 
 #############################################################################
 ############################ Marketing Report Section #######################
@@ -799,7 +810,7 @@ def process_marketing_report(request):
 def view_tracking(request):
     store_id = request.GET.get("store_id") or request.session.get("store_uuid")
     if not store_id:
-        return HttpResponse("❌ store_id is required", status=400)
+        return redirect("Demo:home")
 
     rows = []
     total_visitors = total_sessions = total_pageviews = 0
@@ -875,3 +886,139 @@ def view_tracking(request):
         "visitor_activity": visitor_activity,  # last day activity for the selected visitor
         "request": request,
     })
+
+def abandoned_carts_page(request):
+    token = request.session.get('access_token')
+    auth_token = request.session.get('authorization_token')
+    store_id = request.session.get('store_id')
+
+    if not token:
+        return redirect('Demo:zid_login')
+
+    headers_cart = {
+        'Authorization': f'Bearer {auth_token}',
+        'X-MANAGER-TOKEN': token,
+        'accept': 'application/json',
+        'Accept-Language': 'all-languages',
+        'Store-Id': f'{store_id}',
+        'Role': 'Manager',
+    }
+
+    all_carts = []
+    page = 1
+    per_page = 100
+    try:
+        while True:
+            params = {'page': page, 'page_size': per_page}
+            carts_res = requests.get(f"{settings.ZID_API_BASE}/managers/store/abandoned-carts", headers=headers_cart, params=params)
+            carts_res.raise_for_status()
+            carts_data = carts_res.json()
+            carts_list = carts_data.get('results', [])
+            if not carts_list:
+                break
+            all_carts.extend(carts_list)
+            if len(all_carts) >= carts_data.get('count', 0):  # Zid uses 'count'
+                break
+            page += 1
+    except requests.RequestException as e:
+        traceback.print_exc()
+        messages.error(request, f"⚠️ Error fetching abandoned carts: {str(e)}")
+        all_carts = []
+
+    total_carts = len(all_carts)
+
+    # KPIs
+    recovered_count = sum(1 for c in all_carts if c.get("is_recovered"))
+    total_value = sum(float(c.get("total", 0)) for c in all_carts)
+    avg_cart_value = round(total_value / total_carts, 2) if total_carts > 0 else 0
+
+    context = {
+        "carts": all_carts,
+        "total_carts": total_carts,
+        "recovered_count": recovered_count,
+        "avg_cart_value": avg_cart_value,
+        "total_value": total_value,
+    }
+
+    return render(request, "Demo/abandoned_carts_page.html", context)
+
+def customers_page(request):
+    token = request.session.get('access_token')
+    auth_token = request.session.get('authorization_token')
+    store_id = request.session.get('store_id')
+
+    if not token:
+        return redirect('Demo:zid_login')
+
+    headers_customer = {
+        'Authorization': f'Bearer {auth_token}',
+        'X-MANAGER-TOKEN': token,
+        'accept': 'application/json',
+        'Accept-Language': 'all-languages',
+        'Store-Id': f'{store_id}',
+        'Role': 'Manager',
+    }
+
+    all_customers = []
+    page = 1
+    per_page = 10
+    try:
+        while True:
+            params = {'page': page, 'page_size': per_page}
+            res = requests.get(f"{settings.ZID_API_BASE}/managers/store/customers", headers=headers_customer, params=params)
+            res.raise_for_status()
+            data = res.json()
+            customers_list = data.get('customers', [])  # ✅ FIXED
+            if not customers_list:
+                break
+
+            all_customers.extend(customers_list)
+
+            if len(all_customers) >= data.get('total_customers_count', 0):  # ✅ FIXED
+                break
+            page += 1
+    except requests.RequestException as e:
+        traceback.print_exc()
+        messages.error(request, f"⚠️ Error fetching customers: {str(e)}")
+        all_customers = []
+
+    total_customers = len(all_customers)
+
+    # KPIs (note: Zid uses `verified` not `is_verified`)
+    verified_count = sum(1 for c in all_customers if c.get("verified"))
+    blocked_count = sum(1 for c in all_customers if not c.get("is_active"))  # inactive means blocked
+    avg_orders = round(
+        sum(c.get("order_counts", 0) for c in all_customers) / total_customers, 2
+    ) if total_customers > 0 else 0
+
+    context = {
+        "customers": all_customers,
+        "total_customers": data.get("total_customers_count", total_customers),
+        "verified_count": verified_count,
+        "blocked_count": blocked_count,
+        "avg_orders": avg_orders,
+    }
+    return render(request, "Demo/customers_page.html", context)
+
+# AJAX endpoint for customer details popup
+def customer_detail_api(request, customer_id):
+    token = request.session.get('access_token')
+    auth_token = request.session.get('authorization_token')
+    store_id = request.session.get('store_id')
+
+    headers_customer = {
+        'Authorization': f'Bearer {auth_token}',
+        'X-MANAGER-TOKEN': token,
+        'accept': 'application/json',
+        'Accept-Language': 'all-languages',
+        'Store-Id': f'{store_id}',
+        'Role': 'Manager',
+    }
+
+    try:
+        res = requests.get(f"{settings.ZID_API_BASE}/managers/store/customers/{customer_id}", headers=headers_customer)
+        res.raise_for_status()
+        data = res.json()
+        return JsonResponse(data.get("customer", {}), safe=False)
+    except requests.RequestException as e:
+        return JsonResponse({"error": str(e)}, status=400)
