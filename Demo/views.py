@@ -844,7 +844,7 @@ def view_tracking(request):
 
         # --- Last 30 min stats ---
         thirty_minutes_ago = datetime.now(uae_timezone) - timedelta(minutes=30)
-        df_last_30min = df[df["Visited_at"] >= thirty_minutes_ago]
+        df_last_30min = df[df["Visited_at"].dt.tz_localize("Asia/Dubai", ambiguous='NaT', nonexistent='shift_forward') >= thirty_minutes_ago]
         total_visitors = df_last_30min["Visitor_ID"].nunique()
         total_sessions = df_last_30min["Session_ID"].nunique()
         total_pageviews = len(df_last_30min)
