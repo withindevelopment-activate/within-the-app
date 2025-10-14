@@ -2,6 +2,7 @@ import os,json,ast,logging,pandas as pd
 from supabase import create_client, Client
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
+from .supporting_functions import get_uae_current_date
 
 # Import keys
 url: str = os.environ.get('SUPABASE_URL')
@@ -427,7 +428,7 @@ def get_visitor_last_day_activity(df: pd.DataFrame, visitor_id: str) -> pd.DataF
         return pd.DataFrame(columns=["visitor_id", "campaign", "pageviews", "add_to_cart", "purchases", "events_count"])
 
     # Filter for last 24 hours
-    last_day = datetime.now() - timedelta(days=1)
+    last_day = get_uae_current_date() - timedelta(days=1)
     visitor_df = visitor_df[visitor_df["Visited_at"] >= last_day]
 
     if visitor_df.empty:

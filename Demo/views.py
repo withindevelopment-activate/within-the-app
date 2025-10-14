@@ -106,6 +106,17 @@ def home(request):
     'X-MANAGER-TOKEN': token,
     }
 
+    # Fetch products
+    # Define the headers to retrieve the products
+    headers_product = {
+        'Authorization': f'Bearer {auth_token}',
+        'X-MANAGER-TOKEN': token, 
+        'accept': 'application/json',
+        'Accept-Language': 'all-languages',
+        'Store-Id': f'{store_id}',
+        'Role': 'Manager',
+    }
+
     profile = {}
     orders = []
     products = []
@@ -157,17 +168,6 @@ def home(request):
             order['config_logo'] = order.get('printed_invoice_settings', {}).get('config_logo', '')
             status_obj = order.get("order_status", {})
             order["display_status"] = status_obj.get("name") or status_obj.get("code") or "unknown"
-
-        # Fetch products
-        # Define the headers to retrieve the products
-        headers_product = {
-            'Authorization': f'Bearer {auth_token}',
-            'X-MANAGER-TOKEN': token, 
-            'accept': 'application/json',
-            'Accept-Language': 'all-languages',
-            'Store-Id': f'{store_id}',
-            'Role': 'Manager',
-        }
 
         # Call the products --
         products_res = requests.get(f"{settings.ZID_API_BASE}/products", headers=headers_product)
@@ -823,6 +823,7 @@ def view_tracking(request):
     try:
         df = get_tracking_df()
         df["Visited_at"] = pd.to_datetime(df["Visited_at"])
+        messages.warning(request, f"Ip Address = {get_client_ip(request)}")
 
         # --- Apply filters ---
         visitor_filter = request.GET.get("visitor")
@@ -840,7 +841,7 @@ def view_tracking(request):
             df = df[df["Visited_at"] <= to_date]
 
         # --- Last 30 min stats ---
-        thirty_minutes_ago = datetime.now() - timedelta(minutes=30)
+        thirty_minutes_ago = get_uae_current_date() - timedelta(minutes=30)
         df_last_30min = df[df["Visited_at"] >= thirty_minutes_ago]
         total_visitors = df_last_30min["Visitor_ID"].nunique()
         total_sessions = df_last_30min["Session_ID"].nunique()
@@ -868,6 +869,7 @@ def view_tracking(request):
             visitor_activity = visitor_activity_df.to_dict(orient="records")
         else:
             visitor_activity = []
+            messages.warning(request, f"{visitor_activity}")
 
     except Exception as e:
         logging.error(f"Error fetching tracking data: {str(e)}")
