@@ -13,7 +13,7 @@ from django.core.files.storage import FileSystemStorage
 from io import BytesIO
 
 # Supabase & Supporting imports
-from .supabase_functions import batch_insert_to_supabase, get_next_id_from_supabase_compatible_all, fetch_data_from_supabase, get_tracking_df, build_customer_dictionary,calculate_campaign_results, get_visitor_last_day_activity
+from .supabase_functions import batch_insert_to_supabase, get_next_id_from_supabase_compatible_all, fetch_data_from_supabase, get_tracking_df, build_customer_dictionary,calculate_campaign_results, get_visitor_last_day_activity, attribute_purchases_to_campaigns
 from .supporting_functions import get_uae_current_date
 # Marketing Report functions
 from .marketing_report import create_general_analysis, create_product_percentage_amount_spent, landing_performance_5_async, column_check
@@ -149,7 +149,7 @@ def home(request):
         '''for order in orders[:5]:
             print(order)'''
         total_orders = round(orders_data.get('total_order_count', len(orders)), 2)
-        total_revenue = sum(float(order['transaction_amount']) for order in orders)
+        total_revenue = sum(float(order['transaction_amount'],2) for order in orders)
         total_revenue = round(total_revenue, 2)
 
         # Process orders to extract total and status
@@ -856,7 +856,7 @@ def view_tracking(request):
         customer_dict = build_customer_dictionary(df)
 
         # --- Campaign results ---
-        campaigns_summary_df = calculate_campaign_results(df)
+        campaigns_summary_df = attribute_purchases_to_campaigns(df)
         campaigns_summary_df = campaigns_summary_df.rename(columns={"purchases": "conversions"})
         campaigns_summary = campaigns_summary_df.to_dict(orient="records")
 

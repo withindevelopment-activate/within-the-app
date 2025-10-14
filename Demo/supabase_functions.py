@@ -317,37 +317,72 @@ def get_tracking_df():
 
 def build_customer_dictionary(df: pd.DataFrame) -> dict:
     """
-    Build a customer dictionary from the tracking DataFrame.
-    Keys = unique identifiers (email/mobile/customer_id)
-    Values = related visitor IDs, session IDs, campaigns, user info
+    Build a dictionary of customers with all related visitor_ids, session_ids,
+    campaigns, and event stats (pageviews, add_to_cart, purchases).
     """
-    customer_dict = {}
+    df = df.copy()
+
+    # Normalize and prepare columns
+    df["Customer_ID"] = df["Customer_ID"].fillna("").astype(str).str.strip()
+    df["Customer_Email"] = df["Customer_Email"].fillna("").astype(str).str.strip()
+    df["Customer_Mobile"] = df["Customer_Mobile"].fillna("").astype(str).str.strip()
+    df["Visitor_ID"] = df["Visitor_ID"].fillna("").astype(str).str.strip()
+    df["Session_ID"] = df["Session_ID"].fillna("").astype(str).str.strip()
+    df["UTM_Campaign"] = df["UTM_Campaign"].fillna("").astype(str).str.replace("+", " ", regex=False).str.strip()
+    df["Visited_at"] = pd.to_datetime(df["Visited_at"])
 
     def get_customer_key(row):
-        if pd.notna(row.get("Customer_ID")) and row["Customer_ID"].strip():
-            return row["Customer_ID"].lower().strip()
-        elif pd.notna(row.get("Customer_Email")) and str(row["Customer_Email"]).strip():
-            return str(row["Customer_Email"])
-        elif pd.notna(row.get("Customer_Mobile")) and row["Customer_Mobile"].strip():
-            return row["Customer_Mobile"].strip()
+        if row["Customer_ID"]:
+            return row["Customer_ID"].lower()
+        elif row["Customer_Email"]:
+            return row["Customer_Email"].lower()
+        elif row["Customer_Mobile"]:
+            return row["Customer_Mobile"]
         return None
 
     df["customer_key"] = df.apply(get_customer_key, axis=1)
+
+    customer_dict = {}
 
     for key, group in df.groupby("customer_key"):
         if not key:
             continue
 
-        visitor_ids = set(group["Visitor_ID"].dropna().unique())
-        session_ids = set(group["Session_ID"].dropna().unique())
-        campaigns = set(group["UTM_Campaign"].dropna().unique())
+        # Collect all identifiers for this customer
+        customer_visitors = set(group["Visitor_ID"]) - {""}
+        customer_sessions = set(group["Session_ID"]) - {""}
+        customer_ids = {key}
 
-        latest_row = group.sort_values("Visited_at").iloc[-1]
+        # Find *all rows in df* that match any of these identifiers
+        mask = (
+            df["Visitor_ID"].isin(customer_visitors) |
+            df["Session_ID"].isin(customer_sessions) |
+            df["Customer_ID"].isin(customer_ids) |
+            df["Customer_Email"].isin(customer_ids) |
+            df["Customer_Mobile"].isin(customer_ids)
+        )
+        full_rows = df[mask].copy()
+
+        # Campaigns this customer interacted with
+        campaigns = set(full_rows["UTM_Campaign"]) - {""}
+
+        # Count event types
+        pageviews = (full_rows["Event_Type"] == "pageview").sum()
+        add_to_cart = (full_rows["Event_Type"] == "add_to_cart").sum()
+        purchases = (full_rows["Event_Type"] == "purchase").sum()
+
+        # Latest info for display
+        latest_row = full_rows.sort_values("Visited_at").iloc[-1]
 
         customer_dict[key] = {
-            "visitor_ids": visitor_ids,
-            "sessions": session_ids,
+            "visitor_ids": customer_visitors,
+            "sessions": customer_sessions,
             "campaigns": campaigns,
+            "stats": {
+                "pageviews": int(pageviews),
+                "add_to_cart": int(add_to_cart),
+                "purchases": int(purchases),
+            },
             "user_info": {
                 "name": latest_row.get("Customer_Name"),
                 "email": latest_row.get("Customer_Email"),
@@ -357,6 +392,7 @@ def build_customer_dictionary(df: pd.DataFrame) -> dict:
         }
 
     return customer_dict
+
 
 def calculate_campaign_results(df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -474,6 +510,79 @@ def get_visitor_last_day_activity(df: pd.DataFrame, visitor_id: str) -> pd.DataF
 
     return summary
 
+def attribute_purchases_to_campaigns(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Return a campaign-level summary with purchases attributed to the most relevant campaign
+    using session_id and visit order.
+    """
+    df = df.copy()
+    df["Visited_at"] = pd.to_datetime(df["Visited_at"])
+    df["UTM_Campaign"] = df["UTM_Campaign"].fillna("").astype(str).str.replace("+", " ", regex=False).str.strip()
+
+    # Helper: get event value (purchase/add_to_cart amount)
+    def get_value(row):
+        details = row.get("Event_Details")
+        if pd.notna(details):
+            try:
+                d = json.loads(details.replace("'", '"'))
+                price = float(d.get("price", 1.0))
+                qty = int(d.get("quantity", 1))
+                return price * qty
+            except Exception:
+                return 0.0
+        return 0.0
+
+    df["event_value"] = df.apply(get_value, axis=1)
+
+    # Separate purchases to attribute them
+    purchases = df[df["Event_Type"] == "purchase"].copy()
+    campaign_attribution = []
+
+    for _, purchase in purchases.iterrows():
+        session_id = purchase["Session_ID"]
+        purchase_time = purchase["Visited_at"]
+
+        # Direct campaign
+        if purchase["UTM_Campaign"]:
+            campaign_attribution.append({
+                "campaign": purchase["UTM_Campaign"],
+                "value": purchase["event_value"],
+            })
+            continue
+
+        # Look back in the same session for the latest campaign
+        session_events = df[
+            (df["Session_ID"] == session_id) &
+            (df["Visited_at"] < purchase_time) &
+            (df["UTM_Campaign"] != "")
+        ].sort_values("Visited_at")
+
+        if not session_events.empty:
+            last_campaign = session_events.iloc[-1]["UTM_Campaign"]
+            campaign_attribution.append({
+                "campaign": last_campaign,
+                "value": purchase["event_value"],
+            })
+        else:
+            campaign_attribution.append({
+                "campaign": "(no campaign)",
+                "value": purchase["event_value"],
+            })
+
+    attribution_df = pd.DataFrame(campaign_attribution)
+    if attribution_df.empty:
+        return pd.DataFrame(columns=["campaign", "purchases", "total_value"])
+
+    summary = (
+        attribution_df.groupby("campaign")
+        .agg(
+            purchases=pd.NamedAgg(column="campaign", aggfunc="count"),
+            total_value=pd.NamedAgg(column="value", aggfunc="sum")
+        )
+        .reset_index()
+    )
+
+    return summary.sort_values("total_value", ascending=False)
 
 
 # def summarize_campaign_performance(df: pd.DataFrame, attribution_df: pd.DataFrame) -> pd.DataFrame:

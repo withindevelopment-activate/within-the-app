@@ -193,6 +193,9 @@
               <th>Visitor IDs</th>
               <th>Session IDs</th>
               <th>Campaigns</th>
+              <th>pageviews</th>
+              <th>Add to Cart</th>
+              <th>Purchases</th>
             </tr>
           </thead>
           <tbody>
@@ -205,6 +208,9 @@
               <td>{{ c.visitor_ids|join:", " }}</td>
               <td>{{ c.sessions|join:", " }}</td>
               <td>{{ c.campaigns|join:", " }}</td>
+              <td>{{ c.stats.pageviews }}</td>
+              <td>{{ c.stats.add_to_cart }}</td>
+              <td>{{ c.stats.purchases }}</td>
             </tr>
             {% empty %}
             <tr>
