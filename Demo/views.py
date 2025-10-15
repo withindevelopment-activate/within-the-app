@@ -11,6 +11,7 @@ from rapidfuzz import fuzz
 from urllib.parse import urlencode
 from django.core.files.storage import FileSystemStorage
 from io import BytesIO
+import logging
 
 # Supabase & Supporting imports
 from .supabase_functions import batch_insert_to_supabase, get_next_id_from_supabase_compatible_all, get_tracking_df, build_customer_dictionary, attribute_purchases_to_campaigns
@@ -1018,3 +1019,37 @@ def customer_detail_api(request, customer_id):
         return JsonResponse(data.get("customer", {}), safe=False)
     except requests.RequestException as e:
         return JsonResponse({"error": str(e)}, status=400)
+
+
+#########################################################################
+##################### THE PRODUCTS WEBHOOK SECTION 
+logger = logging.getLogger(__name__)
+
+def zid_product_update(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Invalid method'}, status=405)
+
+    try:
+        # Parse JSON payload
+        body_unicode = request.body.decode('utf-8')
+        data = json.loads(body_unicode)
+
+        if not data:
+            return JsonResponse({'error': 'No JSON payload received'}, status=400)
+
+        product_id = data.get('id')
+        product_name = data.get('name')
+        price = data.get('price')
+
+        logger.info(f"Received product update from Zid — ID: {product_id}, Name: {product_name}, Price: {price}")
+
+
+        return JsonResponse({'status': 'success'}, status=200)
+
+    except json.JSONDecodeError:
+        logger.error("Invalid JSON payload received.")
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+    except Exception as e:
+        logger.exception(f"Error processing Zid webhook: {e}")
+        return JsonResponse({'error': 'Internal server error'}, status=500)
