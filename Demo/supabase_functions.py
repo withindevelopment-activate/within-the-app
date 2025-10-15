@@ -358,9 +358,6 @@ def build_customer_dictionary(df: pd.DataFrame) -> dict:
     non_purchases = df_no_duplicates[~purchase_mask]
     df_dedup = pd.concat([non_purchases, purchases], ignore_index=True)
 
-    # Deduplicate remaining events per visitor/session/campaign/event_type
-    df_dedup = df_dedup.drop_duplicates(subset=["Visitor_ID", "Session_ID", "Event_Type", "UTM_Campaign"])
-
     customer_dict = {}
 
     for key, group in df_dedup.groupby("customer_key"):
