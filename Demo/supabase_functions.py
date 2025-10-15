@@ -513,10 +513,7 @@ def get_visitor_last_day_activity(df: pd.DataFrame, visitor_id: str) -> pd.DataF
 
 def attribute_purchases_to_campaigns(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Return a campaign-level summary with purchases, add_to_cart, and pageviews
-    attributed to the most relevant campaign using session_id and visit order.
-
-    Handles malformed JSON and missing data gracefully.
+    Memory-efficient campaign attribution with purchases, add_to_cart, and pageviews.
     """
     if df.empty:
         return pd.DataFrame(columns=["campaign", "purchases", "add_to_cart", "pageviews", "total_value"])
@@ -524,11 +521,7 @@ def attribute_purchases_to_campaigns(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
 
     # Ensure datetime
-    try:
-        df["Visited_at"] = pd.to_datetime(df["Visited_at"])
-    except Exception as e:
-        messages.error(f"Error converting Visited_at to datetime: {e}")
-        raise ValueError(f"Error converting Visited_at to datetime: {e}")
+    df["Visited_at"] = pd.to_datetime(df["Visited_at"], errors="coerce")
 
     # Clean campaign names
     df["UTM_Campaign"] = (
@@ -539,8 +532,8 @@ def attribute_purchases_to_campaigns(df: pd.DataFrame) -> pd.DataFrame:
         .str.strip()
     )
 
-    # Helper: get event value safely
-    def get_event_value(details):
+    # Event value
+    def safe_value(details):
         if pd.isna(details) or not details:
             return 0.0
         try:
@@ -551,48 +544,29 @@ def attribute_purchases_to_campaigns(df: pd.DataFrame) -> pd.DataFrame:
         except Exception:
             return 0.0
 
-    df["event_value"] = df["Event_Details"].apply(get_event_value)
+    df["event_value"] = df["Event_Details"].apply(safe_value)
 
-    # Build campaign attribution
-    campaign_attribution = []
+    # Sort by session and visit
+    df = df.sort_values(["Session_ID", "Visited_at"])
 
-    for idx, row in df.iterrows():
-        session_id = row.get("Session_ID", "")
-        visit_time = row.get("Visited_at")
-        event_type = row.get("Event_Type", "")
-        value = row.get("event_value", 0.0)
-        campaign = row.get("UTM_Campaign", "")
+    # Forward-fill last known campaign per session
+    df["campaign_attributed"] = df.groupby("Session_ID")["UTM_Campaign"].ffill().fillna("(no campaign)")
 
-        # If no campaign, look back in the session for the last known campaign
-        if not campaign:
-            try:
-                session_events = df[
-                    (df["Session_ID"] == session_id) &
-                    (df["Visited_at"] < visit_time) &
-                    (df["UTM_Campaign"] != "")
-                ].sort_values("Visited_at")
-                campaign = session_events.iloc[-1]["UTM_Campaign"] if not session_events.empty else "(no campaign)"
-            except Exception:
-                campaign = "(no campaign)"
+    # Prepare event type columns
+    df["add_to_cart"] = (df["Event_Type"] == "add_to_cart").astype(int)
+    df["pageviews"] = (df["Event_Type"] == "pageview").astype(int)
+    df["purchases"] = (df["Event_Type"] == "purchase").astype(int)
 
-        campaign_attribution.append({
-            "campaign": campaign,
-            "value": value,
-            "add_to_cart": 1 if event_type == "add_to_cart" else 0,
-            "pageviews": 1 if event_type == "pageview" else 0,
-            "purchases": 1 if event_type == "purchase" else 0
-        })
+    # Aggregate by campaign
+    summary = df.groupby("campaign_attributed").agg(
+        total_value=pd.NamedAgg(column="event_value", aggfunc="sum"),
+        purchases=pd.NamedAgg(column="purchases", aggfunc="sum"),
+        add_to_cart=pd.NamedAgg(column="add_to_cart", aggfunc="sum"),
+        pageviews=pd.NamedAgg(column="pageviews", aggfunc="sum")
+    ).reset_index().rename(columns={"campaign_attributed": "campaign"})
 
-    # Create DataFrame and aggregate
-    try:
-        attribution_df = pd.DataFrame(campaign_attribution)
-        summary = attribution_df.groupby("campaign").sum().reset_index()
-    except Exception as e:
-        messages.error(f"Error aggregating campaign data: {e}")
-        raise RuntimeError(f"Error aggregating campaign data: {e}")
-
-    # Sort by total purchase value descending
-    summary = summary.sort_values("value", ascending=False).rename(columns={"value": "total_value"})
+    # Sort by total_value descending
+    summary = summary.sort_values("total_value", ascending=False)
 
     return summary
 
