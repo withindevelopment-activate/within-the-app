@@ -863,8 +863,8 @@ def view_tracking(request):
         campaigns_summary = campaigns_summary_df.to_dict(orient="records")
 
         # Prepare chart data
-        chart_labels = [c["campaign"] for c in campaigns_summary]
-        chart_data = [c["total_value"] for c in campaigns_summary]
+        # chart_labels = [c["campaign"] for c in campaigns_summary]
+        # chart_data = [c["total_value"] for c in campaigns_summary]
 
     except Exception as e:
         logging.error(f"Error fetching tracking data: {str(e)}")
