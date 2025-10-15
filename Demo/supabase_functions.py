@@ -2,6 +2,7 @@ import os,json,ast,logging,pandas as pd, pytz
 from supabase import create_client, Client
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
+from django.contrib import messages
 
 # Import keys
 url: str = os.environ.get('SUPABASE_URL')
@@ -512,78 +513,88 @@ def get_visitor_last_day_activity(df: pd.DataFrame, visitor_id: str) -> pd.DataF
 
 def attribute_purchases_to_campaigns(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Return a campaign-level summary with purchases attributed to the most relevant campaign
-    using session_id and visit order.
+    Return a campaign-level summary with purchases, add_to_cart, and pageviews
+    attributed to the most relevant campaign using session_id and visit order.
+
+    Handles malformed JSON and missing data gracefully.
     """
+    if df.empty:
+        return pd.DataFrame(columns=["campaign", "purchases", "add_to_cart", "pageviews", "total_value"])
+
     df = df.copy()
-    df["Visited_at"] = pd.to_datetime(df["Visited_at"])
-    df["UTM_Campaign"] = df["UTM_Campaign"].fillna("").astype(str).str.replace("+", " ", regex=False).str.strip()
 
-    # Helper: get event value (purchase/add_to_cart amount)
-    def get_value(row):
-        details = row.get("Event_Details")
-        if pd.notna(details):
-            try:
-                d = json.loads(details.replace("'", '"'))
-                price = float(d.get("price", 1.0))
-                qty = int(d.get("quantity", 1))
-                return price * qty
-            except Exception:
-                return 0.0
-        return 0.0
+    # Ensure datetime
+    try:
+        df["Visited_at"] = pd.to_datetime(df["Visited_at"])
+    except Exception as e:
+        messages.error(f"Error converting Visited_at to datetime: {e}")
+        raise ValueError(f"Error converting Visited_at to datetime: {e}")
 
-    df["event_value"] = df.apply(get_value, axis=1)
-
-    # Separate purchases to attribute them
-    purchases = df[df["Event_Type"] == "purchase"].copy()
-    campaign_attribution = []
-
-    for _, purchase in purchases.iterrows():
-        session_id = purchase["Session_ID"]
-        purchase_time = purchase["Visited_at"]
-
-        # Direct campaign
-        if purchase["UTM_Campaign"]:
-            campaign_attribution.append({
-                "campaign": purchase["UTM_Campaign"],
-                "value": purchase["event_value"],
-            })
-            continue
-
-        # Look back in the same session for the latest campaign
-        session_events = df[
-            (df["Session_ID"] == session_id) &
-            (df["Visited_at"] < purchase_time) &
-            (df["UTM_Campaign"] != "")
-        ].sort_values("Visited_at")
-
-        if not session_events.empty:
-            last_campaign = session_events.iloc[-1]["UTM_Campaign"]
-            campaign_attribution.append({
-                "campaign": last_campaign,
-                "value": purchase["event_value"],
-            })
-        else:
-            campaign_attribution.append({
-                "campaign": "(no campaign)",
-                "value": purchase["event_value"],
-            })
-
-    attribution_df = pd.DataFrame(campaign_attribution)
-    if attribution_df.empty:
-        return pd.DataFrame(columns=["campaign", "purchases", "total_value"])
-
-    summary = (
-        attribution_df.groupby("campaign")
-        .agg(
-            purchases=pd.NamedAgg(column="campaign", aggfunc="count"),
-            total_value=pd.NamedAgg(column="value", aggfunc="sum")
-        )
-        .reset_index()
+    # Clean campaign names
+    df["UTM_Campaign"] = (
+        df.get("UTM_Campaign", "")
+        .fillna("")
+        .astype(str)
+        .str.replace("+", " ", regex=False)
+        .str.strip()
     )
 
-    return summary.sort_values("total_value", ascending=False)
+    # Helper: get event value safely
+    def get_event_value(details):
+        if pd.isna(details) or not details:
+            return 0.0
+        try:
+            d = json.loads(details.replace("'", '"'))
+            price = float(d.get("price", 0.0))
+            qty = int(d.get("quantity", 1))
+            return price * qty
+        except Exception:
+            return 0.0
 
+    df["event_value"] = df["Event_Details"].apply(get_event_value)
+
+    # Build campaign attribution
+    campaign_attribution = []
+
+    for idx, row in df.iterrows():
+        session_id = row.get("Session_ID", "")
+        visit_time = row.get("Visited_at")
+        event_type = row.get("Event_Type", "").lower()
+        value = row.get("event_value", 0.0)
+        campaign = row.get("UTM_Campaign", "")
+
+        # If no campaign, look back in the session for the last known campaign
+        if not campaign:
+            try:
+                session_events = df[
+                    (df["Session_ID"] == session_id) &
+                    (df["Visited_at"] < visit_time) &
+                    (df["UTM_Campaign"] != "")
+                ].sort_values("Visited_at")
+                campaign = session_events.iloc[-1]["UTM_Campaign"] if not session_events.empty else "(no campaign)"
+            except Exception:
+                campaign = "(no campaign)"
+
+        campaign_attribution.append({
+            "campaign": campaign,
+            "value": value,
+            "add_to_cart": 1 if event_type == "add_to_cart" else 0,
+            "pageviews": 1 if event_type == "pageview" else 0,
+            "purchases": 1 if event_type == "purchase" else 0
+        })
+
+    # Create DataFrame and aggregate
+    try:
+        attribution_df = pd.DataFrame(campaign_attribution)
+        summary = attribution_df.groupby("campaign").sum().reset_index()
+    except Exception as e:
+        messages.error(f"Error aggregating campaign data: {e}")
+        raise RuntimeError(f"Error aggregating campaign data: {e}")
+
+    # Sort by total purchase value descending
+    summary = summary.sort_values("value", ascending=False).rename(columns={"value": "total_value"})
+
+    return summary
 
 # def summarize_campaign_performance(df: pd.DataFrame, attribution_df: pd.DataFrame) -> pd.DataFrame:
 #     """
