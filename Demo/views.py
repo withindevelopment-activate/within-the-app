@@ -195,7 +195,7 @@ def home(request):
     # Handle any request errors       
     except requests.RequestException as e:
         traceback.print_exc()
-        messages.error(request, f"Something went wrong: {str(e)}")
+        messages.error(request, f"Something went wrong: {str(e)} + {store_id}")
     
     context= {
         'profile': profile,
@@ -859,7 +859,6 @@ def view_tracking(request):
 
         # --- Campaign results ---
         campaigns_summary_df = attribute_purchases_to_campaigns(df)
-        campaigns_summary_df = campaigns_summary_df.rename(columns={"purchases": "conversions"})
         campaigns_summary = campaigns_summary_df.to_dict(orient="records")
 
         # Prepare chart data
