@@ -333,7 +333,7 @@ def build_customer_dictionary(df: pd.DataFrame) -> dict:
 
     def get_customer_key(row):
         if row["Customer_ID"]:
-            return row["Customer_ID"].lower()
+            return row["Customer_ID"]
         elif row["Customer_Email"]:
             return row["Customer_Email"].lower()
         elif row["Customer_Mobile"]:

@@ -849,8 +849,8 @@ def view_tracking(request):
         total_sessions = df_last_30min["Session_ID"].nunique()
         total_pageviews = len(df_last_30min)
 
-        # --- Top 200 rows for display ---
-        rows = df.sort_values(by="Visited_at", ascending=False).head(200).to_dict(orient="records")
+        # --- Top 50 rows for display ---
+        rows = df.sort_values(by="Visited_at", ascending=False).head(50).to_dict(orient="records")
 
         # --- Customer dictionary ---
         customer_dict = build_customer_dictionary(df)
