@@ -71,17 +71,21 @@ def zid_callback(request):
         request.session['refresh_token'] = refresh_token
         request.session['authorization_token'] = authorization_token
 
-        ''' 
-        # Commented this part since it is redundant ----
+        # Fetch user profile to get store ID
+        headers = {
+            'Authorization': f'Bearer {authorization_token}',
+            'X-MANAGER-TOKEN': access_token,  # Sometimes needed depending on endpoint
+        }
+
         # Fetch user profile to get store ID
         profile_response = requests.get(f"{settings.ZID_API_BASE}/managers/account/profile", headers=headers)
         profile = profile_response.json() if profile_response.status_code == 200 else {}
         store_id = profile.get('user', {}).get('store', {}).get('id')
+
         if store_id:
             request.session['store_id'] = store_id
-            print("Store ID saved to session: - views.py:61", store_id)
         else:
-            print("⚠️ Store ID not found in profile response. - views.py:63")'''
+            print("⚠️ Store ID not found in profile response.")
         return redirect('Demo:home')  # go to the home view
 
     except requests.RequestException as e:
