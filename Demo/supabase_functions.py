@@ -2,7 +2,6 @@ import os,json,ast,logging,pandas as pd, pytz
 from supabase import create_client, Client
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
-from django.contrib import messages
 
 # Import keys
 url: str = os.environ.get('SUPABASE_URL')
@@ -394,181 +393,80 @@ def build_customer_dictionary(df: pd.DataFrame) -> dict:
 
     return customer_dict
 
-
-def calculate_campaign_results(df: pd.DataFrame) -> pd.DataFrame:
+def attribute_purchases_to_campaigns(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Calculate campaign-level performance directly from tracking data
-    without linking to individual customers.
-
-    Returns a DataFrame with columns:
-    [campaign, pageviews, add_to_cart, purchases, total_value, events_count]
+    Return a campaign-level summary with purchases attributed to the most relevant campaign
+    using session_id and visit order.
     """
+    df = df.copy()
+    df["Visited_at"] = pd.to_datetime(df["Visited_at"])
+    df["UTM_Campaign"] = df["UTM_Campaign"].fillna("").astype(str).str.replace("+", " ", regex=False).str.strip()
 
-    # Keep only rows with a campaign
-    df = df[df["UTM_Campaign"].notna() & (df["UTM_Campaign"].str.strip() != "")]
-    if df.empty:
-        return pd.DataFrame(columns=["campaign", "pageviews", "add_to_cart", "purchases", "total_value", "events_count"])
-
-    # Normalize campaign names
-    df["UTM_Campaign"] = df["UTM_Campaign"].str.replace("+", " ", regex=False).str.strip()
-
-    # Prepare event value column
+    # Helper: get event value (purchase/add_to_cart amount)
     def get_value(row):
         details = row.get("Event_Details")
         if pd.notna(details):
             try:
-                details_dict = json.loads(details.replace("'", '"'))  # ensure valid JSON
-                if row["Event_Type"] in ["purchase", "add_to_cart"]:
-                    # Use price * quantity if available
-                    price = float(details_dict.get("price", 1.0))
-                    quantity = int(details_dict.get("quantity", 1))
-                    return price * quantity
+                d = json.loads(details.replace("'", '"'))
+                price = float(d.get("price", 1.0))
+                qty = int(d.get("quantity", 1))
+                return price * qty
             except Exception:
-                return 1.0
+                return 0.0
         return 0.0
 
     df["event_value"] = df.apply(get_value, axis=1)
 
-    # Group by campaign and aggregate metrics
+    # Separate purchases to attribute them
+    purchases = df[df["Event_Type"] == "purchase"].copy()
+    campaign_attribution = []
+
+    for _, purchase in purchases.iterrows():
+        session_id = purchase["Session_ID"]
+        purchase_time = purchase["Visited_at"]
+
+        # Direct campaign
+        if purchase["UTM_Campaign"]:
+            campaign_attribution.append({
+                "campaign": purchase["UTM_Campaign"],
+                "value": purchase["event_value"],
+            })
+            continue
+
+        # Look back in the same session for the latest campaign
+        session_events = df[
+            (df["Session_ID"] == session_id) &
+            (df["Visited_at"] < purchase_time) &
+            (df["UTM_Campaign"] != "")
+        ].sort_values("Visited_at")
+
+        if not session_events.empty:
+            last_campaign = session_events.iloc[-1]["UTM_Campaign"]
+            campaign_attribution.append({
+                "campaign": last_campaign,
+                "value": purchase["event_value"],
+            })
+        else:
+            campaign_attribution.append({
+                "campaign": "(no campaign)",
+                "value": purchase["event_value"],
+            })
+
+    attribution_df = pd.DataFrame(campaign_attribution)
+    if attribution_df.empty:
+        return pd.DataFrame(columns=["campaign", "purchases", "total_value"])
+
     summary = (
-        df.groupby("UTM_Campaign")
+        attribution_df.groupby("campaign")
         .agg(
-            pageviews=pd.NamedAgg(column="Event_Type", aggfunc=lambda x: (x == "pageview").sum()),
-            add_to_cart=pd.NamedAgg(column="Event_Type", aggfunc=lambda x: (x == "add_to_cart").sum()),
-            purchases=pd.NamedAgg(column="Event_Type", aggfunc=lambda x: (x == "purchase").sum()),
-            total_value=pd.NamedAgg(column="event_value", aggfunc="sum"),
+            purchases=pd.NamedAgg(column="campaign", aggfunc="count"),
+            total_value=pd.NamedAgg(column="value", aggfunc="sum")
         )
         .reset_index()
-        .rename(columns={"UTM_Campaign": "campaign"})
     )
 
-    # Total events count per campaign
-    summary["events_count"] = summary["pageviews"] + summary["add_to_cart"] + summary["purchases"]
+    return summary.sort_values("total_value", ascending=False)
 
-    # Sort by total_value descending
-    summary = summary.sort_values("total_value", ascending=False)
-
-    return summary
-
-def get_visitor_last_day_activity(df: pd.DataFrame, visitor_id: str) -> pd.DataFrame:
-    """
-    Get activity for a specific visitor in the last 24 hours.
-    Returns a DataFrame with event counts and campaigns visited.
-    """
-    df["Visited_at"] = pd.to_datetime(df["Visited_at"])
-    uae_timezone = pytz.timezone('Asia/Dubai')
-
-    # Filter for this visitor
-    visitor_df = df[df["Visitor_ID"] == visitor_id].copy()
-    if visitor_df.empty:
-        return pd.DataFrame(columns=["visitor_id", "campaign", "pageviews", "add_to_cart", "purchases", "events_count"])
-
-    # Filter for last 24 hours
-    last_day = datetime.now(uae_timezone) - timedelta(days=1)
-    visitor_df = visitor_df[visitor_df["Visited_at"] >= last_day]
-
-    if visitor_df.empty:
-        return pd.DataFrame(columns=["visitor_id", "campaign", "pageviews", "add_to_cart", "purchases", "events_count"])
-
-    # Normalize campaign names
-    visitor_df["UTM_Campaign"] = visitor_df["UTM_Campaign"].fillna("").str.replace("+", " ", regex=False).str.strip()
-
-    # Prepare event value column
-    def get_value(row):
-        details = row.get("Event_Details")
-        if pd.notna(details):
-            try:
-                details_dict = json.loads(details.replace("'", '"'))
-                if row["Event_Type"] in ["purchase", "add_to_cart"]:
-                    price = float(details_dict.get("price", 1.0))
-                    quantity = int(details_dict.get("quantity", 1))
-                    return price * quantity
-            except Exception:
-                return 1.0
-        return 0.0
-
-    visitor_df["event_value"] = visitor_df.apply(get_value, axis=1)
-
-    # Group by campaign
-    summary = (
-        visitor_df.groupby("UTM_Campaign")
-        .agg(
-            pageviews=pd.NamedAgg(column="Event_Type", aggfunc=lambda x: (x == "pageview").sum()),
-            add_to_cart=pd.NamedAgg(column="Event_Type", aggfunc=lambda x: (x == "add_to_cart").sum()),
-            purchases=pd.NamedAgg(column="Event_Type", aggfunc=lambda x: (x == "purchase").sum()),
-            total_value=pd.NamedAgg(column="event_value", aggfunc="sum"),
-        )
-        .reset_index()
-        .rename(columns={"UTM_Campaign": "campaign"})
-    )
-
-    # Total events count
-    summary["events_count"] = summary["pageviews"] + summary["add_to_cart"] + summary["purchases"]
-    summary["visitor_id"] = visitor_id
-
-    # Sort by total_value descending
-    summary = summary.sort_values("total_value", ascending=False)
-
-    return summary
-
-def attribute_purchases_to_campaigns(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Memory-efficient campaign attribution with purchases, add_to_cart, and pageviews.
-    """
-    if df.empty:
-        return pd.DataFrame(columns=["campaign", "purchases", "add_to_cart", "pageviews", "total_value"])
-
-    df = df.copy()
-
-    # Ensure datetime
-    df["Visited_at"] = pd.to_datetime(df["Visited_at"], errors="coerce")
-
-    # Clean campaign names
-    df["UTM_Campaign"] = (
-        df.get("UTM_Campaign", "")
-        .fillna("")
-        .astype(str)
-        .str.replace("+", " ", regex=False)
-        .str.strip()
-    )
-
-    # Event value
-    def safe_value(details):
-        if pd.isna(details) or not details:
-            return 0.0
-        try:
-            d = json.loads(details.replace("'", '"'))
-            price = float(d.get("price", 0.0))
-            qty = int(d.get("quantity", 1))
-            return price * qty
-        except Exception:
-            return 0.0
-
-    df["event_value"] = df["Event_Details"].apply(safe_value)
-
-    # Sort by session and visit
-    df = df.sort_values(["Session_ID", "Visited_at"])
-
-    # Forward-fill last known campaign per session
-    df["campaign_attributed"] = df.groupby("Session_ID")["UTM_Campaign"].ffill().fillna("(no campaign)")
-
-    # Prepare event type columns
-    df["add_to_cart"] = (df["Event_Type"] == "add_to_cart").astype(int)
-    df["pageviews"] = (df["Event_Type"] == "pageview").astype(int)
-    df["purchases"] = (df["Event_Type"] == "purchase").astype(int)
-
-    # Aggregate by campaign
-    summary = df.groupby("campaign_attributed").agg(
-        total_value=pd.NamedAgg(column="event_value", aggfunc="sum"),
-        purchases=pd.NamedAgg(column="purchases", aggfunc="sum"),
-        add_to_cart=pd.NamedAgg(column="add_to_cart", aggfunc="sum"),
-        pageviews=pd.NamedAgg(column="pageviews", aggfunc="sum")
-    ).reset_index().rename(columns={"campaign_attributed": "campaign"})
-
-    # Sort by total_value descending
-    summary = summary.sort_values("total_value", ascending=False)
-
-    return summary
 
 # def summarize_campaign_performance(df: pd.DataFrame, attribution_df: pd.DataFrame) -> pd.DataFrame:
 #     """

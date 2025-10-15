@@ -820,7 +820,6 @@ def view_tracking(request):
     campaigns_summary = []
     chart_labels = []
     chart_data = []
-    # visitor_activity_df = pd.DataFrame()
 
     try:
         df = get_tracking_df()
@@ -863,15 +862,6 @@ def view_tracking(request):
         chart_labels = [c["campaign"] for c in campaigns_summary]
         chart_data = [c["total_value"] for c in campaigns_summary]
 
-        # --- Visitor activity in last 24 hours ---
-        # if visitor_filter:
-        #     visitor_activity_df = get_visitor_last_day_activity(df, visitor_filter)
-        #     # Convert to dict for template
-        #     visitor_activity = visitor_activity_df.to_dict(orient="records")
-        # else:
-        #     visitor_activity = []
-        #     messages.warning(request, f"{visitor_activity}")
-
     except Exception as e:
         logging.error(f"Error fetching tracking data: {str(e)}")
         messages.error(request, f"❌ Error fetching tracking data: {str(e)}")
@@ -887,7 +877,6 @@ def view_tracking(request):
         "campaigns": campaigns_summary,
         "chart_labels": chart_labels,
         "chart_data": chart_data,
-        # "visitor_activity": visitor_activity,  # last day activity for the selected visitor
         "request": request,
     })
 
