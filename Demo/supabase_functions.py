@@ -311,8 +311,8 @@ def get_tracking_df():
 def build_customer_dictionary(df: pd.DataFrame) -> dict:
     """
     Build a dictionary of customers with all related visitor_ids, session_ids,
-    campaigns, and event stats (pageviews, add_to_cart, purchases).
-    Ensures events in the same session and campaign are not double-counted.
+    campaigns, and event stats. Extract Customer_ID and order_id from Event_Details
+    to avoid duplicate purchases. Ensures events in the same session/campaign are not double-counted.
     """
     df = df.copy()
 
@@ -323,7 +323,20 @@ def build_customer_dictionary(df: pd.DataFrame) -> dict:
     df["UTM_Campaign"] = df.get("UTM_Campaign", "").fillna("").astype(str).str.replace("+", " ", regex=False).str.strip()
     df["Visited_at"] = pd.to_datetime(df["Visited_at"], errors="coerce")
 
-    # Create a unified customer key
+    # Extract Customer_ID and order_id from Event_Details
+    def extract_from_event(details, key):
+        if pd.isna(details) or not details:
+            return ""
+        try:
+            d = json.loads(details.replace("'", '"'))
+            return str(d.get(key, ""))
+        except Exception:
+            return ""
+
+    df["Customer_ID"] = df.apply(lambda row: row["Customer_ID"] or extract_from_event(row.get("Event_Details", ""), "customer_id"), axis=1)
+    df["order_id"] = df.apply(lambda row: extract_from_event(row.get("Event_Details", ""), "order_id"), axis=1)
+
+    # Create unified customer key
     def get_customer_key(row):
         if row["Customer_ID"]:
             return row["Customer_ID"]
@@ -336,7 +349,17 @@ def build_customer_dictionary(df: pd.DataFrame) -> dict:
     df["customer_key"] = df.apply(get_customer_key, axis=1)
 
     # Deduplicate events per visitor/session/campaign/event_type
-    df_dedup = df.drop_duplicates(subset=["Visitor_ID", "Session_ID", "Event_Type", "UTM_Campaign"])
+    # For purchases, deduplicate by order_id
+    df_no_duplicates = df.copy()
+
+    # Deduplicate purchases based on order_id
+    purchase_mask = df_no_duplicates["Event_Type"] == "purchase"
+    purchases = df_no_duplicates[purchase_mask].drop_duplicates(subset=["order_id"])
+    non_purchases = df_no_duplicates[~purchase_mask]
+    df_dedup = pd.concat([non_purchases, purchases], ignore_index=True)
+
+    # Deduplicate remaining events per visitor/session/campaign/event_type
+    df_dedup = df_dedup.drop_duplicates(subset=["Visitor_ID", "Session_ID", "Event_Type", "UTM_Campaign"])
 
     customer_dict = {}
 
@@ -362,7 +385,7 @@ def build_customer_dictionary(df: pd.DataFrame) -> dict:
         # Campaigns
         campaigns = set(full_rows["UTM_Campaign"]) - {""}
 
-        # Stats (count unique events only)
+        # Stats (count unique events)
         stats = {
             "pageviews": int((group["Event_Type"] == "pageview").sum()),
             "add_to_cart": int((group["Event_Type"] == "add_to_cart").sum()),
