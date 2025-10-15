@@ -887,7 +887,7 @@ def view_tracking(request):
         "campaigns": campaigns_summary,
         "chart_labels": chart_labels,
         "chart_data": chart_data,
-        "visitor_activity": visitor_activity,  # last day activity for the selected visitor
+        # "visitor_activity": visitor_activity,  # last day activity for the selected visitor
         "request": request,
     })
 
