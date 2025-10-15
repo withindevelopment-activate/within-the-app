@@ -312,18 +312,18 @@ def build_customer_dictionary(df: pd.DataFrame) -> dict:
     """
     Build a dictionary of customers with all related visitor_ids, session_ids,
     campaigns, and event stats (pageviews, add_to_cart, purchases).
+    Ensures events in the same session and campaign are not double-counted.
     """
     df = df.copy()
 
-    # Normalize and prepare columns
-    df["Customer_ID"] = df["Customer_ID"].fillna("").astype(str).str.strip()
-    df["Customer_Email"] = df["Customer_Email"].fillna("").astype(str).str.strip()
-    df["Customer_Mobile"] = df["Customer_Mobile"].fillna("").astype(str).str.strip()
-    df["Visitor_ID"] = df["Visitor_ID"].fillna("").astype(str).str.strip()
-    df["Session_ID"] = df["Session_ID"].fillna("").astype(str).str.strip()
-    df["UTM_Campaign"] = df["UTM_Campaign"].fillna("").astype(str).str.replace("+", " ", regex=False).str.strip()
-    df["Visited_at"] = pd.to_datetime(df["Visited_at"])
+    # Normalize columns
+    for col in ["Customer_ID", "Customer_Email", "Customer_Mobile", "Visitor_ID", "Session_ID"]:
+        df[col] = df.get(col, "").fillna("").astype(str).str.strip()
 
+    df["UTM_Campaign"] = df.get("UTM_Campaign", "").fillna("").astype(str).str.replace("+", " ", regex=False).str.strip()
+    df["Visited_at"] = pd.to_datetime(df["Visited_at"], errors="coerce")
+
+    # Create a unified customer key
     def get_customer_key(row):
         if row["Customer_ID"]:
             return row["Customer_ID"]
@@ -335,18 +335,21 @@ def build_customer_dictionary(df: pd.DataFrame) -> dict:
 
     df["customer_key"] = df.apply(get_customer_key, axis=1)
 
+    # Deduplicate events per visitor/session/campaign/event_type
+    df_dedup = df.drop_duplicates(subset=["Visitor_ID", "Session_ID", "Event_Type", "UTM_Campaign"])
+
     customer_dict = {}
 
-    for key, group in df.groupby("customer_key"):
+    for key, group in df_dedup.groupby("customer_key"):
         if not key:
             continue
 
-        # Collect all identifiers for this customer
+        # Collect all identifiers
         customer_visitors = set(group["Visitor_ID"]) - {""}
         customer_sessions = set(group["Session_ID"]) - {""}
         customer_ids = {key}
 
-        # Find *all rows in df* that match any of these identifiers
+        # Get all matching rows in the original df for campaigns and latest info
         mask = (
             df["Visitor_ID"].isin(customer_visitors) |
             df["Session_ID"].isin(customer_sessions) |
@@ -356,31 +359,29 @@ def build_customer_dictionary(df: pd.DataFrame) -> dict:
         )
         full_rows = df[mask].copy()
 
-        # Campaigns this customer interacted with
+        # Campaigns
         campaigns = set(full_rows["UTM_Campaign"]) - {""}
 
-        # Count event types
-        pageviews = (full_rows["Event_Type"] == "pageview").sum()
-        add_to_cart = (full_rows["Event_Type"] == "add_to_cart").sum()
-        purchases = (full_rows["Event_Type"] == "purchase").sum()
+        # Stats (count unique events only)
+        stats = {
+            "pageviews": int((group["Event_Type"] == "pageview").sum()),
+            "add_to_cart": int((group["Event_Type"] == "add_to_cart").sum()),
+            "purchases": int((group["Event_Type"] == "purchase").sum())
+        }
 
-        # Latest info for display
+        # Latest user info
         latest_row = full_rows.sort_values("Visited_at").iloc[-1]
 
         customer_dict[key] = {
             "visitor_ids": customer_visitors,
             "sessions": customer_sessions,
             "campaigns": campaigns,
-            "stats": {
-                "pageviews": int(pageviews),
-                "add_to_cart": int(add_to_cart),
-                "purchases": int(purchases),
-            },
+            "stats": stats,
             "user_info": {
                 "name": latest_row.get("Customer_Name"),
                 "email": latest_row.get("Customer_Email"),
                 "mobile": latest_row.get("Customer_Mobile"),
-                "customer_id": latest_row.get("Customer_ID"),
+                "customer_id": latest_row.get("Customer_ID")
             }
         }
 
