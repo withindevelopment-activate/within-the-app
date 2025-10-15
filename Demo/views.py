@@ -875,7 +875,8 @@ def view_tracking(request):
 
     except Exception as e:
         logging.error(f"Error fetching tracking data: {str(e)}")
-        return HttpResponse(f"❌ Error fetching tracking data: {str(e)}", status=500)
+        messages.error(request, f"❌ Error fetching tracking data: {str(e)}")
+        return redirect("Demo:home")
 
     return render(request, "Demo/tracking_view.html", {
         "store_id": store_id,

@@ -559,7 +559,7 @@ def attribute_purchases_to_campaigns(df: pd.DataFrame) -> pd.DataFrame:
     for idx, row in df.iterrows():
         session_id = row.get("Session_ID", "")
         visit_time = row.get("Visited_at")
-        event_type = row.get("Event_Type", "").lower()
+        event_type = row.get("Event_Type", "")
         value = row.get("event_value", 0.0)
         campaign = row.get("UTM_Campaign", "")
 
