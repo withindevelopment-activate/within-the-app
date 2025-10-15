@@ -26,7 +26,6 @@ def fetch_data_from_supabase(table_name):
     else:
         raise Exception("Error fetching data: " + response.error_message)
 
-
 def batch_insert_to_supabase(df, table_name):
     """
     Inserts a batch of rows into a Supabase table without updating existing rows.
@@ -87,7 +86,6 @@ def upsert_partial(df, table_name, pk):
     supabase.table(table_name) \
             .upsert(payload, on_conflict=pk) \
             .execute()
-
 
 def fetch_data_from_supabase_specific(table_name, columns=None, filters=None, order_by=None, limit=None):
     # Construct the select query with specified columns or all columns
@@ -157,7 +155,6 @@ def fetch_data_from_supabase_specific(table_name, columns=None, filters=None, or
     else:
         raise Exception("Error fetching data: " + response.error_message)
 
-
 # Write back to the database - Sometimes we're passing a whole df, sometimes we are passing a single entry. This function is written such that  it handles both cases.
 def write_table_to_supabase(df, table_name): # - Handles the DF passing
 
@@ -197,7 +194,6 @@ def upsert_partial(df, table_name, pk):
             .upsert(payload, on_conflict=pk) \
             .execute()
     
-
 def get_next_id_from_supabase_compatible_all(name, column): # getting the next id
     """
     Retrieve the last ID from a specified column in the Supabase table and return the incremented value.
@@ -228,7 +224,6 @@ def get_next_id_from_supabase_compatible_all(name, column): # getting the next i
         print(f"Error fetching the next ID from Supabase: {e}")
         raise
     
-
 ########### --------------- THE ULTIMATE FUNCTION ---------------- #######################
 def map_skus(df):
     '''
@@ -302,7 +297,6 @@ def map_skus(df):
     
     return df
     
-
 def get_tracking_df():
     """
     Fetch all tracking data from the database and return as a DataFrame.
@@ -313,7 +307,6 @@ def get_tracking_df():
     if "Visited_at" in df.columns:
         df["Visited_at"] = pd.to_datetime(df["Visited_at"], errors="coerce")
     return df
-
 
 def build_customer_dictionary(df: pd.DataFrame) -> dict:
     """
@@ -467,114 +460,3 @@ def attribute_purchases_to_campaigns(df: pd.DataFrame) -> pd.DataFrame:
 
     return summary.sort_values("total_value", ascending=False)
 
-
-# def summarize_campaign_performance(df: pd.DataFrame, attribution_df: pd.DataFrame) -> pd.DataFrame:
-#     """
-#     Aggregate campaign performance including event counts, pageviews, add_to_cart, and purchases.
-#     """
-#     # --- Count events per campaign ---
-#     events_summary = (
-#         df[df["UTM_Campaign"].notna()]
-#         .groupby("UTM_Campaign")["Event_Type"]
-#         .value_counts()
-#         .unstack(fill_value=0)
-#         .reset_index()
-#         .rename(columns={"UTM_Campaign": "campaign"})
-#     )
-
-#     # Rename for consistency
-#     for col in ["pageview", "add_to_cart", "purchase"]:
-#         if col not in events_summary.columns:
-#             events_summary[col] = 0
-
-#     events_summary["events_count"] = events_summary.drop(columns=["campaign"]).sum(axis=1)
-
-#     # --- Purchase attribution summary ---
-#     if not attribution_df.empty:
-#         attribution_summary = (
-#             attribution_df.groupby("campaign")
-#             .agg(
-#                 total_credit=pd.NamedAgg(column="credit_value", aggfunc="sum"),
-#                 conversions=pd.NamedAgg(column="customer_key", aggfunc="count"),
-#             )
-#             .reset_index()
-#         )
-#     else:
-#         attribution_summary = pd.DataFrame(columns=["campaign", "total_credit", "conversions"])
-
-#     # --- Merge event counts with attribution ---
-#     campaign_summary = pd.merge(
-#         events_summary,
-#         attribution_summary,
-#         on="campaign",
-#         how="outer"
-#     ).fillna(0)
-
-#     # Final ordering
-#     campaign_summary = campaign_summary.sort_values("total_credit", ascending=False)
-
-#     return campaign_summary
-
-# def calculate_campaign_attribution(df: pd.DataFrame) -> pd.DataFrame:
-#     """
-#     Calculate partial attribution for campaigns per purchase.
-#     Returns a DataFrame with columns: [customer_key, purchase_date, campaign, credit_value]
-#     """
-#     def get_customer_key(row):
-#         if pd.notna(row.get("Customer_Email")) and row["Customer_Email"].strip():
-#             return row["Customer_Email"].lower().strip()
-#         elif pd.notna(row.get("Customer_Mobile")) and row["Customer_Mobile"].strip():
-#             return row["Customer_Mobile"].strip()
-#         elif pd.notna(row.get("Customer_ID")) and str(row["Customer_ID"]).strip():
-#             return str(row["Customer_ID"])
-#         return None
-
-#     df["customer_key"] = df.apply(get_customer_key, axis=1)
-
-#     # Extract purchases
-#     purchases = df[df["Event_Type"] == "purchase"].copy()
-#     if purchases.empty:
-#         return pd.DataFrame(columns=["customer_key", "purchase_date", "campaign", "credit_value"])
-
-#     purchases["purchase_date"] = purchases["Visited_at"].dt.date
-
-#     attribution_rows = []
-
-#     for _, purchase in purchases.iterrows():
-#         key = purchase["customer_key"]
-#         if not key:
-#             continue
-
-#         purchase_date = purchase["purchase_date"]
-#         purchase_value = 1.0
-
-#         # Optional: read value from Event_Details JSON if exists
-#         details = purchase.get("Event_Details")
-#         if pd.notna(details):
-#             try:
-#                 data = json.loads(details)
-#                 purchase_value = float(data.get("value", 1.0))
-#             except Exception:
-#                 pass
-
-#         # Find campaigns visited the same day
-#         campaigns_today = df[
-#             (df["customer_key"] == key) &
-#             (df["UTM_Campaign"].notna()) &
-#             (df["Visited_at"].dt.date == purchase_date)
-#         ]["UTM_Campaign"].unique()
-
-#         if len(campaigns_today) == 0:
-#             continue
-
-#         credit_per_campaign = purchase_value / len(campaigns_today)
-
-#         for campaign in campaigns_today:
-#             attribution_rows.append({
-#                 "customer_key": key,
-#                 "purchase_date": purchase_date,
-#                 "campaign": campaign,
-#                 "credit_value": credit_per_campaign
-#             })
-
-#     return pd.DataFrame(attribution_rows)

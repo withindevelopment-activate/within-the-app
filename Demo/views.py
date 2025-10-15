@@ -13,7 +13,7 @@ from django.core.files.storage import FileSystemStorage
 from io import BytesIO
 
 # Supabase & Supporting imports
-from .supabase_functions import batch_insert_to_supabase, get_next_id_from_supabase_compatible_all, fetch_data_from_supabase, get_tracking_df, build_customer_dictionary,calculate_campaign_results, get_visitor_last_day_activity, attribute_purchases_to_campaigns
+from .supabase_functions import batch_insert_to_supabase, get_next_id_from_supabase_compatible_all, get_tracking_df, build_customer_dictionary, attribute_purchases_to_campaigns
 from .supporting_functions import get_uae_current_date
 # Marketing Report functions
 from .marketing_report import create_general_analysis, create_product_percentage_amount_spent, landing_performance_5_async, column_check
