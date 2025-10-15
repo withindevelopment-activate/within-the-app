@@ -82,7 +82,7 @@
                 <tr>
                   <td class="sticky-col">{{ o.id }}</td>
                   <td>{{ o.display_status }}</td>
-                  <td>{{ o.order_total }}</td>
+                  <td>{{ o.order_total|floatformat:2 }}</td>
                   <td>{{ o.payment_status }}</td>
                   <td>{{ o.source }}</td>
                   <td>{{ o.created_at|date:"Y-m-d H:i" }}</td>
