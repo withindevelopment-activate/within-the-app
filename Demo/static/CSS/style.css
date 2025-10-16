@@ -29,6 +29,8 @@
   max-height: 400px; 
   font-size: 12px;
   position: absolute;
+  left: 0;
+  overflow-y: auto;
 }
 
 #sourceLegend { 
@@ -36,7 +38,6 @@
   max-height: 400px; 
   font-size: 12px;
   position: absolute;
-  left: 0;
 }
 
 /* Toggle button small square when collapsed */
