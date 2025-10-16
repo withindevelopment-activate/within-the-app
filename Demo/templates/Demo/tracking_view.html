@@ -210,14 +210,60 @@
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-      legend: {
-        display: false, // disable built-in legend
-      },
+      legend: { display: false },
     },
-    layout: {
-      padding: 20
-    }
+    layout: { padding: 20 }
   };
+
+  // Helper to generate custom interactive legend
+  function generateLegend(chart, legendContainerId) {
+    const container = document.getElementById(legendContainerId);
+    container.innerHTML = '';
+
+    const ul = document.createElement('ul');
+    ul.style.padding = 0;
+    ul.style.margin = 0;
+
+    chart.data.labels.forEach((label, i) => {
+      const li = document.createElement('li');
+      li.style.display = 'flex';
+      li.style.alignItems = 'center';
+      li.style.cursor = 'pointer';
+      li.style.marginBottom = '6px';
+      li.dataset.index = i;
+
+      const box = document.createElement('span');
+      box.style.display = 'inline-block';
+      box.style.width = '12px';
+      box.style.height = '12px';
+      box.style.borderRadius = '6px';
+      box.style.backgroundColor = chart.data.datasets[0].backgroundColor[i];
+      box.style.marginRight = '6px';
+
+      const text = document.createElement('span');
+      text.textContent = label + " (" + chart.data.datasets[0].data[i] + ")";
+      
+      li.appendChild(box);
+      li.appendChild(text);
+
+      li.addEventListener('click', function() {
+        const index = this.dataset.index;
+        const meta = chart.getDatasetMeta(0);
+        const slice = meta.data[index];
+
+        // Toggle visibility
+        slice.hidden = !slice.hidden;
+
+        // Add line-through for hidden slices
+        text.style.textDecoration = slice.hidden ? 'line-through' : 'none';
+        chart.update();
+      });
+
+      ul.appendChild(li);
+    });
+
+    container.appendChild(ul);
+  }
 
   // --- Campaign Pie ---
   const campaignPieChart = new Chart(document.getElementById('campaignPieChart'), {
@@ -229,25 +275,14 @@
         backgroundColor: modernColors,
         hoverOffset: 20,
         borderWidth: 0,
-        borderRadius: 10, 
+        borderRadius: 10,
         spacing: 2,
         radius: '80%',
       }]
     },
     options: chartOptions,
   });
-
-  // Generate separate legend for campaign chart
-  document.getElementById('campaignLegend').innerHTML = campaignPieChart.generateLegend();
-  campaignPieChart.options.plugins.legend.labels.generateLabels = function(chart) {
-    return chart.data.labels.map((label, i) => ({
-      text: label + " (" + chart.data.datasets[0].data[i] + ")",
-      fillStyle: chart.data.datasets[0].backgroundColor[i],
-      strokeStyle: chart.data.datasets[0].backgroundColor[i],
-      hidden: false,
-      index: i
-    }));
-  };
+  generateLegend(campaignPieChart, 'campaignLegend');
 
   // --- Source Pie ---
   const sourcePieChart = new Chart(document.getElementById('sourcePieChart'), {
@@ -259,19 +294,15 @@
         backgroundColor: modernColors,
         hoverOffset: 20,
         borderWidth: 0,
-        borderRadius: 10, 
+        borderRadius: 10,
         spacing: 2,
         radius: '80%',
       }]
     },
     options: chartOptions,
   });
-
-  // Generate separate legend for source chart
-  document.getElementById('sourceLegend').innerHTML = sourcePieChart.generateLegend();
-  sourcePieChart.options.plugins.legend.labels.generateLabels = campaignPieChart.options.plugins.legend.labels.generateLabels;
+  generateLegend(sourcePieChart, 'sourceLegend');
   </script>
-
 
 </div>
 {% endblock %}

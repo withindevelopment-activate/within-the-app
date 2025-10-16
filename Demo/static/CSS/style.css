@@ -23,9 +23,16 @@
   border-color: #5a5a5a;
 }
 
-.chart-container {
-  position: relative;
-  height: 400px; /* fixed height for both charts */
+#campaignLegend, #sourceLegend {
+  overflow-y: auto;
+  max-height: 400px;
+  font-size: 12px;
+}
+
+#campaignLegend ul, #sourceLegend ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
 }
 
 /* Toggle button small square when collapsed */
