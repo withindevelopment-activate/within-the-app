@@ -28,4 +28,10 @@ urlpatterns = [
     path("zid/customer-detail/<int:customer_id>/", views.customer_detail_api, name="customer_detail_api"),
 
     path('zid-webhook/product-update/', views.subscribe_store_to_product_update, name='zid_product_update'),
+
+    path("meta/login/", views.meta_login, name="meta_login"),
+    path("meta/callback/", views.meta_callback, name="meta_callback"),
+    path("meta/adaccounts/", views.meta_get_ad_accounts, name="meta_ad_accounts"),
+
+    # path("campaigns/overview/", views.campaigns_overview, name="campaigns_overview"),
 ]

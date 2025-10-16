@@ -173,3 +173,18 @@ ZID_API_HOST = "api.zid.sa"
 # Sessions
 SESSION_COOKIE_AGE = 3600  # 1 hour
 SESSION_SAVE_EVERY_REQUEST = True
+
+
+META_APP_ID = "1435524447520642"
+META_APP_SECRET = "4bdfbeccf61ccd2ef92c47eff6ea306c"
+META_REDIRECT_URI = "https://testing-within.onrender.com/meta/callback/"  # must match in Meta dev settings
+META_OAUTH_SCOPE = "ads_management,ads_read,business_management,pages_show_list"  # adjust as needed
+
+OAUTH_PROVIDERS = {
+    "meta": {
+        "auth_url": "https://www.facebook.com/v21.0/dialog/oauth",
+        "token_url": "https://graph.facebook.com/v21.0/oauth/access_token",
+        "long_lived_token_url": "https://graph.facebook.com/v21.0/oauth/access_token",
+        "graph_api_base": "https://graph.facebook.com/v21.0"
+    }
+}

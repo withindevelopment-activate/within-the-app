@@ -1061,3 +1061,109 @@ def subscribe_store_to_product_update(authorization_token, access_token):
     except Exception as e:
         print(f"Failed to create webhook subscription: {e}")
         return None
+    
+import uuid
+
+def meta_login(request):
+    """
+    Redirects user to Meta OAuth page.
+    """
+    state = str(uuid.uuid4())
+    request.session['meta_oauth_state'] = state
+
+    auth_url = settings.OAUTH_PROVIDERS['meta']['auth_url']
+    params = {
+        "client_id": settings.META_APP_ID,
+        "redirect_uri": settings.META_REDIRECT_URI,
+        "state": state,
+        "scope": settings.META_OAUTH_SCOPE,
+        "response_type": "code",
+    }
+
+    auth_request_url = requests.Request('GET', auth_url, params=params).prepare().url
+    return redirect(auth_request_url)
+
+from datetime import datetime, timedelta
+from django.http import HttpResponse
+
+def meta_callback(request):
+    """
+    Handles redirect from Meta, validates state, and exchanges code for tokens.
+    """
+    code = request.GET.get('code')
+    state_from_meta = request.GET.get('state')
+    state_from_session = request.session.get('meta_oauth_state')
+
+    if not state_from_session or state_from_session != state_from_meta:
+        return HttpResponse("Invalid state — potential CSRF attack", status=400)
+
+    del request.session['meta_oauth_state']
+
+    token_url = settings.OAUTH_PROVIDERS['meta']['token_url']
+    data = {
+        "client_id": settings.META_APP_ID,
+        "redirect_uri": settings.META_REDIRECT_URI,
+        "client_secret": settings.META_APP_SECRET,
+        "code": code,
+    }
+
+    try:
+        resp = requests.get(token_url, params=data)
+        resp.raise_for_status()
+        token_data = resp.json()
+
+        short_lived_token = token_data["access_token"]
+        expires_in = token_data.get("expires_in", 3600)
+        expiry_datetime = datetime.now() + timedelta(seconds=expires_in)
+
+        # Optional: exchange for long-lived token (good for 60 days)
+        long_lived_token = exchange_long_lived_token(short_lived_token)
+
+        # Store in session (better: store in your DB for persistence)
+        request.session["meta_access_token"] = long_lived_token or short_lived_token
+        request.session["meta_token_expires_at"] = expiry_datetime.isoformat()
+
+        return redirect("Demo:campaigns_overview")
+
+    except requests.RequestException as e:
+        return HttpResponse(f"Token exchange failed: {e}", status=500)
+
+def exchange_long_lived_token(short_lived_token):
+    """
+    Exchanges short-lived Meta token for a long-lived one.
+    """
+    url = settings.OAUTH_PROVIDERS['meta']['long_lived_token_url']
+    params = {
+        "grant_type": "fb_exchange_token",
+        "client_id": settings.META_APP_ID,
+        "client_secret": settings.META_APP_SECRET,
+        "fb_exchange_token": short_lived_token,
+    }
+
+    try:
+        resp = requests.get(url, params=params)
+        resp.raise_for_status()
+        data = resp.json()
+        return data.get("access_token")
+    except requests.RequestException as e:
+        print(f"Failed to get long-lived token: {e}")
+        return None
+
+def meta_get_ad_accounts(request):
+    """
+    Example API call using stored access token.
+    """
+    token = request.session.get("meta_access_token")
+    if not token:
+        return redirect("meta_login")
+
+    url = f"{settings.OAUTH_PROVIDERS['meta']['graph_api_base']}/me/adaccounts"
+    params = {"access_token": token}
+
+    try:
+        resp = requests.get(url, params=params)
+        resp.raise_for_status()
+        data = resp.json()
+        return HttpResponse(f"Your Ad Accounts: {data}")
+    except requests.RequestException as e:
+        return HttpResponse(f"Failed to fetch ad accounts: {e}", status=500)
