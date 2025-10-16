@@ -12,6 +12,7 @@ from urllib.parse import urlencode
 from django.core.files.storage import FileSystemStorage
 from io import BytesIO
 import logging
+import http.client
 
 # Supabase & Supporting imports
 from .supabase_functions import batch_insert_to_supabase, get_next_id_from_supabase_compatible_all, get_tracking_df, build_customer_dictionary, attribute_purchases_to_campaigns
@@ -45,7 +46,7 @@ def zid_login(request):
 def zid_callback(request):
     code = request.GET.get('code')
     if not code:
-        messages.error(request, "❌ No code returned from Zid.")
+        messages.error(request, "No code returned from Zid.")
         return redirect('Demo:zid_login')
 
     data = {
@@ -86,14 +87,18 @@ def zid_callback(request):
         if store_id:
             request.session['store_id'] = store_id
         else:
-            print("⚠️ Store ID not found in profile response.")
+            print("Store ID not found in profile response.")
+
+        ### Subscribe to the products webhook --
+        subscribe_store_to_product_update(authorization_token, access_token)
+        ##
         return redirect('Demo:home')  # go to the home view
 
     except requests.RequestException as e:
         messages.error(request, f"Token error: {str(e)}")
         return redirect('Demo:zid_login')
 
-# Step 3: Render analytics dashboard using Zid API
+
 def home(request):
     token = request.session.get('access_token')
     auth_token = request.session.get('authorization_token')
@@ -1025,34 +1030,34 @@ def customer_detail_api(request, customer_id):
 
 
 #########################################################################
-##################### THE PRODUCTS WEBHOOK SECTION 
+##################### THE PRODUCTS WEBHOOK SECTION --- SARAH 16TH OF OCTOBER
 logger = logging.getLogger(__name__)
 
-def zid_product_update(request):
-    if request.method != 'POST':
-        return JsonResponse({'error': 'Invalid method'}, status=405)
+def subscribe_store_to_product_update(authorization_token, access_token):
+
+    conn = http.client.HTTPSConnection(settings.ZID_API_HOST)
+
+    payload = json.dumps({
+        "event": "product.update",
+        "target_url": settings.TARGET_URL_PRODUCT_HOOK,
+        "original_id": settings.ZID_CLIENT_ID,
+        "subscriber": settings.ZID_CLIENT_ID
+        
+    })
+
+    headers = {
+        'Authorization': f'Bearer {authorization_token}',
+        'X-Manager-Token': access_token,
+        'Content-Type': 'application/json'
+    }
 
     try:
-        # Parse JSON payload
-        body_unicode = request.body.decode('utf-8')
-        data = json.loads(body_unicode)
-
-        if not data:
-            return JsonResponse({'error': 'No JSON payload received'}, status=400)
-
-        product_id = data.get('id')
-        product_name = data.get('name')
-        price = data.get('price')
-
-        logger.info(f"Received product update from Zid — ID: {product_id}, Name: {product_name}, Price: {price}")
-
-
-        return JsonResponse({'status': 'success'}, status=200)
-
-    except json.JSONDecodeError:
-        logger.error("Invalid JSON payload received.")
-        return JsonResponse({'error': 'Invalid JSON'}, status=400)
-
+        conn.request("POST", settings.ZID_WEBHOOK_ENDPOINT, payload, headers)
+        res = conn.getresponse()
+        data = res.read()
+        decoded = data.decode("utf-8")
+        print(f"Webhook subscription response: {decoded}")
+        return json.loads(decoded)
     except Exception as e:
-        logger.exception(f"Error processing Zid webhook: {e}")
-        return JsonResponse({'error': 'Internal server error'}, status=500)
+        print(f"Failed to create webhook subscription: {e}")
+        return None
