@@ -31,6 +31,7 @@
   position: absolute;
   left: 0;
   overflow-y: auto;
+  scrollbar-width: none;;
 }
 
 #sourceLegend { 
