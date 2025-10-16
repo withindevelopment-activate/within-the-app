@@ -23,6 +23,12 @@
   border-color: #5a5a5a;
 }
 
+.chart-container {
+  position: relative;
+  width: 100%;
+  height: 400px; /* fixed height for both charts */
+}
+
 /* Toggle button small square when collapsed */
 #sidebar.collapsed #toggleSidebar {
   width: 40px;
