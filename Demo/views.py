@@ -825,6 +825,7 @@ def view_tracking(request):
     campaigns_summary = []
     chart_labels = []
     chart_data = []
+    context = {}
 
     try:
         df = get_tracking_df()
@@ -859,12 +860,33 @@ def view_tracking(request):
         customer_dict = build_customer_dictionary(df)
 
         # --- Campaign results ---
-        campaigns_summary_df = attribute_purchases_to_campaigns(df)
-        campaigns_summary = campaigns_summary_df.to_dict(orient="records")
+        campaigns_summary_df, sources_summary_df = attribute_purchases_to_campaigns(df)
 
-        # Prepare chart data
-        # chart_labels = [c["campaign"] for c in campaigns_summary]
-        # chart_data = [c["total_value"] for c in campaigns_summary]
+        campaigns_summary = campaigns_summary_df.to_dict(orient="records")
+        sources_summary = sources_summary_df.to_dict(orient="records")
+
+        context = {
+            "store_id": store_id,
+            "rows": rows,
+            "total_visitors": total_visitors,
+            "total_sessions": total_sessions,
+            "total_pageviews": total_pageviews,
+            "customer_dict": customer_dict,
+            "campaigns": campaigns_summary,
+            "chart_labels": chart_labels,
+            "chart_data": chart_data,
+            "request": request,
+        }
+
+        context["campaigns"] = campaigns_summary
+        context["sources"] = sources_summary
+
+        # For charts
+        context["campaign_labels"] = campaigns_summary_df["campaign"].tolist()
+        context["campaign_data"] = campaigns_summary_df["conversion_credit"].tolist()
+
+        context["source_labels"] = sources_summary_df["source"].tolist()
+        context["source_data"] = sources_summary_df["conversion_credit"].tolist()
 
     except Exception as e:
         logging.error(f"Error fetching tracking data: {str(e)}")
@@ -872,16 +894,7 @@ def view_tracking(request):
         return redirect("Demo:home")
 
     return render(request, "Demo/tracking_view.html", {
-        "store_id": store_id,
-        "rows": rows,
-        "total_visitors": total_visitors,
-        "total_sessions": total_sessions,
-        "total_pageviews": total_pageviews,
-        "customer_dict": customer_dict,
-        "campaigns": campaigns_summary,
-        "chart_labels": chart_labels,
-        "chart_data": chart_data,
-        "request": request,
+        
     })
 
 def abandoned_carts_page(request):

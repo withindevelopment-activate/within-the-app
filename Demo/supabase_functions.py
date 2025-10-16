@@ -481,11 +481,10 @@ def build_customer_dictionary(df: pd.DataFrame) -> dict:
 
 #     return summary.sort_values("total_value", ascending=False)
 
-def attribute_purchases_to_campaigns(df: pd.DataFrame) -> pd.DataFrame:
+def attribute_purchases_to_campaigns(df: pd.DataFrame):
     """
-    Return a campaign-level summary with purchases attributed to campaigns.
-    If a purchase is associated with multiple campaigns, each gets equal fractional credit.
-    Also lists all order_ids attributed to each campaign.
+    Return campaign-level and source-level attribution summaries with conversion credits.
+    Each campaign/source gets fractional credit if multiple touchpoints exist.
     """
     df = df.copy()
 
@@ -500,6 +499,15 @@ def attribute_purchases_to_campaigns(df: pd.DataFrame) -> pd.DataFrame:
         .str.replace("+", " ", regex=False)
         .str.strip()
     )
+
+    df["UTM_Source"] = (
+        df.get("UTM_Source", "")
+        .fillna("")
+        .astype(str)
+        .str.replace("+", " ", regex=False)
+        .str.strip()
+    )
+
     df["Visited_at"] = pd.to_datetime(df["Visited_at"], errors="coerce")
 
     # Helper to extract from Event_Details
@@ -521,52 +529,64 @@ def attribute_purchases_to_campaigns(df: pd.DataFrame) -> pd.DataFrame:
         axis=1,
     )
 
-    # Deduplicate purchases based on order_id
+    # Deduplicate purchases by order_id
     purchase_mask = df["Event_Type"] == "purchase"
     purchases = df[purchase_mask].drop_duplicates(subset=["order_id"])
 
-    campaign_credits = []
+    attributions = []
 
-    for idx, purchase in purchases.iterrows():
+    for _, purchase in purchases.iterrows():
         session_id = purchase["Session_ID"]
-        customer_id = purchase["Customer_ID"] or purchase["Customer_Email"] or purchase["Customer_Mobile"]
-        order_id = purchase["order_id"]
 
-        # Campaigns before or at time of purchase
+        # Campaign & source interactions prior to purchase
         session_mask = (
             (df["Session_ID"] == session_id)
             & (df["Visited_at"] <= purchase["Visited_at"])
-            & (df["UTM_Campaign"] != "")
         )
-        campaigns = df[session_mask]["UTM_Campaign"].unique()
+
+        session_data = df[session_mask]
+
+        campaigns = session_data[session_data["UTM_Campaign"] != ""]["UTM_Campaign"].unique()
+        sources = session_data[session_data["UTM_Source"] != ""]["UTM_Source"].unique()
 
         if len(campaigns) == 0:
-            campaigns = ["(no campaign)"]
+            campaigns = ["Direct"]
+        if len(sources) == 0:
+            sources = ["Direct"]
 
-        credit = 1.0 / len(campaigns)
+        campaign_credit = 1.0 / len(campaigns)
+        source_credit = 1.0 / len(sources)
+
         for camp in campaigns:
-            campaign_credits.append({
-                "campaign": camp,
-                "conversion_credit": credit,
-                "order_id": order_id
-            })
+            attributions.append({"type": "campaign", "key": camp, "credit": campaign_credit})
 
-    if not campaign_credits:
-        return pd.DataFrame(columns=["campaign", "conversion_credit", "order_ids"])
+        for src in sources:
+            attributions.append({"type": "source", "key": src, "credit": source_credit})
 
-    campaign_df = pd.DataFrame(campaign_credits)
+    if not attributions:
+        return pd.DataFrame(columns=["campaign", "conversion_credit"]), pd.DataFrame(columns=["source", "conversion_credit"])
 
-    # Aggregate: sum credit and collect unique order_ids per campaign
-    summary = (
-        campaign_df.groupby("campaign")
-        .agg(
-            conversion_credit=pd.NamedAgg(column="conversion_credit", aggfunc="sum"),
-            order_ids=pd.NamedAgg(column="order_id", aggfunc=lambda x: list(pd.Series(x).dropna().unique()))
-        )
+    attr_df = pd.DataFrame(attributions)
+
+    # Aggregate for campaigns
+    campaign_summary = (
+        attr_df[attr_df["type"] == "campaign"]
+        .groupby("key")
+        .agg(conversion_credit=pd.NamedAgg(column="credit", aggfunc="sum"))
         .reset_index()
+        .rename(columns={"key": "campaign"})
         .sort_values("conversion_credit", ascending=False)
     )
 
-    return summary
+    # Aggregate for sources
+    source_summary = (
+        attr_df[attr_df["type"] == "source"]
+        .groupby("key")
+        .agg(conversion_credit=pd.NamedAgg(column="credit", aggfunc="sum"))
+        .reset_index()
+        .rename(columns={"key": "source"})
+        .sort_values("conversion_credit", ascending=False)
+    )
 
+    return campaign_summary, source_summary
 

@@ -133,6 +133,18 @@
     </div>
   </div>
 
+  <div class="row mt-5">
+    <div class="col-md-6">
+      <h5>Conversions by Campaign</h5>
+      <canvas id="campaignPieChart"></canvas>
+    </div>
+    <div class="col-md-6">
+      <h5>Conversions by UTM Source</h5>
+      <canvas id="sourcePieChart"></canvas>
+    </div>
+  </div>
+
+
   <!-- Campaign Attribution Table -->
   <div class="mt-5">
     <h4>Campaign Attribution</h4>
@@ -165,13 +177,6 @@
       </div>
     </div>
 
-  <!-- Campaign Attribution Chart -->
-<!--  <div class="row mt-4">
-    <div class="col-md-12">
-      <canvas id="campaignChart"></canvas>
-    </div>
-  </div> -->
-<!-- Customer Dictionary Table -->
 <div class="mt-5">
   <h4>Customer Dictionary</h4>
   <div class="data-wrap">
@@ -217,33 +222,51 @@
     </div>
   </div>
 
-
-
-<!--  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
-    const ctx = document.getElementById('campaignChart').getContext('2d');
-    const campaignChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: {{ chart_labels|safe }},
-            datasets: [{
-                label: 'Attributed Revenue',
-                data: {{ chart_data|safe }},
-                backgroundColor: 'rgba(54, 162, 235, 0.6)',
-                borderColor: 'rgba(54, 162, 235, 1)',
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: { display: false },
-                title: { display: true, text: 'Campaign Attributed Revenue' }
-            },
-            scales: { y: { beginAtZero: true } }
-        }
-    });
+  const modernColors = [
+    '#6366F1','#F59E0B','#10B981','#EF4444','#3B82F6',
+    '#8B5CF6','#EC4899','#14B8A6','#F97316','#84CC16'
+  ];
 
-  </script> -->
+  const campaignPieChart = new Chart(document.getElementById('campaignPieChart'), {
+    type: 'pie',
+    data: {
+      labels: {{ campaign_labels|safe }},
+      datasets: [{
+        data: {{ campaign_data|safe }},
+        backgroundColor: modernColors,
+        hoverOffset: 15
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'bottom' },
+        title: { display: true, text: 'Campaign Conversion Share' }
+      }
+    }
+  });
+
+  const sourcePieChart = new Chart(document.getElementById('sourcePieChart'), {
+    type: 'pie',
+    data: {
+      labels: {{ source_labels|safe }},
+      datasets: [{
+        data: {{ source_data|safe }},
+        backgroundColor: modernColors,
+        hoverOffset: 15
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'bottom' },
+        title: { display: true, text: 'Source Conversion Share' }
+      }
+    }
+  });
+  </script>
+
 </div>
 {% endblock %}
