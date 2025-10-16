@@ -134,11 +134,11 @@
   </div>
 
   <div class="row mt-5">
-    <div class="col-md-6">
+    <div class="col-md-6 text-center chart-container">
       <h5>Conversions by Campaign</h5>
       <canvas id="campaignPieChart"></canvas>
     </div>
-    <div class="col-md-6">
+    <div class="col-md-6 text-center chart-container">
       <h5>Conversions by UTM Source</h5>
       <canvas id="sourcePieChart"></canvas>
     </div>
@@ -198,6 +198,26 @@
     "#0099C6", "#DD4477", "#66AA00", "#B82E2E", "#316395", 
     "#994499", "#22AA99"
   ];
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,  // important for fixed height
+    plugins: {
+      legend: {
+        display: true,
+        position: 'right',
+        align: 'start',
+        labels: {
+          boxWidth: 15,
+          borderRadius: 50,
+          padding: 10,
+          font: { size: 12 }
+        }
+      },
+    },
+    layout: {
+      padding: 30 // optional extra space around the chart
+    }
+  };
 
   const campaignPieChart = new Chart(document.getElementById('campaignPieChart'), {
     type: 'pie',
@@ -214,14 +234,7 @@
         cutout: '10%',
       }]
     },
-    options: {
-      responsive: true,
-      plugins: {
-        legend: {
-          display: false,
-        },
-      }
-    }
+    options: chartOptions
   });
 
   const sourcePieChart = new Chart(document.getElementById('sourcePieChart'), {
@@ -239,21 +252,7 @@
         cutout: '10%',
       }]
     },
-    options: {
-      responsive: true,
-      plugins: {
-        legend: {
-          display: true,
-          position: 'right',
-          align: 'center',
-          labels: {
-            boxWidth: 10,
-            padding: 10,
-            font: { size: 12 }
-          }
-        },
-      }
-    }
+    options: chartOptions
   });
   </script>
 
