@@ -823,8 +823,7 @@ def view_tracking(request):
     total_visitors = total_sessions = total_pageviews = 0
     customer_dict = {}
     campaigns_summary = []
-    chart_labels = []
-    chart_data = []
+    sources_summary = []
     context = {}
 
     try:
@@ -872,18 +871,14 @@ def view_tracking(request):
             "total_sessions": total_sessions,
             "total_pageviews": total_pageviews,
             "customer_dict": customer_dict,
+            "campaigns": campaigns_summary,
+            "sources": sources_summary,
+            "campaign_labels": campaigns_summary_df["campaign"].tolist(),
+            "campaign_data": campaigns_summary_df["conversion_credit"].tolist(),
+            "source_labels": sources_summary_df["source"].tolist(),
+            "source_data": sources_summary_df["conversion_credit"].tolist(),
             "request": request,
         }
-
-        context["campaigns"] = campaigns_summary
-        context["sources"] = sources_summary
-
-        # For charts
-        context["campaign_labels"] = campaigns_summary_df["campaign"].tolist()
-        context["campaign_data"] = campaigns_summary_df["conversion_credit"].tolist()
-
-        context["source_labels"] = sources_summary_df["source"].tolist()
-        context["source_data"] = sources_summary_df["conversion_credit"].tolist()
 
     except Exception as e:
         logging.error(f"Error fetching tracking data: {str(e)}")
