@@ -25,10 +25,7 @@
 
 .chart-container {
   position: relative;
-  width: 100%;
   height: 400px; /* fixed height for both charts */
-  overflow-y:auto;
-  scrollbar-width: none;
 }
 
 /* Toggle button small square when collapsed */

@@ -134,15 +134,21 @@
   </div>
 
   <div class="row mt-5">
-    <div class="col-md-6 text-center chart-container">
-      <h5>Conversions by Campaign</h5>
-      <canvas id="campaignPieChart"></canvas>
+    <div class="col-md-6 d-flex">
+      <div style="flex: 1; height: 400px;">
+        <canvas id="campaignPieChart"></canvas>
+      </div>
+      <div id="campaignLegend" class="ms-3" style="overflow-y:auto; max-height:400px;"></div>
     </div>
-    <div class="col-md-6 text-center chart-container">
-      <h5>Conversions by UTM Source</h5>
-      <canvas id="sourcePieChart"></canvas>
+
+    <div class="col-md-6 d-flex">
+      <div style="flex: 1; height: 400px;">
+        <canvas id="sourcePieChart"></canvas>
+      </div>
+      <div id="sourceLegend" class="ms-3" style="overflow-y:auto; max-height:400px;"></div>
     </div>
   </div>
+
 
 <div class="mt-5">
   <h4>Customer Dictionary</h4>
@@ -198,27 +204,22 @@
     "#0099C6", "#DD4477", "#66AA00", "#B82E2E", "#316395", 
     "#994499", "#22AA99"
   ];
+
+  // Shared chart options
   const chartOptions = {
     responsive: true,
-    maintainAspectRatio: false,  // important for fixed height
+    maintainAspectRatio: false,
     plugins: {
       legend: {
-        display: true,
-        position: 'right',
-        align: 'start',
-        labels: {
-          boxWidth: 15,
-          borderRadius: 50,
-          padding: 10,
-          font: { size: 12 }
-        }
+        display: false, // disable built-in legend
       },
     },
     layout: {
-      padding: 30 // optional extra space around the chart
+      padding: 20
     }
   };
 
+  // --- Campaign Pie ---
   const campaignPieChart = new Chart(document.getElementById('campaignPieChart'), {
     type: 'pie',
     data: {
@@ -233,9 +234,22 @@
         radius: '80%',
       }]
     },
-    options: chartOptions
+    options: chartOptions,
   });
 
+  // Generate separate legend for campaign chart
+  document.getElementById('campaignLegend').innerHTML = campaignPieChart.generateLegend();
+  campaignPieChart.options.plugins.legend.labels.generateLabels = function(chart) {
+    return chart.data.labels.map((label, i) => ({
+      text: label + " (" + chart.data.datasets[0].data[i] + ")",
+      fillStyle: chart.data.datasets[0].backgroundColor[i],
+      strokeStyle: chart.data.datasets[0].backgroundColor[i],
+      hidden: false,
+      index: i
+    }));
+  };
+
+  // --- Source Pie ---
   const sourcePieChart = new Chart(document.getElementById('sourcePieChart'), {
     type: 'pie',
     data: {
@@ -250,9 +264,14 @@
         radius: '80%',
       }]
     },
-    options: chartOptions
+    options: chartOptions,
   });
+
+  // Generate separate legend for source chart
+  document.getElementById('sourceLegend').innerHTML = sourcePieChart.generateLegend();
+  sourcePieChart.options.plugins.legend.labels.generateLabels = campaignPieChart.options.plugins.legend.labels.generateLabels;
   </script>
+
 
 </div>
 {% endblock %}
