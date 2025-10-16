@@ -872,9 +872,6 @@ def view_tracking(request):
             "total_sessions": total_sessions,
             "total_pageviews": total_pageviews,
             "customer_dict": customer_dict,
-            "campaigns": campaigns_summary,
-            "chart_labels": chart_labels,
-            "chart_data": chart_data,
             "request": request,
         }
 
@@ -893,9 +890,7 @@ def view_tracking(request):
         messages.error(request, f"❌ Error fetching tracking data: {str(e)}")
         return redirect("Demo:home")
 
-    return render(request, "Demo/tracking_view.html", {
-        
-    })
+    return render(request, "Demo/tracking_view.html", context=context)
 
 def abandoned_carts_page(request):
     token = request.session.get('access_token')
