@@ -539,13 +539,13 @@ def attribute_purchases_to_campaigns(df: pd.DataFrame) -> pd.DataFrame:
     campaign_df = pd.DataFrame(campaign_credits)
 
     if campaign_df.empty:
-        return pd.DataFrame(columns=["campaign", "conversions"])
+        return pd.DataFrame(columns=["campaign", "conversion_credit"])
 
     summary = (
         campaign_df.groupby("campaign")
-        .agg(conversions=pd.NamedAgg(column="conversion_credit", aggfunc="sum"))
+        .agg(conversion_credit=pd.NamedAgg(column="conversion_credit", aggfunc="sum"))
         .reset_index()
-        .sort_values("conversions", ascending=False)
+        .sort_values("conversion_credit", ascending=False)
     )
 
     return summary
