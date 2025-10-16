@@ -498,6 +498,7 @@ def attribute_purchases_to_campaigns(df: pd.DataFrame):
         .astype(str)
         .str.replace("+", " ", regex=False)
         .str.strip()
+        .str.title()
     )
 
     df["UTM_Source"] = (
@@ -506,6 +507,7 @@ def attribute_purchases_to_campaigns(df: pd.DataFrame):
         .astype(str)
         .str.replace("+", " ", regex=False)
         .str.strip()
+        .str.title()
     )
 
     df["Visited_at"] = pd.to_datetime(df["Visited_at"], errors="coerce")
