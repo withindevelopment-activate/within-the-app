@@ -134,18 +134,26 @@
   </div>
 
   <div class="row mt-5">
-    <div class="col-md-6 d-flex">
-      <div style="flex: 1; height: 400px;">
-        <canvas id="campaignPieChart"></canvas>
+    <!-- Campaign Chart -->
+    <div class="col-md-6">
+      <h5 class="text-center mb-2">Conversions by Campaign</h5>
+      <div class="d-flex">
+        <div style="flex: 1; height: 400px;">
+          <canvas id="campaignPieChart"></canvas>
+        </div>
+        <div id="campaignLegend" class="ms-3" style="overflow-y:auto; max-height:400px;"></div>
       </div>
-      <div id="campaignLegend" class="ms-3" style="overflow-y:auto; max-height:400px;"></div>
     </div>
 
-    <div class="col-md-6 d-flex">
-      <div style="flex: 1; height: 400px;">
-        <canvas id="sourcePieChart"></canvas>
+    <!-- Source Chart -->
+    <div class="col-md-6">
+      <h5 class="text-center mb-2">Conversions by UTM Source</h5>
+      <div class="d-flex">
+        <div style="flex: 1; height: 400px;">
+          <canvas id="sourcePieChart"></canvas>
+        </div>
+        <div id="sourceLegend" class="ms-3" style="overflow-y:auto; max-height:400px;"></div>
       </div>
-      <div id="sourceLegend" class="ms-3" style="overflow-y:auto; max-height:400px;"></div>
     </div>
   </div>
 
@@ -205,17 +213,13 @@
     "#994499", "#22AA99"
   ];
 
-  // Shared chart options
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
-    plugins: {
-      legend: { display: false },
-    },
+    plugins: { legend: { display: false } },
     layout: { padding: 20 }
   };
 
-  // Helper to generate custom interactive legend
   function generateLegend(chart, legendContainerId) {
     const container = document.getElementById(legendContainerId);
     container.innerHTML = '';
@@ -254,7 +258,7 @@
         // Toggle visibility
         slice.hidden = !slice.hidden;
 
-        // Add line-through for hidden slices
+        // Line-through disabled slices
         text.style.textDecoration = slice.hidden ? 'line-through' : 'none';
         chart.update();
       });
@@ -265,7 +269,7 @@
     container.appendChild(ul);
   }
 
-  // --- Campaign Pie ---
+  // Campaign Pie
   const campaignPieChart = new Chart(document.getElementById('campaignPieChart'), {
     type: 'pie',
     data: {
@@ -284,7 +288,7 @@
   });
   generateLegend(campaignPieChart, 'campaignLegend');
 
-  // --- Source Pie ---
+  // Source Pie
   const sourcePieChart = new Chart(document.getElementById('sourcePieChart'), {
     type: 'pie',
     data: {

@@ -23,17 +23,8 @@
   border-color: #5a5a5a;
 }
 
-#campaignLegend, #sourceLegend {
-  overflow-y: auto;
-  max-height: 400px;
-  font-size: 12px;
-}
-
-#campaignLegend ul, #sourceLegend ul {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
+#campaignLegend ul, #sourceLegend ul { list-style: none; padding: 0; margin: 0; }
+#campaignLegend, #sourceLegend { overflow-y: auto; max-height: 400px; font-size: 12px; }
 
 /* Toggle button small square when collapsed */
 #sidebar.collapsed #toggleSidebar {
