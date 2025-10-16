@@ -24,7 +24,20 @@
 }
 
 #campaignLegend ul, #sourceLegend ul { list-style: none; padding: 0; margin: 0; }
-#campaignLegend, #sourceLegend { overflow-y: auto; max-height: 400px; font-size: 12px; }
+#campaignLegend { 
+  overflow-y: auto; 
+  max-height: 400px; 
+  font-size: 12px;
+  position: absolute;
+}
+
+#sourceLegend { 
+  overflow-y: auto; 
+  max-height: 400px; 
+  font-size: 12px;
+  position: absolute;
+  left: 0;
+}
 
 /* Toggle button small square when collapsed */
 #sidebar.collapsed #toggleSidebar {
