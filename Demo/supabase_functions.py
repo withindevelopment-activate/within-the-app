@@ -510,7 +510,7 @@ def attribute_purchases_to_campaigns(df: pd.DataFrame) -> pd.DataFrame:
 
     # Deduplicate purchases based on order_id
     purchase_mask = df["Event_Type"] == "purchase"
-    purchases = df[purchase_mask].drop_duplicates(subset=["order_id"])
+    purchases = df[purchase_mask]
 
     # For each purchase, find all campaigns that the customer interacted with in the same session
     campaign_credits = []
