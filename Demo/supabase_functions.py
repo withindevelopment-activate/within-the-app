@@ -485,6 +485,7 @@ def attribute_purchases_to_campaigns(df: pd.DataFrame) -> pd.DataFrame:
     """
     Return a campaign-level summary with purchases attributed to campaigns.
     If a purchase is associated with multiple campaigns, each gets equal fractional credit.
+    Also lists all order_ids attributed to each campaign.
     """
     df = df.copy()
 
@@ -492,10 +493,16 @@ def attribute_purchases_to_campaigns(df: pd.DataFrame) -> pd.DataFrame:
     for col in ["Customer_ID", "Customer_Email", "Customer_Mobile", "Visitor_ID", "Session_ID"]:
         df[col] = df.get(col, "").fillna("").astype(str).str.strip()
 
-    df["UTM_Campaign"] = df.get("UTM_Campaign", "").fillna("").astype(str).str.replace("+", " ", regex=False).str.strip()
+    df["UTM_Campaign"] = (
+        df.get("UTM_Campaign", "")
+        .fillna("")
+        .astype(str)
+        .str.replace("+", " ", regex=False)
+        .str.strip()
+    )
     df["Visited_at"] = pd.to_datetime(df["Visited_at"], errors="coerce")
 
-    # Extract Customer_ID and order_id from Event_Details
+    # Helper to extract from Event_Details
     def extract_from_event(details, key):
         if pd.isna(details) or not details:
             return ""
@@ -505,48 +512,61 @@ def attribute_purchases_to_campaigns(df: pd.DataFrame) -> pd.DataFrame:
         except Exception:
             return ""
 
-    df["Customer_ID"] = df.apply(lambda row: row["Customer_ID"] or extract_from_event(row.get("Event_Details", ""), "customer_id"), axis=1)
-    df["order_id"] = df.apply(lambda row: extract_from_event(row.get("Event_Details", ""), "order_id"), axis=1)
+    df["Customer_ID"] = df.apply(
+        lambda row: row["Customer_ID"] or extract_from_event(row.get("Event_Details", ""), "customer_id"),
+        axis=1,
+    )
+    df["order_id"] = df.apply(
+        lambda row: extract_from_event(row.get("Event_Details", ""), "order_id"),
+        axis=1,
+    )
 
     # Deduplicate purchases based on order_id
     purchase_mask = df["Event_Type"] == "purchase"
-    purchases = df[purchase_mask]
+    purchases = df[purchase_mask].drop_duplicates(subset=["order_id"])
 
-    # For each purchase, find all campaigns that the customer interacted with in the same session
     campaign_credits = []
 
     for idx, purchase in purchases.iterrows():
         session_id = purchase["Session_ID"]
         customer_id = purchase["Customer_ID"] or purchase["Customer_Email"] or purchase["Customer_Mobile"]
+        order_id = purchase["order_id"]
 
-        # Get all campaigns for this session/customer prior to purchase
+        # Campaigns before or at time of purchase
         session_mask = (
-            (df["Session_ID"] == session_id) &
-            (df["Visited_at"] <= purchase["Visited_at"]) &
-            (df["UTM_Campaign"] != "")
+            (df["Session_ID"] == session_id)
+            & (df["Visited_at"] <= purchase["Visited_at"])
+            & (df["UTM_Campaign"] != "")
         )
         campaigns = df[session_mask]["UTM_Campaign"].unique()
 
         if len(campaigns) == 0:
             campaigns = ["(no campaign)"]
 
-        # Each campaign gets fractional credit
         credit = 1.0 / len(campaigns)
         for camp in campaigns:
-            campaign_credits.append({"campaign": camp, "conversion_credit": credit})
+            campaign_credits.append({
+                "campaign": camp,
+                "conversion_credit": credit,
+                "order_id": order_id
+            })
 
-    # Build DataFrame
+    if not campaign_credits:
+        return pd.DataFrame(columns=["campaign", "conversion_credit", "order_ids"])
+
     campaign_df = pd.DataFrame(campaign_credits)
 
-    if campaign_df.empty:
-        return pd.DataFrame(columns=["campaign", "conversion_credit"])
-
+    # Aggregate: sum credit and collect unique order_ids per campaign
     summary = (
         campaign_df.groupby("campaign")
-        .agg(conversion_credit=pd.NamedAgg(column="conversion_credit", aggfunc="sum"))
+        .agg(
+            conversion_credit=pd.NamedAgg(column="conversion_credit", aggfunc="sum"),
+            order_ids=pd.NamedAgg(column="order_id", aggfunc=lambda x: list(pd.Series(x).dropna().unique()))
+        )
         .reset_index()
         .sort_values("conversion_credit", ascending=False)
     )
 
     return summary
+
 
