@@ -1064,6 +1064,39 @@ def subscribe_store_to_product_update(authorization_token, access_token):
     
 import uuid
 
+### THE FUNCITON THAT DOES THE UPDATES AFTER THE WEBHOOK IS TRIGGERED (A PRODUCT IS UPDATED)
+@require_POST
+def product_update(request):
+    """
+    This view receives data from Zid whenever a product is updated.
+    Zid sends a POST request with the updated product data.
+    """
+    try:
+        data = json.loads(request.body.decode("utf-8"))
+        print("The raw data gotten is:", data)
+
+        # Extracting key details
+        product_id = data.get("id")
+        name = data.get("name")
+        sku = data.get("sku")
+        sale_price = data.get("sale_price")
+        price = data.get("price")
+        updated_at = data.get("updated_at")
+
+        print(f"Product Update Received — ID: {product_id}, Name: {name}, Price: {price}, SKU: {sku}, update occurred at {updated_at}")
+
+        return JsonResponse({"status": "success"}, status=200)
+
+    except Exception as e:
+        print(f"Error in product_update: {e}")
+        return JsonResponse({"error": "Invalid payload"}, status=400)
+
+
+
+
+################################################################################################
+######################################## META's API --
+
 def meta_login(request):
     """
     Redirects user to Meta OAuth page.
