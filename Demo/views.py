@@ -1065,12 +1065,15 @@ def subscribe_store_to_product_update(authorization_token, access_token):
 import uuid
 
 ### THE FUNCITON THAT DOES THE UPDATES AFTER THE WEBHOOK IS TRIGGERED (A PRODUCT IS UPDATED)
-@require_POST
 def product_update(request):
     """
     This view receives data from Zid whenever a product is updated.
     Zid sends a POST request with the updated product data.
     """
+    if request.method == "GET":
+        # Only send an ok reponse
+        return JsonResponse({"status": "ok"}, status=200)
+    
     try:
         data = json.loads(request.body.decode("utf-8"))
         print("The raw data gotten is:", data)
@@ -1090,8 +1093,6 @@ def product_update(request):
     except Exception as e:
         print(f"Error in product_update: {e}")
         return JsonResponse({"error": "Invalid payload"}, status=400)
-
-
 
 
 ################################################################################################
