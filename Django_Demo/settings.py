@@ -166,7 +166,7 @@ ZID_CLIENT_ID = os.environ.get('ZID_CLIENT_ID')
 ZID_CLIENT_SECRET = os.environ.get('ZID_CLIENT_SECRET')
 ZID_REDIRECT_URI = 'https://testing-within.onrender.com/zid/callback'
 # Webhook Specific
-TARGET_URL_PRODUCT_HOOK = 'https://testing-within.onrender.com/zid-webhook/product-update'
+TARGET_URL_PRODUCT_HOOK = 'https://testing-within.onrender.com/zid-webhook/product-update/'
 ZID_WEBHOOK_ENDPOINT = "/v1/managers/webhooks"
 ZID_API_HOST = "api.zid.sa"
 
