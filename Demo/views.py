@@ -861,7 +861,7 @@ def view_tracking(request):
         rows = df.sort_values(by="Visited_at", ascending=False).head(50).to_dict(orient="records")
 
         # --- Customer dictionary ---
-        customer_dict = build_customer_dictionary(df)
+        # customer_dict = build_customer_dictionary(df)
 
         # --- Campaign results ---
         campaigns_summary_df, sources_summary_df = attribute_purchases_to_campaigns(df)
@@ -875,7 +875,7 @@ def view_tracking(request):
             "total_visitors": total_visitors,
             "total_sessions": total_sessions,
             "total_pageviews": total_pageviews,
-            "customer_dict": customer_dict,
+            # "customer_dict": customer_dict,
             "campaigns": campaigns_summary,
             "sources": sources_summary,
             "campaign_labels": campaigns_summary_df["campaign"].tolist(),
