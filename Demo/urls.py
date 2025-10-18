@@ -33,5 +33,14 @@ urlpatterns = [
     path("meta/callback/", views.meta_callback, name="meta_callback"),
     path("meta/adaccounts/", views.meta_get_ad_accounts, name="meta_ad_accounts"),
 
+    path('oauth/snapchat/login/', views.snapchat_login, name='snapchat_login'),
+    path('oauth/snapchat/callback/', views.snapchat_callback, name='snapchat_callback'),
+    path('snapchat/campaigns/', views.campaigns_overview, name='campaigns_overview'),
+
+    path("oauth/tiktok/login/", views.tiktok_login, name="tiktok_login"),
+    path("oauth/tiktok/callback/", views.tiktok_callback, name="tiktok_callback"),
+    path("oauth/tiktok/refresh/", views.tiktok_refresh_token, name="tiktok_refresh"),
+    path("tiktok/campaigns/", views.tiktok_campaigns, name="tiktok_campaigns"),
+
     # path("campaigns/overview/", views.campaigns_overview, name="campaigns_overview"),
 ]
