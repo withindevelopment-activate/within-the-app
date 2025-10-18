@@ -1159,6 +1159,7 @@ def snapchat_callback(request):
 
         # 4. Store the tokens securely in the session.
         request.session["snapchat_access_token"] = token_data["access_token"]
+        print("THE SNAPCHAT ACCESS TOKEN IS:", token_data['access_token'])
         request.session["snapchat_refresh_token"] = token_data.get("refresh_token")
 
         expires_in_seconds = token_data.get("expires_in", 3600)
