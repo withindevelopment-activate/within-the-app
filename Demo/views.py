@@ -13,6 +13,8 @@ from django.core.files.storage import FileSystemStorage
 from io import BytesIO
 import logging
 import http.client
+from supabase import create_client, Client
+import os
 
 # Supabase & Supporting imports
 from .supabase_functions import batch_insert_to_supabase, get_next_id_from_supabase_compatible_all, get_tracking_df, build_customer_dictionary, attribute_purchases_to_campaigns
@@ -1573,3 +1575,91 @@ def meta_get_ad_accounts(request):
         return HttpResponse(f"Your Ad Accounts: {data}")
     except requests.RequestException as e:
         return HttpResponse(f"Failed to fetch ad accounts: {e}", status=500)
+
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++==
+#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# VIEWING THE PRICE MONITOR UPON PRODUCT PRICE UPDATE AND THEIR ORDER COUNTS
+url: str = os.environ.get('SUPABASE_URL')
+key: str = os.environ.get('SUPABASE_KEY')
+
+supabase: Client = create_client(url, key)
+
+def view_price_monitor(request):
+    """
+    Reads the Price_Change_Monitor table from Supabase,
+    unpacks Order_Count_History and Price_Updates JSON fields,
+    and sends a clean, flat list to the HTML template.
+    """
+    try:
+        # --- Fetch table data
+        res = supabase.table("Price_Change_Monitor").select("*").execute()
+        data = res.data or []
+
+        clean_rows = []
+        for record in data:
+            sku = record.get("SKU")
+            product_name = record.get("Product_Name")
+            is_variant = record.get("Is_Variant")
+            current_price = record.get("Current_Price")
+            product_id = record.get("Product_ID")
+            last_updated = record.get("Last_Updated")
+
+            # Parse JSON fields safely
+            order_history = record.get("Order_Count_History")
+            price_updates = record.get("Price_Updates")
+
+            if isinstance(order_history, str):
+                order_history = json.loads(order_history or "{}")
+            if isinstance(price_updates, str):
+                price_updates = json.loads(price_updates or "{}")
+
+            # Get latest order count entry (highest key)
+            latest_update_key = None
+            latest_order_count = None
+            latest_date = None
+
+            if order_history:
+                try:
+                    latest_update_key = max(order_history.keys(), key=int)
+                    latest_order_entry = order_history[latest_update_key]
+                    latest_order_count = latest_order_entry.get("orders_after_update")
+                    latest_date = latest_order_entry.get("date")
+                except Exception:
+                    pass
+
+            # Get new/old price info if available
+            new_price = None
+            old_price = None
+            if price_updates and sku in price_updates:
+                try:
+                    latest_price_key = max(price_updates[sku].keys(), key=int)
+                    price_entry = price_updates[sku][latest_price_key]
+                    new_price = price_entry.get("new_price")
+                    old_price = price_entry.get("old_price")
+                except Exception:
+                    pass
+
+            clean_rows.append({
+                "SKU": sku,
+                "Product_Name": product_name,
+                "Is_Variant": is_variant,
+                "Product_ID": product_id,
+                "Old_Price": old_price,
+                "New_Price": new_price,
+                "Current_Price": current_price,
+                "Last_Update_Date": latest_date,
+                "Orders_After_Update": latest_order_count,
+                "Last_Updated": last_updated,
+            })
+
+        # Sort by most recent date
+        clean_rows.sort(key=lambda x: (x["Last_Update_Date"] or ""), reverse=True)
+
+        return render(request, "Demo/price_monitor_view.html", {"records": clean_rows})
+
+    except Exception as e:
+        print(f"[ERROR] view_price_monitor: {e}")
+        import traceback
+        traceback.print_exc()
+        return render(request, "Demo/price_monitor_view.html", {"records": []})
+

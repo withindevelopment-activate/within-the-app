@@ -42,5 +42,6 @@ urlpatterns = [
     path("oauth/tiktok/refresh/", views.tiktok_refresh_token, name="tiktok_refresh"),
     path("tiktok/campaigns/", views.tiktok_campaigns, name="tiktok_campaigns"),
 
+    path("price-monitor/", views.view_price_monitor, name="price_monitor")
     # path("campaigns/overview/", views.campaigns_overview, name="campaigns_overview"),
 ]
