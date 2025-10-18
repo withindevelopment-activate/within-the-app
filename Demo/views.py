@@ -1094,7 +1094,378 @@ def product_update(request):
         print(f"Error in product_update: {e}")
         return JsonResponse({"error": "Invalid payload"}, status=400)
 
+################################################################################################
+######################################## SNAPCHAT's API ----
+def snapchat_login(request):
+    """
+    Initiates the Snapchat Marketing API OAuth 2.0 flow by creating a unique state
+    and storing it in the user's session.
+    """
+    # Generate a unique state to prevent CSRF attacks.
+    state = str(uuid.uuid4())
+    print(f"Generated OAuth state: {state}")
+    # Store the state in the Django session. It's automatically saved
+    # and tied to the user's browser session.
+    request.session['snapchat_oauth_state'] = state
+    
+    # Construct the authorization URL
+    auth_url = 'https://accounts.snapchat.com/login/oauth2/authorize'
+    params = {
+        'response_type': 'code',
+        'client_id': settings.SNAPCHAT_CLIENT_ID,
+        'redirect_uri': settings.SNAPCHAT_REDIRECT_URI,
+        'scope': settings.SNAPCHAT_OAUTH_SCOPE,
+        'state': state
+    }
+    
+    auth_request_url = requests.Request('GET', auth_url, params=params).prepare().url
+    print(f"Redirecting to Snapchat OAuth URL: {auth_request_url}")
+    return redirect(auth_request_url)
 
+def snapchat_callback(request):
+    """
+    Handles the redirect from Snapchat, validates the state, and exchanges
+    the authorization code for an access token.
+    """
+    code = request.GET.get('code')
+    state_from_snapchat = request.GET.get('state')
+
+    # 1. Retrieve the state from the session.
+    state_from_session = request.session.get('snapchat_oauth_state')
+
+    # 2. Validate the state to prevent CSRF attacks.
+    if not state_from_session or state_from_snapchat != state_from_session:
+        return HttpResponse('State mismatch: Potential CSRF attack.', status=400)
+
+    # Delete the state from the session after successful validation.
+    del request.session['snapchat_oauth_state']
+
+    # 3. Exchange the authorization code for an access token
+    cfg = settings.OAUTH_PROVIDERS["snapchat"]
+    token_url = cfg["token_url"]
+
+    data = {
+        "grant_type": "authorization_code",
+        "code": code,
+        'client_id': settings.SNAPCHAT_CLIENT_ID,
+        "client_secret": settings.SNAPCHAT_CLIENT_SECRET,
+        "redirect_uri": settings.SNAPCHAT_REDIRECT_URI,
+    }
+
+    try:
+        response = requests.post(token_url, data=data)
+        response.raise_for_status()
+        token_data = response.json()
+
+        # 4. Store the tokens securely in the session.
+        request.session["snapchat_access_token"] = token_data["access_token"]
+        request.session["snapchat_refresh_token"] = token_data.get("refresh_token")
+
+        expires_in_seconds = token_data.get("expires_in", 3600)
+        expiry_datetime = datetime.now() + timedelta(seconds=expires_in_seconds)
+        request.session["snapchat_token_expires_at"] = expiry_datetime.isoformat()
+
+        # 5. Redirect the user to the campaigns overview page.
+        return redirect("Demo:campaigns_overview")
+
+    except requests.RequestException as e:
+        return HttpResponse(f"Failed to get access token: {e}", status=500)
+
+def refresh_snapchat_token(request):
+    """
+    Refreshes the Snapchat access token using the refresh token.
+    """
+    refresh_token = request.session.get("snapchat_refresh_token")
+    if not refresh_token:
+        return None
+
+    cfg = settings.OAUTH_PROVIDERS["snapchat"]
+    data = {
+        "grant_type": "refresh_token",
+        "refresh_token": refresh_token,
+        "client_id": settings.SNAPCHAT_CLIENT_ID,
+        "client_secret": settings.SNAPCHAT_CLIENT_SECRET,
+    }
+
+    try:
+        resp = requests.post(cfg["token_url"], data=data)
+        resp.raise_for_status()
+        token_data = resp.json()
+
+        # Update session with new tokens
+        request.session["snapchat_access_token"] = token_data["access_token"]
+        request.session["snapchat_refresh_token"] = token_data.get("refresh_token", refresh_token)
+
+        expires_in = token_data.get("expires_in", 3600)
+        expiry_datetime = datetime.now() + timedelta(seconds=expires_in)
+        request.session["snapchat_token_expires_at"] = expiry_datetime.isoformat()
+
+        return token_data["access_token"]
+    except requests.RequestException as e:
+        print(f"Token refresh failed: {e}")
+        return None
+    
+from dateutil import parser
+
+def snapchat_api_call(request, endpoint, params=None):
+    """
+    Helper function to make an authenticated API call, handling token refresh.
+    """
+    access_token = request.session.get('snapchat_access_token')
+
+    # Parse expiry from ISO string
+    expires_at_str = request.session.get("snapchat_token_expires_at")
+    expires_at = parser.isoparse(expires_at_str) if expires_at_str else None
+
+    if not access_token or (expires_at and datetime.now() > expires_at - timedelta(minutes=5)):
+        access_token = refresh_snapchat_token(request)
+        if not access_token:
+            return None
+
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Content-Type': 'application/json',
+    }
+    
+    url = f'https://adsapi.snapchat.com/v1/{endpoint}'
+    
+    try:
+        response = requests.get(url, headers=headers, params=params)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"API request failed to {endpoint}: {e}")
+        return None
+
+def campaigns_overview(request):
+    status = request.GET.get("status") or "ACTIVE"   # default = ACTIVE
+    from_date = request.GET.get("from")  # yyyy-mm-dd
+    to_date = request.GET.get("to") 
+    ZeroSpent = request.GET.get("ZeroSpent")
+    access_token = request.session.get('snapchat_access_token')
+
+    tz_offset_minutes = int(request.GET.get("tz_offset", 0))  # in minutes
+
+    from_dt = datetime.strptime(from_date, "%Y-%m-%d") if from_date else datetime.now() - timedelta(days=8)
+    to_dt = datetime.strptime(to_date, "%Y-%m-%d") if to_date else (datetime.now())
+
+    # Adjust start/end for user's timezone
+    from_dt = from_dt.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(minutes=tz_offset_minutes)
+    to_dt = to_dt.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(minutes=tz_offset_minutes)
+
+    if from_dt > to_dt:
+        from_dt, to_dt = to_dt, from_dt
+
+    # Attach timezone offset instead of Z
+    start_time = from_dt.isoformat(timespec="milliseconds") + 'Z'
+    end_time = to_dt.isoformat(timespec="milliseconds") + 'Z'
+
+    
+
+    if not access_token:
+        return redirect('Demo:snapchat_login')
+    
+    params = {
+        "fields": "impressions,spend,conversion_purchases,conversion_purchases_value",
+        "granularity": "TOTAL",
+        "start_time": start_time,
+        "end_time": end_time,
+    }
+
+    # Step 1: Get org & ad account
+    orgs = snapchat_api_call(request, "me/organizations")
+    if not orgs or not orgs.get("organizations"):
+        return HttpResponse("No organizations found", status=404)
+    organization_id = orgs["organizations"][0]["organization"]["id"]
+
+    accounts = snapchat_api_call(request, f"organizations/{organization_id}/adaccounts")
+    if not accounts or not accounts.get("adaccounts"):
+        return HttpResponse("No ad accounts found", status=404)
+    ad_account_id = accounts["adaccounts"][0]["adaccount"]["id"]
+
+    # Step 2: Get campaigns
+    campaigns_data = snapchat_api_call(request, f"adaccounts/{ad_account_id}/campaigns")
+    raw_campaigns = campaigns_data.get("campaigns", [])
+    processed_campaigns, total_spend, total_revenue = [], 0, 0
+
+
+    if status and status != "all":
+        raw_campaigns = [
+            c for c in raw_campaigns
+            if c["campaign"]["status"] == status
+        ]
+    else:
+        raw_campaigns = campaigns_data.get("campaigns", [])
+    
+    # Step 3: Loop per campaign for stats
+    for c in raw_campaigns:
+        campaign = c["campaign"]
+        stats_resp = snapchat_api_call(request, f"campaigns/{campaign['id']}/stats", params=params)
+        print("Stats response:", stats_resp)
+        adsquads_data = snapchat_api_call(request, f"campaigns/{campaign['id']}/adsquads")
+        adsquads_raw = adsquads_data.get("adsquads", [])
+        daily_budget = 0
+        if adsquads_raw:
+            for adsquad in adsquads_raw:
+                daily_budget += adsquad["adsquad"].get("daily_budget_micro", 0) / 1_000_000.0
+
+        # print("adsquads_data -----------",adsquads_data)
+        # print("stats_resp -----------",stats_resp)
+        stats = {}
+        if stats_resp and "total_stats" in stats_resp:
+            stats = stats_resp["total_stats"][0]["total_stat"].get("stats", {})
+
+        spend = stats.get("spend", 0) / 1_000_000.0
+        purchases = stats.get("conversion_purchases", 0)
+        revenue = stats.get("conversion_purchases_value", 0) / 1_000_000.0
+        roas = (revenue / spend) if spend > 0 else 0
+
+        total_spend += spend
+        total_revenue += revenue
+
+        if ZeroSpent and int(spend) > 0:
+            processed_campaigns.append({
+                "id": campaign["id"],
+                "name": campaign["name"],
+                "status": campaign["status"],
+                "spend": spend,
+                "daily_budget": daily_budget,
+                "impressions": stats.get("impressions", 0),
+                "purchases": purchases,
+                "revenue": revenue,
+                "roas": roas,
+                "start_time": campaign["start_time"],
+            })
+
+        elif not ZeroSpent:
+            processed_campaigns.append({
+                "id": campaign["id"],
+                "name": campaign["name"],
+                "status": campaign["status"],
+                "spend": spend,
+                "daily_budget": daily_budget,
+                "impressions": stats.get("impressions", 0),
+                "purchases": purchases,
+                "revenue": revenue,
+                "roas": roas,
+                "start_time": campaign["start_time"],
+            })
+
+    # Step 4: Summary
+    total_campaigns = len(processed_campaigns)
+    avg_spend = total_spend / total_campaigns if total_campaigns else 0
+    avg_roas = total_revenue / total_spend if total_spend > 0 else 0
+
+    return render(request, "Demo/campaigns_overview.html", {
+        "campaigns": processed_campaigns,
+        "total_campaigns": total_campaigns,
+        "total_spend": total_spend,
+        "total_revenue": total_revenue,
+        "avg_spend": avg_spend,
+        "avg_roas": avg_roas,
+        "from_date": from_dt.strftime("%Y-%m-%d"),
+        "to_date": to_dt.strftime("%Y-%m-%d"),
+        "ZeroSpent": ZeroSpent,
+    })
+
+################################################################################################
+######################################## TIKTOK's API ----
+
+# TikTok API constants
+CLIENT_KEY = settings.TIKTOK_CLIENT_KEY
+CLIENT_SECRET = settings.TIKTOK_CLIENT_SECRET
+REDIRECT_URI = settings.TIKTOK_REDIRECT_URI   
+
+AUTH_BASE = "https://business-api.tiktokglobalshop.com/open_api/v1.3"  # Marketing API base
+OAUTH_URL = "https://business-api.tiktokglobalshop.com/oauth"
+TOKEN_URL = "https://business-api.tiktokglobalshop.com/oauth2/access_token/"
+
+# --- LOGIN VIEW ---
+def tiktok_login(request):
+    auth_url = (
+        f"{OAUTH_URL}/authorize?"
+        f"app_id={settings.TIKTOK_CLIENT_KEY}"
+        f"&redirect_uri={settings.TIKTOK_REDIRECT_URI}"
+        f"&state=xyz123"
+        f"&scope={settings.TIKTOK_OAUTH_SCOPE}"   # add required scopes
+    )
+    return redirect(auth_url)
+
+# --- CALLBACK VIEW ---
+def tiktok_callback(request):
+    code = request.GET.get("auth_code")
+    if not code:
+        return HttpResponse("No auth_code returned", status=400)
+
+    data = {
+        "app_id": settings.TIKTOK_CLIENT_KEY,
+        "secret": settings.TIKTOK_CLIENT_SECRET,
+        "auth_code": code,
+    }
+    resp = requests.post(TOKEN_URL, data=data)
+    tokens = resp.json()
+
+    if "data" not in tokens:
+        return JsonResponse(tokens, status=400)
+
+    # Save tokens in session or DB
+    request.session["tiktok_access_token"] = tokens["data"]["access_token"]
+    request.session["tiktok_refresh_token"] = tokens["data"]["refresh_token"]
+    request.session["tiktok_token_expiry"] = (
+        datetime.datetime.utcnow()
+        + datetime.timedelta(seconds=tokens["data"]["expires_in"])
+    ).isoformat()
+
+    return redirect("tiktok_campaigns")
+
+# --- REFRESH TOKEN ---
+def tiktok_refresh_token(request):
+    refresh_token = request.session.get("tiktok_refresh_token")
+    if not refresh_token:
+        return HttpResponse("No refresh token", status=400)
+
+    data = {
+        "app_id": settings.TIKTOK_CLIENT_KEY,
+        "secret": settings.TIKTOK_CLIENT_SECRET,
+        "grant_type": "refresh_token",
+        "refresh_token": refresh_token,
+    }
+    resp = requests.post(TOKEN_URL, data=data)
+    tokens = resp.json()
+
+    if "data" not in tokens:
+        return JsonResponse(tokens, status=400)
+
+    request.session["tiktok_access_token"] = tokens["data"]["access_token"]
+    request.session["tiktok_refresh_token"] = tokens["data"]["refresh_token"]
+    request.session["tiktok_token_expiry"] = (
+        datetime.datetime.utcnow()
+        + datetime.timedelta(seconds=tokens["data"]["expires_in"])
+    ).isoformat()
+
+    return JsonResponse({"status": "refreshed"})
+
+# --- FETCH CAMPAIGNS ---
+def tiktok_campaigns(request):
+    access_token = request.session.get("tiktok_access_token")
+    if not access_token:
+        return redirect("tiktok_login")
+
+    # You need advertiser_id (from your TikTok Ads Manager account)
+    advertiser_id = settings.TIKTOK_ADVERTISER_ID
+
+    url = f"{AUTH_BASE}/campaign/get/"
+    params = {
+        "advertiser_id": advertiser_id,
+        "page_size": 10,
+        "page": 1,
+    }
+    headers = {"Access-Token": access_token}
+    resp = requests.get(url, headers=headers, params=params)
+    data = resp.json()
+
+    # Render campaigns in a template
+    return render(request, "tiktok/campaigns.html", {"campaigns": data})
 ################################################################################################
 ######################################## META's API ----
 

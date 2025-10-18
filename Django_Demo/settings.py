@@ -170,6 +170,13 @@ TARGET_URL_PRODUCT_HOOK = 'https://testing-within.onrender.com/zid-webhook/produ
 ZID_WEBHOOK_ENDPOINT = "/v1/managers/webhooks"
 ZID_API_HOST = "api.zid.sa"
 
+## Webhooks
+'''TARGET_URL_PRODUCT_HOOK = 'https://translation-sc.onrender.com/product-update'
+TARGET_URL_ORDER_HOOK = 'https://translation-sc.onrender.com/order-update'
+ZID_WEBHOOK_ENDPOINT = "/v1/managers/webhooks"
+ZID_API_HOST = "api.zid.sa"'''
+
+
 # Sessions
 SESSION_COOKIE_AGE = 3600  # 1 hour
 SESSION_SAVE_EVERY_REQUEST = True
@@ -186,5 +193,36 @@ OAUTH_PROVIDERS = {
         "token_url": "https://graph.facebook.com/v21.0/oauth/access_token",
         "long_lived_token_url": "https://graph.facebook.com/v21.0/oauth/access_token",
         "graph_api_base": "https://graph.facebook.com/v21.0"
+    },
+     "tiktok": {
+        "client_id": "...",
+        "client_secret": "...",
+        "redirect_uri": "https://yourapp.com/oauth/tiktok/callback/",
+        "auth_url": "https://www.tiktok.com/v2/auth/authorize/",
+        "token_url": "https://open.tiktokapis.com/v2/oauth/token/",
+        "scope": "user.info.basic,video.list",
+    },
+    "snapchat": {
+        "client_id": "b9312a42-dc70-4dde-9cce-515e4dd3bcb2",
+        "client_secret": "760a09521ee7ed47e84d",
+        "redirect_uri": "https://testing-within.onrender.com/oauth/snapchat/callback",
+        "auth_url": "https://accounts.snapchat.com/login/oauth2/authorize",
+        "token_url": "https://accounts.snapchat.com/login/oauth2/access_token",
+        "scope": "snapchat-profile-api snapchat-marketing-api snapchat-offline-conversions-api"
     }
+
 }
+
+SNAPCHAT_CLIENT_ID = "ff633b59-bba4-4661-9f22-5178e6f1529a"
+SNAPCHAT_CLIENT_SECRET = "21b8b156f26731290105"
+SNAPCHAT_REDIRECT_URI = "https://testing-within.onrender.com/oauth/snapchat/callback"
+SNAPCHAT_OAUTH_SCOPE = "snapchat-profile-api snapchat-marketing-api snapchat-offline-conversions-api"
+
+# SNAPCHAT_CLIENT_ID = "4f9c1908-b9ec-4440-a5c4-9b038fcb95b4"
+# SNAPCHAT_CLIENT_SECRET = "HNFS0DJwUtGiJKhfI2eKY_JxkhEo-ic0vGeDjLal1UM"
+
+TIKTOK_CLIENT_KEY = "your-app-id"
+TIKTOK_CLIENT_SECRET = "your-app-secret"
+TIKTOK_REDIRECT_URI = "https://testing-within.onrender.com/oauth/tiktok/callback/"
+TIKTOK_ADVERTISER_ID = "your-advertiser-id"
+TIKTOK_OAUTH_SCOPE = "user.info.basic,video.list,video.upload,ad.account,ad.campaign,ad.adgroup,ad.ad,report.campaign,report.adgroup,report.ad"
