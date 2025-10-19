@@ -1483,8 +1483,6 @@ def tiktok_callback(request):
     }
 
     resp = requests.post(TOKEN_URL, json=data, headers={"Content-Type": "application/json"}, timeout=10)
-    print("Token response:", resp.text)
-
     tokens = resp.json()
     print("Parsed tokens:", tokens)
 
