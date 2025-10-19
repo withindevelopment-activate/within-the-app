@@ -1,0 +1,141 @@
+{% extends "Demo/base.html" %}
+
+{% block title %} Campaigns Overview {% endblock title %}
+
+{% block content %}
+<div class="container py-4">
+  <h2 class="mb-4">Campaigns Overview</h2>
+  <div class="mb-3 mt-3">
+    <a href="{% url 'Demo:select_org' %}" class="btn btn-secondary btn-sm">Change Advertiser</a>
+  </div>
+
+  <div class="row text-center mb-4">
+    <div class="col-md-4">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">Total Revenue</h5>
+          <h3>{{ total_revenue|floatformat:2 }}$</h3>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">Total Spent</h5>
+          <h3>{{ total_spend|floatformat:2 }}$</h3>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">Average ROAS</h5>
+          <h3>{{ avg_roas|floatformat:2 }}</h3>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="d-flex justify-content-end mb-3">
+    <a href="{% url 'Demo:create_campaign' %}" class="btn btn-success">
+      + Create Campaign
+    </a>
+  </div>
+
+  <form method="get" class="mb-4 row">
+    <div class="col-md-3 mb-3">
+      <select class="form-select" name="status">
+        <option value="all">All</option>
+        <option value="ACTIVE" {% if request.GET.status == "ACTIVE" %}selected{% endif %}>Active</option>
+        <option value="PAUSED" {% if request.GET.status == "PAUSED" %}selected{% endif %}>Paused</option>
+        <option value="DRAFT" {% if request.GET.status == "DRAFT" %}selected{% endif %}>Draft</option>
+        <option value="PENDING_REVIEW" {% if request.GET.status == "PENDING_REVIEW" %}selected{% endif %}>Pending Review</option>
+        <option value="COMPLETED" {% if request.GET.status == "COMPLETED" %}selected{% endif %}>Completed</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <select class="form-select" name="ZeroSpent">
+        <option value="">----</option>
+        <option value="ZeroSpent" {% if request.GET.ZeroSpent == "ZeroSpent" %}selected{% endif %}>Amount Spent > 0</option>
+        <!-- <option value="PAUSED">Paused</option>
+        <option value="DRAFT">Draft</option> -->
+      </select>
+    </div>
+    <div class="col-md-3">
+      <input type="date" class="form-control" name="from" value="{{ request.GET.from }}">
+    </div>
+    <div class="col-md-3">
+      <input type="date" class="form-control" name="to" value="{{ request.GET.to }}">
+    </div>
+    <div class="col-md-3">
+      <button class="btn btn-primary w-100">Apply</button>
+    </div>
+    <input type="hidden" id="tz_offset" name="tz_offset">
+  </form>
+
+  <div class="data-wrap">
+    <div class="data-viewport">
+      <div class="data-scroller" role="region" aria-label="Scrollable data table" tabindex="0">
+        <table class="data-table" role="table" aria-label="Analytics dataset">
+          <thead>
+            <tr>
+              <th class="sticky-col">ID</th>
+              <th>Name</th>
+              <th>Status</th>
+              <th>Spent ($)</th>
+              <th>Impressions</th>
+              <th>Daily Budget ($)</th>
+              <th>Conversions</th>
+              <th>Conversion Value ($)</th>
+              <th>ROAS</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for campaign in campaigns %}
+            <tr>
+              <td class="sticky-col">{{ campaign.id }}</td>
+              <td>{{ campaign.name }}</td>
+              <td>{{ campaign.status }}</td>
+              <td>${{ campaign.spend|floatformat:2 }}</td>
+              <td>{{ campaign.impressions|default:"N/A" }}</td>
+              <td>${{ campaign.daily_budget|floatformat:2 }}</td>
+              <td>{{ campaign.purchases|default:"N/A" }}</td>
+              <td>${{ campaign.revenue|floatformat:2|default:"N/A" }}</td>
+              <td>{{ campaign.roas|floatformat:2|default:"N/A" }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="7" class="text-center text-muted">No campaigns found.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="row mt-5">
+    <div class="col-md-6">
+      <canvas id="spendByDay"></canvas>
+    </div>
+    <div class="col-md-6">
+      <canvas id="spendByStatus"></canvas>
+    </div>
+  </div>
+</div>
+
+<script>
+  // On page load, set the timezone offset in minutes
+  document.addEventListener("DOMContentLoaded", function() {
+    const tzOffsetInput = document.getElementById("tz_offset");
+    tzOffsetInput.value = new Date().getTimezoneOffset(); 
+    // getTimezoneOffset() returns minutes offset from UTC (negative if ahead of UTC)
+  });
+
+  // Optional: Update tz_offset before submitting in case user changes date inputs dynamically
+  const form = document.getElementById("campaignFilterForm");
+  form.addEventListener("submit", function() {
+    document.getElementById("tz_offset").value = new Date().getTimezoneOffset();
+  });
+</script>
+{% endblock %}

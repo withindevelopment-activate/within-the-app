@@ -1,0 +1,18 @@
+{% extends "Demo/base.html" %}
+{% block content %}
+<div class="container py-4">
+  <h2 class="mb-3">Select Snapchat Ad Account</h2>
+  <form method="post">
+    {% csrf_token %}
+    <div class="list-group">
+      {% for acc in ad_accounts %}
+        <label class="list-group-item">
+          <input type="radio" name="ad_account_id" value="{{ acc.id }}" required>
+          {{ acc.name }} ({{ acc.id }})
+        </label>
+      {% endfor %}
+    </div>
+    <button type="submit" class="btn btn-primary mt-3">Continue</button>
+  </form>
+</div>
+{% endblock %}

@@ -187,42 +187,12 @@ META_APP_SECRET = "4bdfbeccf61ccd2ef92c47eff6ea306c"
 META_REDIRECT_URI = "https://testing-within.onrender.com/meta/callback/"  # must match in Meta dev settings
 META_OAUTH_SCOPE = "ads_management,ads_read,business_management,pages_show_list"  # adjust as needed
 
-OAUTH_PROVIDERS = {
-    "meta": {
-        "auth_url": "https://www.facebook.com/v21.0/dialog/oauth",
-        "token_url": "https://graph.facebook.com/v21.0/oauth/access_token",
-        "long_lived_token_url": "https://graph.facebook.com/v21.0/oauth/access_token",
-        "graph_api_base": "https://graph.facebook.com/v21.0"
-    },
-     "tiktok": {
-        "client_id": "...",
-        "client_secret": "...",
-        "redirect_uri": "https://yourapp.com/oauth/tiktok/callback/",
-        "auth_url": "https://www.tiktok.com/v2/auth/authorize/",
-        "token_url": "https://open.tiktokapis.com/v2/oauth/token/",
-        "scope": "user.info.basic,video.list",
-    },
-    "snapchat": {
-        "client_id": "b9312a42-dc70-4dde-9cce-515e4dd3bcb2",
-        "client_secret": "760a09521ee7ed47e84d",
-        "redirect_uri": "https://testing-within.onrender.com/oauth/snapchat/callback",
-        "auth_url": "https://accounts.snapchat.com/login/oauth2/authorize",
-        "token_url": "https://accounts.snapchat.com/login/oauth2/access_token",
-        "scope": "snapchat-profile-api snapchat-marketing-api snapchat-offline-conversions-api"
-    }
-
-}
+TIKTOK_CLIENT_KEY = "7551247511634051088"
+TIKTOK_CLIENT_SECRET = "fef07eae0ea6ed64c02baa5c33f2d3a653877746"
+TIKTOK_REDIRECT_URI = "https://testing-within.onrender.com/oauth/tiktok/callback/"
+TIKTOK_OAUTH_SCOPE = "user.info.basic,video.list,video.upload,ad.account,ad.campaign,ad.adgroup,ad.ad,report.campaign,report.adgroup,report.ad"
 
 SNAPCHAT_CLIENT_ID = "ff633b59-bba4-4661-9f22-5178e6f1529a"
 SNAPCHAT_CLIENT_SECRET = "21b8b156f26731290105"
 SNAPCHAT_REDIRECT_URI = "https://testing-within.onrender.com/oauth/snapchat/callback"
 SNAPCHAT_OAUTH_SCOPE = "snapchat-profile-api snapchat-marketing-api snapchat-offline-conversions-api"
-
-# SNAPCHAT_CLIENT_ID = "4f9c1908-b9ec-4440-a5c4-9b038fcb95b4"
-# SNAPCHAT_CLIENT_SECRET = "HNFS0DJwUtGiJKhfI2eKY_JxkhEo-ic0vGeDjLal1UM"
-
-TIKTOK_CLIENT_KEY = "your-app-id"
-TIKTOK_CLIENT_SECRET = "your-app-secret"
-TIKTOK_REDIRECT_URI = "https://testing-within.onrender.com/oauth/tiktok/callback/"
-TIKTOK_ADVERTISER_ID = "your-advertiser-id"
-TIKTOK_OAUTH_SCOPE = "user.info.basic,video.list,video.upload,ad.account,ad.campaign,ad.adgroup,ad.ad,report.campaign,report.adgroup,report.ad"

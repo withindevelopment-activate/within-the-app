@@ -35,12 +35,16 @@ urlpatterns = [
 
     path('oauth/snapchat/login/', views.snapchat_login, name='snapchat_login'),
     path('oauth/snapchat/callback/', views.snapchat_callback, name='snapchat_callback'),
+    path("snapchat/select-org/", views.select_organization, name="select_org"),
+    path("snapchat/select-account/<str:org_id>/", views.select_ad_account, name="select_account"),
     path('snapchat/campaigns/', views.campaigns_overview, name='campaigns_overview'),
 
     path("oauth/tiktok/login/", views.tiktok_login, name="tiktok_login"),
     path("oauth/tiktok/callback/", views.tiktok_callback, name="tiktok_callback"),
-    path("oauth/tiktok/refresh/", views.tiktok_refresh_token, name="tiktok_refresh"),
     path("tiktok/campaigns/", views.tiktok_campaigns, name="tiktok_campaigns"),
+    path("tiktok/select-advertiser/<str:advertiser_id>/", views.tiktok_select_advertiser, name="tiktok_select_advertiser"),
+    path("tiktok/select-advertiser/", views.tiktok_select_advertiser, name="tiktok_select_advertiser"),
+
 
     path("price-monitor/", views.view_price_monitor, name="price_monitor")
     # path("campaigns/overview/", views.campaigns_overview, name="campaigns_overview"),

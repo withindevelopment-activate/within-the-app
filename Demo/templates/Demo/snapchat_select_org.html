@@ -1,0 +1,18 @@
+{% extends "Demo/base.html" %}
+{% block content %}
+<div class="container py-4">
+  <h2 class="mb-3">Select Snapchat Organization</h2>
+  <form method="post">
+    {% csrf_token %}
+    <div class="list-group">
+      {% for org in organizations %}
+        <label class="list-group-item">
+          <input type="radio" name="organization_id" value="{{ org.id }}" required>
+          {{ org.name }} ({{ org.id }})
+        </label>
+      {% endfor %}
+    </div>
+    <button type="submit" class="btn btn-primary mt-3">Next</button>
+  </form>
+</div>
+{% endblock %}

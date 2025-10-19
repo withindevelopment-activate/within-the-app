@@ -307,12 +307,12 @@ def get_tracking_df():
     if "Visited_at" in df.columns:
         df["Visited_at"] = pd.to_datetime(df["Visited_at"], errors="coerce")
     return df
-
 def build_customer_dictionary(df: pd.DataFrame) -> dict:
     """
-    Lightweight version:
-    - Tracks add_to_cart count, purchase count, campaigns used per customer
-    - Includes latest known customer name if available
+    Build a dictionary of customers:
+    - Tracks add_to_cart, purchase, and campaigns used
+    - Includes latest customer name
+    - Includes all events from any of their visitor IDs
     """
     if df.empty:
         return {}
@@ -320,7 +320,7 @@ def build_customer_dictionary(df: pd.DataFrame) -> dict:
     df = df.copy()
 
     # Normalize columns
-    for col in ["Customer_ID", "Customer_Email", "Customer_Mobile", "Customer_Name"]:
+    for col in ["Customer_ID", "Customer_Email", "Customer_Mobile", "Customer_Name", "Visitor_ID"]:
         df[col] = df.get(col, "").fillna("").astype(str).str.strip()
 
     df["UTM_Campaign"] = (
@@ -360,39 +360,40 @@ def build_customer_dictionary(df: pd.DataFrame) -> dict:
     df["customer_key"] = df.apply(get_customer_key, axis=1)
     df = df[df["customer_key"].notna()]
 
-    # Filter only relevant events for stats
-    filtered_df = df[df["Event_Type"].isin(["add_to_cart", "purchase"])]
-
-    # Stats aggregation (add_to_cart, purchases, campaigns)
-    customer_stats = (
-        filtered_df.groupby("customer_key")
-        .agg(
-            add_to_cart=pd.NamedAgg(column="Event_Type", aggfunc=lambda x: (x == "add_to_cart").sum()),
-            purchases=pd.NamedAgg(column="Event_Type", aggfunc=lambda x: (x == "purchase").sum()),
-            campaigns=pd.NamedAgg(column="UTM_Campaign", aggfunc=lambda x: list(set(x) - {""}))
-        )
-        .reset_index()
-    )
-
-    # Extract latest customer name for each key (based on Visited_at)
-    name_df = (
-        df[df["Customer_Name"] != ""]
-        .sort_values("Visited_at")
-        .groupby("customer_key")
-        .tail(1)[["customer_key", "Customer_Name"]]
-    )
-
-    name_map = dict(zip(name_df["customer_key"], name_df["Customer_Name"]))
-
-    # Build final dictionary
     customer_dict = {}
-    for _, row in customer_stats.iterrows():
-        key = row["customer_key"]
+
+    # First, get visitor IDs for each customer
+    customer_visitors_map = (
+        df.groupby("customer_key")["Visitor_ID"]
+        .apply(lambda x: set([v for v in x if v]))
+        .to_dict()
+    )
+
+    for key, visitor_ids in customer_visitors_map.items():
+        # Filter all rows where customer_key matches OR visitor_id is in this set
+        mask = (df["customer_key"] == key) | (df["Visitor_ID"].isin(visitor_ids))
+        customer_rows = df[mask]
+
+        # Only relevant events
+        stats_rows = customer_rows[customer_rows["Event_Type"].isin(["add_to_cart", "purchase"])]
+
+        # Stats
+        add_to_cart_count = (stats_rows["Event_Type"] == "add_to_cart").sum()
+        purchase_count = (stats_rows["Event_Type"] == "purchase").sum()
+        campaigns = list(set(stats_rows["UTM_Campaign"]) - {""})
+
+        # Latest name
+        name_rows = customer_rows[customer_rows["Customer_Name"] != ""]
+        latest_name = ""
+        if not name_rows.empty:
+            latest_name = name_rows.sort_values("Visited_at").iloc[-1]["Customer_Name"]
+
         customer_dict[key] = {
-            "customer_name": name_map.get(key, ""),  # include name if found
-            "add_to_cart": int(row["add_to_cart"]),
-            "purchases": int(row["purchases"]),
-            "campaigns": row["campaigns"],
+            "customer_name": latest_name,
+            "visitor_ids": visitor_ids,
+            "add_to_cart": int(add_to_cart_count),
+            "purchases": int(purchase_count),
+            "campaigns": campaigns,
         }
 
     return customer_dict

@@ -167,6 +167,7 @@
           <thead>
             <tr>
               <th>Customer Key</th>
+              <th>Visitor IDs</th>
               <th>Name</th>
               <th>Campaigns</th>
               <th>Add to Cart</th>
@@ -177,6 +178,7 @@
             {% for key, c in customer_dict.items %}
             <tr>
               <td>{{ key }}</td>
+              <td>{{ c.visitor_ids|join:", " }}</td>
               <td>{{ c.customer_name }}</td>
               <td>{{ c.campaigns|join:", " }}</td>
               <td>{{ c.add_to_cart }}</td>

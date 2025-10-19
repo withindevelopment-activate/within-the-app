@@ -1093,6 +1093,7 @@ def product_update(request):
 
 ################################################################################################
 ######################################## SNAPCHAT's API ----
+
 def snapchat_login(request):
     """
     Initiates the Snapchat Marketing API OAuth 2.0 flow by creating a unique state
@@ -1100,7 +1101,6 @@ def snapchat_login(request):
     """
     # Generate a unique state to prevent CSRF attacks.
     state = str(uuid.uuid4())
-    print(f"Generated OAuth state: {state}")
     # Store the state in the Django session. It's automatically saved
     # and tied to the user's browser session.
     request.session['snapchat_oauth_state'] = state
@@ -1116,7 +1116,6 @@ def snapchat_login(request):
     }
     
     auth_request_url = requests.Request('GET', auth_url, params=params).prepare().url
-    print(f"Redirecting to Snapchat OAuth URL: {auth_request_url}")
     return redirect(auth_request_url)
 
 def snapchat_callback(request):
@@ -1156,7 +1155,6 @@ def snapchat_callback(request):
 
         # 4. Store the tokens securely in the session.
         request.session["snapchat_access_token"] = token_data["access_token"]
-        print("THE SNAPCHAT ACCESS TOKEN IS:", token_data['access_token'])
         request.session["snapchat_refresh_token"] = token_data.get("refresh_token")
 
         expires_in_seconds = token_data.get("expires_in", 3600)
@@ -1203,11 +1201,16 @@ def refresh_snapchat_token(request):
         print(f"Token refresh failed: {e}")
         return None
     
-def snapchat_api_call(request, endpoint, params=None):
+from dateutil import parser
+
+def snapchat_api_call(request, endpoint, method="GET", params=None, data=None, json_data=None):
     """
-    Helper function to make an authenticated API call, handling token refresh.
+    Generic Snapchat API helper supporting GET, POST, PUT, DELETE
+    - Handles token refresh automatically
+    - params = query string dict
+    - data/json_data = request body
     """
-    access_token = request.session.get('snapchat_access_token')
+    access_token = request.session.get("snapchat_access_token")
 
     # Parse expiry from ISO string
     expires_at_str = request.session.get("snapchat_token_expires_at")
@@ -1219,19 +1222,81 @@ def snapchat_api_call(request, endpoint, params=None):
             return None
 
     headers = {
-        'Authorization': f'Bearer {access_token}',
-        'Content-Type': 'application/json',
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json",
     }
-    
-    url = f'https://adsapi.snapchat.com/v1/{endpoint}'
-    
+
+    url = f"https://adsapi.snapchat.com/v1/{endpoint}"
+
     try:
-        response = requests.get(url, headers=headers, params=params)
+        if method.upper() == "GET":
+            response = requests.get(url, headers=headers, params=params)
+        elif method.upper() == "POST":
+            response = requests.post(url, headers=headers, params=params, json=json_data or data)
+        elif method.upper() == "PUT":
+            response = requests.put(url, headers=headers, params=params, json=json_data or data)
+        elif method.upper() == "DELETE":
+            response = requests.delete(url, headers=headers, params=params)
+        else:
+            raise ValueError(f"Unsupported HTTP method: {method}")
+
         response.raise_for_status()
         return response.json()
+
     except requests.exceptions.RequestException as e:
-        print(f"API request failed to {endpoint}: {e}")
-        return None
+        messages.error(request, f"API request failed to {endpoint}: {e}")
+        try:
+            return response.json()  # return error response if available
+        except:
+            return None
+
+
+def select_organization(request):
+    # Call Snapchat to list organizations
+    orgs_data = snapchat_api_call(request, "me/organizations")
+
+    if not orgs_data or "organizations" not in orgs_data:
+        return HttpResponse("No organizations found", status=404)
+
+    organizations = [
+        {
+            "id": org["organization"]["id"],
+            "name": org["organization"]["name"],
+        }
+        for org in orgs_data["organizations"]
+    ]
+
+    if request.method == "POST":
+        selected_org = request.POST.get("organization_id")
+        if selected_org:
+            request.session["snap_org_id"] = selected_org
+            return redirect("Demo:select_account", org_id=selected_org)
+
+    return render(request, "Demo/snapchat_select_org.html", {"organizations": organizations})
+
+
+def select_ad_account(request, org_id):
+    # Call Snapchat to list ad accounts for the chosen org
+    accounts_data = snapchat_api_call(request, f"organizations/{org_id}/adaccounts")
+
+    if not accounts_data or "adaccounts" not in accounts_data:
+        return HttpResponse("No ad accounts found", status=404)
+
+    ad_accounts = [
+        {
+            "id": acc["adaccount"]["id"],
+            "name": acc["adaccount"]["name"],
+        }
+        for acc in accounts_data["adaccounts"]
+    ]
+
+    if request.method == "POST":
+        selected_account = request.POST.get("ad_account_id")
+        if selected_account:
+            request.session["snap_ad_account_id"] = selected_account
+            return redirect("Demo:campaigns_overview") 
+
+    return render(request, "Demo/snapchat_select_account.html", {"ad_accounts": ad_accounts})
 
 def campaigns_overview(request):
     status = request.GET.get("status") or "ACTIVE"   # default = ACTIVE
@@ -1269,15 +1334,13 @@ def campaigns_overview(request):
     }
 
     # Step 1: Get org & ad account
-    orgs = snapchat_api_call(request, "me/organizations")
-    if not orgs or not orgs.get("organizations"):
-        return HttpResponse("No organizations found", status=404)
-    organization_id = orgs["organizations"][0]["organization"]["id"]
+    organization_id = request.session.get("snap_org_id")
+    if not organization_id:
+        return redirect("Demo:select_org")
 
-    accounts = snapchat_api_call(request, f"organizations/{organization_id}/adaccounts")
-    if not accounts or not accounts.get("adaccounts"):
-        return HttpResponse("No ad accounts found", status=404)
-    ad_account_id = accounts["adaccounts"][0]["adaccount"]["id"]
+    ad_account_id = request.session.get("snap_ad_account_id")
+    if not ad_account_id:
+        return redirect("Demo:select_account", org_id=organization_id)
 
     # Step 2: Get campaigns
     campaigns_data = snapchat_api_call(request, f"adaccounts/{ad_account_id}/campaigns")
@@ -1368,28 +1431,49 @@ def campaigns_overview(request):
 ######################################## TIKTOK's API ----
 
 # TikTok API constants
-CLIENT_KEY = settings.TIKTOK_CLIENT_KEY
-CLIENT_SECRET = settings.TIKTOK_CLIENT_SECRET
-REDIRECT_URI = settings.TIKTOK_REDIRECT_URI   
-
-AUTH_BASE = "https://business-api.tiktokglobalshop.com/open_api/v1.3"  # Marketing API base
-OAUTH_URL = "https://business-api.tiktokglobalshop.com/oauth"
-TOKEN_URL = "https://business-api.tiktokglobalshop.com/oauth2/access_token/"
+API_BASE = "https://business-api.tiktok.com/open_api/v1.3"
+OAUTH_URL = "https://business-api.tiktok.com/portal/auth"
+TOKEN_URL = "https://business-api.tiktok.com/open_api/v1.3/oauth2/access_token/"
 
 # --- LOGIN VIEW ---
 def tiktok_login(request):
+    scope = ",".join([
+        "ad_account",
+        "ad_campaign",
+        "ad_group",
+        "ad",
+        "audience",
+        "report",
+        "measurement",
+        "creative",
+        "app",
+        "pixel",
+        "dpa_catalog",
+        "reach_frequency",
+        "lead",
+        "tiktok_creator_marketplace",
+        "ad_comment",
+        "business_plugin",
+        "automated_rules",
+        "tiktok_account",
+        "onsite_commerce_store",
+        "offline_event",
+    ])
+
     auth_url = (
-        f"{OAUTH_URL}/authorize?"
-        f"app_id={settings.TIKTOK_CLIENT_KEY}"
-        f"&redirect_uri={settings.TIKTOK_REDIRECT_URI}"
+        "https://business-api.tiktok.com/portal/auth"
+        f"?app_id={settings.TIKTOK_CLIENT_KEY}"
         f"&state=xyz123"
-        f"&scope={settings.TIKTOK_OAUTH_SCOPE}"   # add required scopes
+        f"&redirect_uri={settings.TIKTOK_REDIRECT_URI}"
+        f"&scope={scope}"
     )
     return redirect(auth_url)
 
 # --- CALLBACK VIEW ---
 def tiktok_callback(request):
     code = request.GET.get("auth_code")
+    state = request.GET.get("state")
+   
     if not code:
         return HttpResponse("No auth_code returned", status=400)
 
@@ -1397,71 +1481,197 @@ def tiktok_callback(request):
         "app_id": settings.TIKTOK_CLIENT_KEY,
         "secret": settings.TIKTOK_CLIENT_SECRET,
         "auth_code": code,
+        "grant_type": "authorized_code"
     }
-    resp = requests.post(TOKEN_URL, data=data)
+
+    resp = requests.post(TOKEN_URL, json=data, headers={"Content-Type": "application/json"}, timeout=10)
+    print("Token response:", resp.text)
+
     tokens = resp.json()
+    print("Parsed tokens:", tokens)
 
-    if "data" not in tokens:
-        return JsonResponse(tokens, status=400)
+    if not tokens:
+        return redirect("Demo:tiktok_login")
 
-    # Save tokens in session or DB
+    # Always save access_token
     request.session["tiktok_access_token"] = tokens["data"]["access_token"]
-    request.session["tiktok_refresh_token"] = tokens["data"]["refresh_token"]
+
+    # Save advertiser IDs
+    request.session["tiktok_advertiser_ids"] = tokens["data"].get("advertiser_ids", [])
+
+    # Refresh token may not exist
+    if "refresh_token" in tokens["data"]:
+        request.session["tiktok_refresh_token"] = tokens["data"]["refresh_token"]
+
+    # TikTok didn’t return expires_in, so assume default short expiry (e.g. 24h)
+    expiry_seconds = tokens["data"].get("expires_in", 86400)
     request.session["tiktok_token_expiry"] = (
-        datetime.datetime.utcnow()
-        + datetime.timedelta(seconds=tokens["data"]["expires_in"])
+        datetime.now() + timedelta(seconds=expiry_seconds)
     ).isoformat()
 
-    return redirect("tiktok_campaigns")
-
-# --- REFRESH TOKEN ---
-def tiktok_refresh_token(request):
-    refresh_token = request.session.get("tiktok_refresh_token")
-    if not refresh_token:
-        return HttpResponse("No refresh token", status=400)
-
-    data = {
+    # --- Fetch advertiser accounts ---
+    url = f"{API_BASE}/oauth2/advertiser/get/"
+    headers = {"Access-Token": request.session["tiktok_access_token"]}
+    params  = {
         "app_id": settings.TIKTOK_CLIENT_KEY,
         "secret": settings.TIKTOK_CLIENT_SECRET,
-        "grant_type": "refresh_token",
-        "refresh_token": refresh_token,
     }
-    resp = requests.post(TOKEN_URL, data=data)
-    tokens = resp.json()
+    resp = requests.get(url, params=params, headers=headers, timeout=10)
+    advertisers = resp.json()
 
-    if "data" not in tokens:
-        return JsonResponse(tokens, status=400)
+    if "data" not in advertisers or "list" not in advertisers["data"]:
+        return JsonResponse(advertisers, status=400)
 
-    request.session["tiktok_access_token"] = tokens["data"]["access_token"]
-    request.session["tiktok_refresh_token"] = tokens["data"]["refresh_token"]
-    request.session["tiktok_token_expiry"] = (
-        datetime.datetime.utcnow()
-        + datetime.timedelta(seconds=tokens["data"]["expires_in"])
-    ).isoformat()
+    # For demo: auto-pick the first advertiser
+    advertiser_list = advertisers["data"]["list"]
+    if advertiser_list:
+        request.session["tiktok_advertiser_id"] = advertiser_list[0]["advertiser_id"]
 
-    return JsonResponse({"status": "refreshed"})
+    # Or render a selection page for user if multiple accounts
+    if len(advertiser_list) == 1:
+        return redirect("Demo:tiktok_login")
+    return render(request, "Demo/tiktok_select_advertiser.html", {"advertisers": advertiser_list})
+
+# --- SAVE SELECTED ADVERTISER (if multiple) ---
+def tiktok_select_advertiser(request, advertiser_id=None):
+    if not request.session.get("tiktok_access_token"):
+        return redirect("Demo:tiktok_login")
+    
+    # If an advertiser is selected, save it to the session and redirect to campaigns
+    if advertiser_id:
+        request.session["tiktok_advertiser_id"] = advertiser_id
+        return redirect("Demo:tiktok_campaigns")
+    
+    # Fetch the list of advertisers again
+    access_token = request.session["tiktok_access_token"]
+    url = f"{API_BASE}/oauth2/advertiser/get/"
+    headers = {"Access-Token": access_token}
+    params = {
+        "app_id": settings.TIKTOK_CLIENT_KEY,
+        "secret": settings.TIKTOK_CLIENT_SECRET,
+    }
+    resp = requests.get(url, headers=headers, params=params)
+    advertisers = resp.json()
+
+    if "data" not in advertisers or "list" not in advertisers["data"]:
+        return JsonResponse(advertisers, status=400)
+
+    advertiser_list = advertisers["data"]["list"]
+    print("Advertiser list:", advertiser_list)
+    return render(request, "Demo/tiktok_select_advertiser.html", {"advertisers": advertiser_list})
 
 # --- FETCH CAMPAIGNS ---
 def tiktok_campaigns(request):
     access_token = request.session.get("tiktok_access_token")
+    advertiser_id = request.session.get("tiktok_advertiser_id")
+
     if not access_token:
-        return redirect("tiktok_login")
+        return redirect("Demo:tiktok_login")
+    if not advertiser_id:
+        return HttpResponse("No advertiser selected", status=400)
 
-    # You need advertiser_id (from your TikTok Ads Manager account)
-    advertiser_id = settings.TIKTOK_ADVERTISER_ID
+    # Filters
+    start_date = request.GET.get("start_date", (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d"))
+    end_date = request.GET.get("end_date", datetime.now().strftime("%Y-%m-%d"))
+    page_size = int(request.GET.get("page_size", 100))
+    status_filter = request.GET.get("status", "CAMPAIGN_STATUS_ENABLE")  # Default to enabled campaigns
 
-    url = f"{AUTH_BASE}/campaign/get/"
-    params = {
-        "advertiser_id": advertiser_id,
-        "page_size": 10,
-        "page": 1,
-    }
+    # Validate the status filter
+    valid_statuses = ["CAMPAIGN_STATUS_ENABLE", "CAMPAIGN_STATUS_DISABLE", "CAMPAIGN_STATUS_DELETE", "ALL"]
+    if status_filter not in valid_statuses:
+        status_filter = "CAMPAIGN_STATUS_ENABLE"  # Fallback to default if invalid
+
+    # --- Step 1: Get campaigns ---
+    url = f"{API_BASE}/campaign/get/"
+    params = {"advertiser_id": advertiser_id, "page_size": page_size, "page": 1}
+    if status_filter != "ALL":
+        params["filtering"] = json.dumps({"secondary_status": status_filter})  # Add status filter if not "ALL"
+
     headers = {"Access-Token": access_token}
-    resp = requests.get(url, headers=headers, params=params)
-    data = resp.json()
 
-    # Render campaigns in a template
-    return render(request, "tiktok/campaigns.html", {"campaigns": data})
+    resp = requests.get(url, headers=headers, params=params)
+    campaigns_data = resp.json()
+    if "data" not in campaigns_data or "list" not in campaigns_data["data"]:
+        return JsonResponse(campaigns_data, status=400)
+
+    campaigns = campaigns_data["data"]["list"]
+
+    # --- Step 2: Get ad groups once for budget mapping ---
+    ad_group_url = f"{API_BASE}/adgroup/get/"
+    ad_group_params = {"advertiser_id": advertiser_id, "page_size": 100, "page": 1}
+    ad_group_resp = requests.get(ad_group_url, headers=headers, params=ad_group_params)
+    ad_group_data = ad_group_resp.json()
+    
+    ad_group_details = {}  # Dictionary to store ad group budgets and statuses
+    if "data" in ad_group_data and "list" in ad_group_data["data"]:
+        ad_group_details = {
+            ad["campaign_id"]: {
+                "budget": ad.get("budget", 0),
+                "status": ad.get("secondary_status", "UNKNOWN")  # Extract status
+            }
+            for ad in ad_group_data["data"]["list"]
+        }
+    # --- Step 3: Get campaign stats ---
+    stats_url = f"{API_BASE}/report/integrated/get/"
+    stats_params = {
+        "advertiser_id": advertiser_id,
+        "service_type": "AUCTION",
+        "report_type": "BASIC",
+        "data_level": "AUCTION_CAMPAIGN",
+        "dimensions": json.dumps(["campaign_id"]),
+        "metrics": json.dumps([
+            "spend", "clicks", "impressions", "complete_payment", "total_complete_payment_rate",
+            "cost_per_complete_payment", "complete_payment_roas"
+        ]),
+        "start_date": start_date,
+        "end_date": end_date,
+        "page": 1,
+        "page_size": page_size,
+    }
+    stats_resp = requests.get(stats_url, headers=headers, params=stats_params)
+    stats_data = stats_resp.json()
+    print("Stats data:", stats_data)
+
+    stats_lookup = {}
+    if "data" in stats_data and "list" in stats_data["data"]:
+        for stat in stats_data["data"]["list"]:
+            stats_lookup[stat["dimensions"]["campaign_id"]] = stat["metrics"]
+
+    print("Stats lookup:", stats_lookup)
+    # --- Step 4: Merge data ---
+    enriched_campaigns = []
+    for campaign in campaigns:
+        cid = campaign["campaign_id"]
+        metrics = stats_lookup.get(cid, {})
+        ad_group_info = ad_group_details.get(cid, {"budget": 0, "status": "UNKNOWN"})
+
+        # Transform the ad group status
+        raw_status = ad_group_info["status"]
+        readable_status = raw_status.replace("ADGROUP_STATUS_", "").replace("_", " ").title()
+        enriched_campaigns.append({
+            "campaign_id": cid,
+            "campaign_name": campaign["campaign_name"],
+            "campaign_status": campaign["secondary_status"],
+            "spend": float(metrics.get("spend", 0)),
+            "clicks": int(metrics.get("clicks", 0)),
+            "impressions": int(metrics.get("impressions", 0)),
+            "purchases": int(metrics.get("complete_payment", 0)),
+            "purchases_value": float(metrics.get("total_complete_payment_rate", 0)),
+            "roas": float(metrics.get("complete_payment_roas", 0)),
+            "cost_per_conversion": float(metrics.get("cost_per_complete_payment", 0)),
+            "budget": ad_group_info.get("budget", 0),
+            "status": readable_status  # Use the ad group status
+        })
+
+    print("Enriched campaigns:", enriched_campaigns)
+    return render(request, "Demo/tiktok_campaigns.html", {
+        "campaigns": enriched_campaigns,
+        "start_date": start_date,
+        "end_date": end_date,
+        "page_size": page_size,
+        "status_filter": status_filter, 
+    })
+
 ################################################################################################
 ######################################## META's API ----
 
