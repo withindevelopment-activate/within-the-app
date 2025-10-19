@@ -159,7 +159,7 @@
 
 
 <div class="mt-5">
-  {% comment %} <h4>Customer Dictionary</h4>
+  <h4>Customer Dictionary</h4>
   <div class="data-wrap">
     <div class="data-viewport">
       <div class="data-scroller" role="region" aria-label="Scrollable data table" tabindex="0">
@@ -168,12 +168,7 @@
             <tr>
               <th>Customer Key</th>
               <th>Name</th>
-              <th>Email</th>
-              <th>Mobile</th>
-              <th>Visitor IDs</th>
-              <th>Session IDs</th>
               <th>Campaigns</th>
-              <th>pageviews</th>
               <th>Add to Cart</th>
               <th>Purchases</th>
             </tr>
@@ -182,15 +177,10 @@
             {% for key, c in customer_dict.items %}
             <tr>
               <td>{{ key }}</td>
-              <td>{{ c.user_info.name }}</td>
-              <td>{{ c.user_info.email }}</td>
-              <td>{{ c.user_info.mobile }}</td>
-              <td>{{ c.visitor_ids|join:", " }}</td>
-              <td>{{ c.sessions|join:", " }}</td>
+              <td>{{ c.customer_name }}</td>
               <td>{{ c.campaigns|join:", " }}</td>
-              <td>{{ c.stats.pageviews }}</td>
-              <td>{{ c.stats.add_to_cart }}</td>
-              <td>{{ c.stats.purchases }}</td>
+              <td>{{ c.add_to_cart }}</td>
+              <td>{{ c.purchases }}</td>
             </tr>
             {% empty %}
             <tr>
@@ -201,7 +191,7 @@
         </table>
       </div>
     </div>
-  </div> {% endcomment %}
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>

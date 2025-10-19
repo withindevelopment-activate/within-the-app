@@ -310,33 +310,44 @@ def get_tracking_df():
 
 def build_customer_dictionary(df: pd.DataFrame) -> dict:
     """
-    Build a dictionary of customers with all related visitor_ids, session_ids,
-    campaigns, and event stats. Extract Customer_ID and order_id from Event_Details
-    to avoid duplicate purchases. Ensures events in the same session/campaign are not double-counted.
+    Lightweight version:
+    - Tracks add_to_cart count, purchase count, campaigns used per customer
+    - Includes latest known customer name if available
     """
+    if df.empty:
+        return {}
+
     df = df.copy()
 
     # Normalize columns
-    for col in ["Customer_ID", "Customer_Email", "Customer_Mobile", "Visitor_ID", "Session_ID"]:
+    for col in ["Customer_ID", "Customer_Email", "Customer_Mobile", "Customer_Name"]:
         df[col] = df.get(col, "").fillna("").astype(str).str.strip()
 
-    df["UTM_Campaign"] = df.get("UTM_Campaign", "").fillna("").astype(str).str.replace("+", " ", regex=False).str.strip()
+    df["UTM_Campaign"] = (
+        df.get("UTM_Campaign", "")
+        .fillna("")
+        .astype(str)
+        .str.replace("+", " ", regex=False)
+        .str.strip()
+    )
     df["Visited_at"] = pd.to_datetime(df["Visited_at"], errors="coerce")
 
-    # Extract Customer_ID and order_id from Event_Details
-    def extract_from_event(details, key):
+    # Extract Customer_ID from Event_Details if missing
+    def extract_customer_id(row):
+        if row["Customer_ID"]:
+            return row["Customer_ID"]
+        details = row.get("Event_Details")
         if pd.isna(details) or not details:
             return ""
         try:
             d = json.loads(details.replace("'", '"'))
-            return str(d.get(key, ""))
+            return str(d.get("customer_id", "")) or ""
         except Exception:
             return ""
 
-    df["Customer_ID"] = df.apply(lambda row: row["Customer_ID"] or extract_from_event(row.get("Event_Details", ""), "customer_id"), axis=1)
-    df["order_id"] = df.apply(lambda row: extract_from_event(row.get("Event_Details", ""), "order_id"), axis=1)
+    df["Customer_ID"] = df.apply(extract_customer_id, axis=1)
 
-    # Create unified customer key
+    # Define unified key
     def get_customer_key(row):
         if row["Customer_ID"]:
             return row["Customer_ID"]
@@ -347,139 +358,44 @@ def build_customer_dictionary(df: pd.DataFrame) -> dict:
         return None
 
     df["customer_key"] = df.apply(get_customer_key, axis=1)
+    df = df[df["customer_key"].notna()]
 
-    # Deduplicate events per visitor/session/campaign/event_type
-    # For purchases, deduplicate by order_id
-    df_no_duplicates = df.copy()
+    # Filter only relevant events for stats
+    filtered_df = df[df["Event_Type"].isin(["add_to_cart", "purchase"])]
 
-    # Deduplicate purchases based on order_id
-    purchase_mask = df_no_duplicates["Event_Type"] == "purchase"
-    purchases = df_no_duplicates[purchase_mask].drop_duplicates(subset=["order_id"])
-    non_purchases = df_no_duplicates[~purchase_mask]
-    df_dedup = pd.concat([non_purchases, purchases], ignore_index=True)
-
-    customer_dict = {}
-
-    for key, group in df_dedup.groupby("customer_key"):
-        if not key:
-            continue
-
-        # Collect all identifiers
-        customer_visitors = set(group["Visitor_ID"]) - {""}
-        customer_sessions = set(group["Session_ID"]) - {""}
-        customer_ids = {key}
-
-        # Get all matching rows in the original df for campaigns and latest info
-        mask = (
-            df["Visitor_ID"].isin(customer_visitors) |
-            df["Session_ID"].isin(customer_sessions) |
-            df["Customer_ID"].isin(customer_ids) |
-            df["Customer_Email"].isin(customer_ids) |
-            df["Customer_Mobile"].isin(customer_ids)
+    # Stats aggregation (add_to_cart, purchases, campaigns)
+    customer_stats = (
+        filtered_df.groupby("customer_key")
+        .agg(
+            add_to_cart=pd.NamedAgg(column="Event_Type", aggfunc=lambda x: (x == "add_to_cart").sum()),
+            purchases=pd.NamedAgg(column="Event_Type", aggfunc=lambda x: (x == "purchase").sum()),
+            campaigns=pd.NamedAgg(column="UTM_Campaign", aggfunc=lambda x: list(set(x) - {""}))
         )
-        full_rows = df[mask].copy()
+        .reset_index()
+    )
 
-        # Campaigns
-        campaigns = set(full_rows["UTM_Campaign"]) - {""}
+    # Extract latest customer name for each key (based on Visited_at)
+    name_df = (
+        df[df["Customer_Name"] != ""]
+        .sort_values("Visited_at")
+        .groupby("customer_key")
+        .tail(1)[["customer_key", "Customer_Name"]]
+    )
 
-        # Stats (count unique events)
-        stats = {
-            "pageviews": int((group["Event_Type"] == "pageview").sum()),
-            "add_to_cart": int((group["Event_Type"] == "add_to_cart").sum()),
-            "purchases": int((group["Event_Type"] == "purchase").sum())
-        }
+    name_map = dict(zip(name_df["customer_key"], name_df["Customer_Name"]))
 
-        # Latest user info
-        latest_row = full_rows.sort_values("Visited_at").iloc[-1]
-
+    # Build final dictionary
+    customer_dict = {}
+    for _, row in customer_stats.iterrows():
+        key = row["customer_key"]
         customer_dict[key] = {
-            "visitor_ids": customer_visitors,
-            "sessions": customer_sessions,
-            "campaigns": campaigns,
-            "stats": stats,
-            "user_info": {
-                "name": latest_row.get("Customer_Name"),
-                "email": latest_row.get("Customer_Email"),
-                "mobile": latest_row.get("Customer_Mobile"),
-                "customer_id": latest_row.get("Customer_ID")
-            }
+            "customer_name": name_map.get(key, ""),  # include name if found
+            "add_to_cart": int(row["add_to_cart"]),
+            "purchases": int(row["purchases"]),
+            "campaigns": row["campaigns"],
         }
 
     return customer_dict
-
-# def attribute_purchases_to_campaigns(df: pd.DataFrame) -> pd.DataFrame:
-#     """
-#     Return a campaign-level summary with purchases attributed to the most relevant campaign
-#     using session_id and visit order.
-#     """
-#     df = df.copy()
-#     df["Visited_at"] = pd.to_datetime(df["Visited_at"])
-#     df["UTM_Campaign"] = df["UTM_Campaign"].fillna("").astype(str).str.replace("+", " ", regex=False).str.strip()
-
-#     # Helper: get event value (purchase/add_to_cart amount)
-#     def get_value(row):
-#         details = row.get("Event_Details")
-#         if pd.notna(details):
-#             try:
-#                 d = json.loads(details.replace("'", '"'))
-#                 price = float(d.get("price", 1.0))
-#                 qty = int(d.get("quantity", 1))
-#                 return price * qty
-#             except Exception:
-#                 return 0.0
-#         return 0.0
-
-#     df["event_value"] = df.apply(get_value, axis=1)
-
-#     # Separate purchases to attribute them
-#     purchases = df[df["Event_Type"] == "purchase"].copy()
-#     campaign_attribution = []
-
-#     for _, purchase in purchases.iterrows():
-#         session_id = purchase["Session_ID"]
-#         purchase_time = purchase["Visited_at"]
-
-#         # Direct campaign
-#         if purchase["UTM_Campaign"]:
-#             campaign_attribution.append({
-#                 "campaign": purchase["UTM_Campaign"],
-#                 "value": purchase["event_value"],
-#             })
-#             continue
-
-#         # Look back in the same session for the latest campaign
-#         session_events = df[
-#             (df["Session_ID"] == session_id) &
-#             (df["Visited_at"] < purchase_time) &
-#             (df["UTM_Campaign"] != "")
-#         ].sort_values("Visited_at")
-
-#         if not session_events.empty:
-#             last_campaign = session_events.iloc[-1]["UTM_Campaign"]
-#             campaign_attribution.append({
-#                 "campaign": last_campaign,
-#                 "value": purchase["event_value"],
-#             })
-#         else:
-#             campaign_attribution.append({
-#                 "campaign": "(no campaign)",
-#                 "value": purchase["event_value"],
-#             })
-
-#     attribution_df = pd.DataFrame(campaign_attribution)
-#     if attribution_df.empty:
-#         return pd.DataFrame(columns=["campaign", "purchases", "total_value"])
-
-#     summary = (
-#         attribution_df.groupby("campaign")
-#         .agg(
-#             purchases=pd.NamedAgg(column="campaign", aggfunc="count"),
-#             total_value=pd.NamedAgg(column="value", aggfunc="sum")
-#         )
-#         .reset_index()
-#     )
-
-#     return summary.sort_values("total_value", ascending=False)
 
 def attribute_purchases_to_campaigns(df: pd.DataFrame):
     """

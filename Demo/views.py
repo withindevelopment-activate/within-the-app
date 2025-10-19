@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-import requests, pandas as pd, json, re, asyncio, traceback, logging, pytz
+import requests, pandas as pd, json, re, asyncio, traceback, logging, pytz, uuid, os, http.client
 from django.conf import settings
 from django.shortcuts import redirect, render
 from django.views.decorators.csrf import csrf_exempt
@@ -11,10 +11,9 @@ from rapidfuzz import fuzz
 from urllib.parse import urlencode
 from django.core.files.storage import FileSystemStorage
 from io import BytesIO
-import logging
-import http.client
 from supabase import create_client, Client
-import os
+from dateutil import parser
+
 
 # Supabase & Supporting imports
 from .supabase_functions import batch_insert_to_supabase, get_next_id_from_supabase_compatible_all, get_tracking_df, build_customer_dictionary, attribute_purchases_to_campaigns
@@ -99,7 +98,6 @@ def zid_callback(request):
     except requests.RequestException as e:
         messages.error(request, f"Token error: {str(e)}")
         return redirect('Demo:zid_login')
-
 
 def home(request):
     token = request.session.get('access_token')
@@ -863,7 +861,7 @@ def view_tracking(request):
         rows = df.sort_values(by="Visited_at", ascending=False).head(50).to_dict(orient="records")
 
         # --- Customer dictionary ---
-        # customer_dict = build_customer_dictionary(df)
+        customer_dict = build_customer_dictionary(df)
 
         # --- Campaign results ---
         campaigns_summary_df, sources_summary_df = attribute_purchases_to_campaigns(df)
@@ -877,7 +875,7 @@ def view_tracking(request):
             "total_visitors": total_visitors,
             "total_sessions": total_sessions,
             "total_pageviews": total_pageviews,
-            # "customer_dict": customer_dict,
+            "customer_dict": customer_dict,
             "campaigns": campaigns_summary,
             "sources": sources_summary,
             "campaign_labels": campaigns_summary_df["campaign"].tolist(),
@@ -1030,7 +1028,6 @@ def customer_detail_api(request, customer_id):
     except requests.RequestException as e:
         return JsonResponse({"error": str(e)}, status=400)
 
-
 #########################################################################
 ##################### THE PRODUCTS WEBHOOK SECTION --- SARAH 16TH OF OCTOBER
 logger = logging.getLogger(__name__)
@@ -1064,8 +1061,6 @@ def subscribe_store_to_product_update(authorization_token, access_token):
         print(f"Failed to create webhook subscription: {e}")
         return None
     
-import uuid
-
 ### THE FUNCITON THAT DOES THE UPDATES AFTER THE WEBHOOK IS TRIGGERED (A PRODUCT IS UPDATED)
 def product_update(request):
     """
@@ -1208,8 +1203,6 @@ def refresh_snapchat_token(request):
         print(f"Token refresh failed: {e}")
         return None
     
-from dateutil import parser
-
 def snapchat_api_call(request, endpoint, params=None):
     """
     Helper function to make an authenticated API call, handling token refresh.
@@ -1490,9 +1483,6 @@ def meta_login(request):
 
     auth_request_url = requests.Request('GET', auth_url, params=params).prepare().url
     return redirect(auth_request_url)
-
-from datetime import datetime, timedelta
-from django.http import HttpResponse
 
 def meta_callback(request):
     """
