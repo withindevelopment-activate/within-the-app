@@ -194,5 +194,5 @@ TIKTOK_OAUTH_SCOPE = "user.info.basic,video.list,video.upload,ad.account,ad.camp
 
 SNAPCHAT_CLIENT_ID = "f2f50d58-83c5-4a5e-8a15-d8ebf0936ee2"
 SNAPCHAT_CLIENT_SECRET = "0dc2fcf68db6e5d5d4b3"
-SNAPCHAT_REDIRECT_URI = "https://testing-within.onrender.com/oauth/snapchat/callback"
+SNAPCHAT_REDIRECT_URI = "https://testing-within.onrender.com/oauth/snapchat/callback/"
 SNAPCHAT_OAUTH_SCOPE = "snapchat-profile-api snapchat-marketing-api snapchat-offline-conversions-api"
