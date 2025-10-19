@@ -1137,8 +1137,7 @@ def snapchat_callback(request):
     del request.session['snapchat_oauth_state']
 
     # 3. Exchange the authorization code for an access token
-    cfg = settings.OAUTH_PROVIDERS["snapchat"]
-    token_url = cfg["token_url"]
+    token_url = "https://accounts.snapchat.com/login/oauth2/access_token"
 
     data = {
         "grant_type": "authorization_code",
@@ -1175,7 +1174,6 @@ def refresh_snapchat_token(request):
     if not refresh_token:
         return None
 
-    cfg = settings.OAUTH_PROVIDERS["snapchat"]
     data = {
         "grant_type": "refresh_token",
         "refresh_token": refresh_token,
@@ -1184,7 +1182,7 @@ def refresh_snapchat_token(request):
     }
 
     try:
-        resp = requests.post(cfg["token_url"], data=data)
+        resp = requests.post("https://accounts.snapchat.com/login/oauth2/access_token", data=data)
         resp.raise_for_status()
         token_data = resp.json()
 
