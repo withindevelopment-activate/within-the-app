@@ -1252,49 +1252,42 @@ def snapchat_api_call(request, endpoint, method="GET", params=None, data=None, j
         except:
             return None
 
-def select_organization(request):
-    # Call Snapchat to list organizations
-    orgs_data = snapchat_api_call(request, "me/organizations")
+def snapchat_select_organization(request, org_id=None):
+    # If an org is selected, save it and redirect to ad accounts
+    if org_id:
+        request.session["snap_org_id"] = org_id
+        return redirect("Demo:snapchat_select_account", org_id=org_id)
 
+    # Fetch organizations from Snapchat API
+    orgs_data = snapchat_api_call(request, "me/organizations")
     if not orgs_data or "organizations" not in orgs_data:
-        return HttpResponse("No organizations found", status=404)
+        messages.error(request, "No organizations found.")
+        return JsonResponse(orgs_data or {}, status=404)
 
     organizations = [
-        {
-            "id": org["organization"]["id"],
-            "name": org["organization"]["name"],
-        }
+        {"id": org["organization"]["id"], "name": org["organization"]["name"]}
         for org in orgs_data["organizations"]
     ]
 
-    if request.method == "POST":
-        selected_org = request.POST.get("organization_id")
-        if selected_org:
-            request.session["snap_org_id"] = selected_org
-            return redirect("Demo:select_account", org_id=selected_org)
-
     return render(request, "Demo/snapchat_select_org.html", {"organizations": organizations})
 
-def select_ad_account(request, org_id):
-    # Call Snapchat to list ad accounts for the chosen org
-    accounts_data = snapchat_api_call(request, f"organizations/{org_id}/adaccounts")
 
+def snapchat_select_account(request, org_id, ad_account_id=None):
+    # If an ad account is selected, save it and redirect to campaigns
+    if ad_account_id:
+        request.session["snap_ad_account_id"] = ad_account_id
+        return redirect("Demo:snapchat_campaigns_overview")
+
+    # Fetch ad accounts for the organization
+    accounts_data = snapchat_api_call(request, f"organizations/{org_id}/adaccounts")
     if not accounts_data or "adaccounts" not in accounts_data:
-        return HttpResponse("No ad accounts found", status=404)
+        messages.error(request, "No ad accounts found.")
+        return JsonResponse(accounts_data or {}, status=404)
 
     ad_accounts = [
-        {
-            "id": acc["adaccount"]["id"],
-            "name": acc["adaccount"]["name"],
-        }
+        {"id": acc["adaccount"]["id"], "name": acc["adaccount"]["name"]}
         for acc in accounts_data["adaccounts"]
     ]
-
-    if request.method == "POST":
-        selected_account = request.POST.get("ad_account_id")
-        if selected_account:
-            request.session["snap_ad_account_id"] = selected_account
-            return redirect("Demo:campaigns_overview") 
 
     return render(request, "Demo/snapchat_select_account.html", {"ad_accounts": ad_accounts})
 
@@ -1552,10 +1545,10 @@ def tiktok_select_advertiser(request, advertiser_id=None):
     advertisers = resp.json()
 
     if "data" not in advertisers or "list" not in advertisers["data"]:
+        messages.error(request, "Failed to fetch advertisers.")
         return JsonResponse(advertisers, status=400)
 
     advertiser_list = advertisers["data"]["list"]
-    print("Advertiser list:", advertiser_list)
     return render(request, "Demo/tiktok_select_advertiser.html", {"advertisers": advertiser_list})
 
 # --- FETCH CAMPAIGNS ---

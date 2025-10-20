@@ -42,8 +42,10 @@ urlpatterns = [
     # --- Snapchat ---
     path('oauth/snapchat/login/', views.snapchat_login, name='snapchat_login'),
     path('oauth/snapchat/callback/', views.snapchat_callback, name='snapchat_callback'),
-    path("snapchat/select-org/", views.select_organization, name="select_org"),
-    path("snapchat/select-account/<str:org_id>/", views.select_ad_account, name="select_account"),
+    path("snapchat/select-organization/", views.snapchat_select_organization, name="snapchat_select_organization"),
+    path("snapchat/select-organization/<str:org_id>/", views.snapchat_select_organization, name="snapchat_select_organization_with_id"),
+    path("snapchat/<str:org_id>/select-account/", views.snapchat_select_account, name="snapchat_select_account"),
+    path("snapchat/<str:org_id>/select-account/<str:ad_account_id>/", views.snapchat_select_account, name="snapchat_select_account_with_id"),
     path('snapchat/campaigns/', views.campaigns_overview, name='campaigns_overview'),
 
     # --- TikTok ---

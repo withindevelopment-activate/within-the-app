@@ -1,18 +1,35 @@
 {% extends "Demo/base.html" %}
+{% block title %} Select Snapchat Ad Account {% endblock title %}
+
 {% block content %}
 <div class="container py-4">
-  <h2 class="mb-3">Select Snapchat Ad Account</h2>
-  <form method="post">
-    {% csrf_token %}
-    <div class="list-group">
-      {% for acc in ad_accounts %}
-        <label class="list-group-item">
-          <input type="radio" name="ad_account_id" value="{{ acc.id }}" required>
-          {{ acc.name }} ({{ acc.id }})
-        </label>
-      {% endfor %}
+  <h2 class="mb-4">Select Ad Account</h2>
+
+  {% if ad_accounts %}
+  <div class="row">
+    {% for acc in ad_accounts %}
+    <div class="col-md-6 col-lg-4 mb-3">
+      <a href="{% url 'Demo:snapchat_select_account' org_id=acc.org_id ad_account_id=acc.id %}" class="text-decoration-none">
+        <div class="card shadow-sm h-100">
+          <div class="card-body d-flex flex-column justify-content-between">
+            <div>
+              <h5 class="card-title text-primary">{{ acc.name }}</h5>
+              <p class="text-muted mb-1">Ad Account ID:</p>
+              <p><code>{{ acc.id }}</code></p>
+            </div>
+            <div class="mt-3">
+              <button class="btn btn-primary btn-sm w-100">Select Account</button>
+            </div>
+          </div>
+        </div>
+      </a>
     </div>
-    <button type="submit" class="btn btn-primary mt-3">Continue</button>
-  </form>
+    {% endfor %}
+  </div>
+  {% else %}
+    <div class="alert alert-warning text-center">
+      No ad accounts found for this organization.
+    </div>
+  {% endif %}
 </div>
 {% endblock %}
