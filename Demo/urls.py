@@ -34,7 +34,7 @@ urlpatterns = [
     # --- Meta ---
     path("meta/login/", views.meta_login, name="meta_login"),
     path("meta/callback/", views.meta_callback, name="meta_callback"),
-    path("meta/ad-accounts/", views.meta_ad_accounts, name="meta_ad_accounts"),
+    # path("meta/ad-accounts/", views.meta_ad_accounts, name="meta_ad_accounts"),
     path("meta/select-ad-account/<str:account_id>/", views.meta_select_ad_account, name="meta_select_ad_account"),
     path("meta/select-ad-account/", views.meta_select_ad_account, name="meta_select_ad_account"),  # fallback
     path("meta/campaigns/", views.meta_campaigns, name="meta_campaigns"),
