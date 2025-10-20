@@ -181,6 +181,13 @@ ZID_API_HOST = "api.zid.sa"'''
 SESSION_COOKIE_AGE = 3600  # 1 hour
 SESSION_SAVE_EVERY_REQUEST = True
 
+OAUTH_PROVIDERS = {
+    "meta": {
+        "auth_url": "https://www.facebook.com/v24.0/dialog/oauth",
+        "token_url": "https://graph.facebook.com/v24.0/oauth/access_token",
+        "api_base_url": "https://graph.facebook.com/v24.0",
+    },
+}
 
 META_APP_ID = "2779810159026295"
 META_APP_SECRET = "c70629b90450fafefb839dacf334d858"
