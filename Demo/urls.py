@@ -14,6 +14,8 @@ urlpatterns = [
     path('zid/products/', views.products_page, name='products_page'),
     
     path("search/", views.search_view, name="search"),
+    path("privacy-policy/", views.privacy_policy, name="privacy_policy"),
+    path("data-deletion/", views.data_deletion, name="data_deletion"),
 
     path("marketing/", views.marketing_page, name="marketing"), # Marketing report section
     path("marketing_ready/", views.marketing_page_ready, name="marketing_ready"),

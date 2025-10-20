@@ -1,0 +1,35 @@
+{% extends "Demo/base.html" %}
+
+{% block title %}Data Deletion Instructions{% endblock title %}
+
+{% block content %}
+<div class="container py-5">
+  <h2 class="mb-4">Data Deletion Instructions</h2>
+  <p class="text-muted">Follow these steps to request deletion of your data from Zid Analytics.</p>
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <h5>Step 1: Identify Your Account</h5>
+      <p>Log in to your Zid.sa account and confirm your store or user details.</p>
+
+      <h5>Step 2: Submit Deletion Request</h5>
+      <p>Send an email to <a href="mailto:support@zid.sa">support@zid.sa</a> with:</p>
+      <ul>
+        <li>Your full name</li>
+        <li>Your email address used with Zid</li>
+        <li>Your store ID (if applicable)</li>
+        <li>A brief statement requesting data deletion</li>
+      </ul>
+
+      <h5>Step 3: Confirmation</h5>
+      <p>We will review your request and respond within 7 business days. Once completed, you will receive confirmation that your data has been permanently deleted from our systems.</p>
+
+      <h5>Important Notes</h5>
+      <ul>
+        <li>Deleted data cannot be recovered.</li>
+        <li>Some anonymized analytics data may remain for system integrity, but will not contain personal identifiers.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,44 @@
+{% extends "Demo/base.html" %}
+
+{% block title %}Privacy Policy{% endblock title %}
+
+{% block content %}
+<div class="container py-5">
+  <h2 class="mb-4">Privacy Policy</h2>
+  <p class="text-muted">Effective Date: 20 October 2025</p>
+
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <h5>1. Introduction</h5>
+      <p>We respect your privacy and are committed to protecting your personal data. This Privacy Policy explains how we collect, use, and safeguard your information.</p>
+
+      <h5>2. Information We Collect</h5>
+      <ul>
+        <li>Personal details you provide (name, email, phone).</li>
+        <li>Analytics and tracking data from your store.</li>
+        <li>Cookies and session information.</li>
+      </ul>
+
+      <h5>3. How We Use Your Data</h5>
+      <ul>
+        <li>To provide and improve our analytics dashboard.</li>
+        <li>To personalize your experience and store tracking data.</li>
+        <li>To send notifications related to your account or services.</li>
+      </ul>
+
+      <h5>4. Sharing of Data</h5>
+      <p>We do not sell your personal data. Data may be shared with third-party services only to provide our services, under strict privacy agreements.</p>
+
+      <h5>5. Your Rights</h5>
+      <ul>
+        <li>You can request access to your personal data.</li>
+        <li>You can request correction of inaccurate information.</li>
+        <li>You can request deletion of your data. See <a href="{% url 'Demo:data_deletion' %}">Data Deletion Instructions</a>.</li>
+      </ul>
+
+      <h5>6. Contact Us</h5>
+      <p>If you have questions about this Privacy Policy, contact us at <a href="mailto:support@zid.sa">support@zid.sa</a>.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}

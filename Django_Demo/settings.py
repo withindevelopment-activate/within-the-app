@@ -185,7 +185,7 @@ SESSION_SAVE_EVERY_REQUEST = True
 META_APP_ID = "1435524447520642"
 META_APP_SECRET = "4bdfbeccf61ccd2ef92c47eff6ea306c"
 META_REDIRECT_URI = "https://testing-within.onrender.com/meta/callback/"  # must match in Meta dev settings
-META_OAUTH_SCOPE = "ads_management,ads_read,business_management,pages_show_list"  # adjust as needed
+META_OAUTH_SCOPE = "business_management,ads_management,leads_retrieval,ads_read"  # adjust as needed
 
 TIKTOK_CLIENT_KEY = "7551247511634051088"
 TIKTOK_CLIENT_SECRET = "fef07eae0ea6ed64c02baa5c33f2d3a653877746"

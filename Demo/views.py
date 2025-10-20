@@ -1252,7 +1252,6 @@ def snapchat_api_call(request, endpoint, method="GET", params=None, data=None, j
         except:
             return None
 
-
 def select_organization(request):
     # Call Snapchat to list organizations
     orgs_data = snapchat_api_call(request, "me/organizations")
@@ -1275,7 +1274,6 @@ def select_organization(request):
             return redirect("Demo:select_account", org_id=selected_org)
 
     return render(request, "Demo/snapchat_select_org.html", {"organizations": organizations})
-
 
 def select_ad_account(request, org_id):
     # Call Snapchat to list ad accounts for the chosen org
@@ -1863,3 +1861,8 @@ def view_price_monitor(request):
         traceback.print_exc()
         return render(request, "Demo/price_monitor_view.html", {"records": []})
 
+def privacy_policy(request):
+    return render(request, "Demo/privacy_policy.html")
+
+def data_deletion(request):
+    return render(request, "Demo/data_deletion.html")
