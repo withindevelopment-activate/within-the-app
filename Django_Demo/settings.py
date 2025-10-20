@@ -182,8 +182,8 @@ SESSION_COOKIE_AGE = 3600  # 1 hour
 SESSION_SAVE_EVERY_REQUEST = True
 
 
-META_APP_ID = "1435524447520642"
-META_APP_SECRET = "4bdfbeccf61ccd2ef92c47eff6ea306c"
+META_APP_ID = "2779810159026295"
+META_APP_SECRET = "c70629b90450fafefb839dacf334d858"
 META_REDIRECT_URI = "https://testing-within.onrender.com/meta/callback/"  # must match in Meta dev settings
 META_OAUTH_SCOPE = "business_management,ads_management,leads_retrieval,ads_read"  # adjust as needed
 

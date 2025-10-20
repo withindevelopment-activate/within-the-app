@@ -31,16 +31,22 @@ urlpatterns = [
 
     path('zid-webhook/product-update/', views.product_update, name='zid_product_update'),
 
+    # --- Meta ---
     path("meta/login/", views.meta_login, name="meta_login"),
     path("meta/callback/", views.meta_callback, name="meta_callback"),
-    path("meta/adaccounts/", views.meta_get_ad_accounts, name="meta_ad_accounts"),
+    path("meta/ad-accounts/", views.meta_ad_accounts, name="meta_ad_accounts"),
+    path("meta/select-ad-account/<str:account_id>/", views.meta_select_ad_account, name="meta_select_ad_account"),
+    path("meta/select-ad-account/", views.meta_select_ad_account, name="meta_select_ad_account"),  # fallback
+    path("meta/campaigns/", views.meta_campaigns, name="meta_campaigns"),
 
+    # --- Snapchat ---
     path('oauth/snapchat/login/', views.snapchat_login, name='snapchat_login'),
     path('oauth/snapchat/callback/', views.snapchat_callback, name='snapchat_callback'),
     path("snapchat/select-org/", views.select_organization, name="select_org"),
     path("snapchat/select-account/<str:org_id>/", views.select_ad_account, name="select_account"),
     path('snapchat/campaigns/', views.campaigns_overview, name='campaigns_overview'),
 
+    # --- TikTok ---
     path("oauth/tiktok/login/", views.tiktok_login, name="tiktok_login"),
     path("oauth/tiktok/callback/", views.tiktok_callback, name="tiktok_callback"),
     path("tiktok/campaigns/", views.tiktok_campaigns, name="tiktok_campaigns"),

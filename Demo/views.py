@@ -1672,7 +1672,7 @@ def tiktok_campaigns(request):
 
 ################################################################################################
 ######################################## META's API ----
-
+# --- LOGIN VIEW ---
 def meta_login(request):
     """
     Redirects user to Meta OAuth page.
@@ -1680,88 +1680,90 @@ def meta_login(request):
     state = str(uuid.uuid4())
     request.session['meta_oauth_state'] = state
 
-    auth_url = settings.OAUTH_PROVIDERS['meta']['auth_url']
-    params = {
-        "client_id": settings.META_APP_ID,
-        "redirect_uri": settings.META_REDIRECT_URI,
-        "state": state,
-        "scope": settings.META_OAUTH_SCOPE,
-        "response_type": "code",
-    }
+    scope = ",".join([
+        "ads_read", "ads_management", "business_management", "pages_read_engagement",
+        "pages_show_list", "instagram_basic"
+    ])
 
-    auth_request_url = requests.Request('GET', auth_url, params=params).prepare().url
-    return redirect(auth_request_url)
+    auth_url = (
+        f"{settings.OAUTH_PROVIDERS['meta']['auth_url']}"
+        f"?client_id={settings.META_APP_ID}"
+        f"&redirect_uri={settings.META_REDIRECT_URI}"
+        f"&state={state}"
+        f"&scope={scope}"
+        f"&response_type=code"
+    )
+    return redirect(auth_url)
 
+
+# --- CALLBACK VIEW ---
 def meta_callback(request):
     """
-    Handles redirect from Meta, validates state, and exchanges code for tokens.
+    Handles Meta redirect, validates state, exchanges code for token, and stores in session.
     """
-    code = request.GET.get('code')
-    state_from_meta = request.GET.get('state')
-    state_from_session = request.session.get('meta_oauth_state')
+    code = request.GET.get("code")
+    state = request.GET.get("state")
+    state_session = request.session.get("meta_oauth_state")
 
-    if not state_from_session or state_from_session != state_from_meta:
+    if not state_session or state_session != state:
         return HttpResponse("Invalid state — potential CSRF attack", status=400)
 
-    del request.session['meta_oauth_state']
+    del request.session["meta_oauth_state"]
 
-    token_url = settings.OAUTH_PROVIDERS['meta']['token_url']
     data = {
         "client_id": settings.META_APP_ID,
         "redirect_uri": settings.META_REDIRECT_URI,
         "client_secret": settings.META_APP_SECRET,
-        "code": code,
+        "code": code
     }
 
     try:
-        resp = requests.get(token_url, params=data)
+        resp = requests.get(settings.OAUTH_PROVIDERS['meta']['token_url'], params=data)
         resp.raise_for_status()
         token_data = resp.json()
-
         short_lived_token = token_data["access_token"]
-        expires_in = token_data.get("expires_in", 3600)
-        expiry_datetime = datetime.now() + timedelta(seconds=expires_in)
 
-        # Optional: exchange for long-lived token (good for 60 days)
+        # Optional: exchange for long-lived token
         long_lived_token = exchange_long_lived_token(short_lived_token)
 
-        # Store in session (better: store in your DB for persistence)
+        # Save token and expiry in session
+        expires_in = token_data.get("expires_in", 3600)
+        expiry = datetime.now() + timedelta(seconds=expires_in)
         request.session["meta_access_token"] = long_lived_token or short_lived_token
-        request.session["meta_token_expires_at"] = expiry_datetime.isoformat()
+        request.session["meta_token_expires_at"] = expiry.isoformat()
 
-        return redirect("Demo:campaigns_overview")
+        return redirect("Demo:meta_ad_accounts")
 
     except requests.RequestException as e:
         return HttpResponse(f"Token exchange failed: {e}", status=500)
 
-def exchange_long_lived_token(short_lived_token):
-    """
-    Exchanges short-lived Meta token for a long-lived one.
-    """
+
+# --- EXCHANGE LONG-LIVED TOKEN ---
+def exchange_long_lived_token(short_token):
     url = settings.OAUTH_PROVIDERS['meta']['long_lived_token_url']
     params = {
         "grant_type": "fb_exchange_token",
         "client_id": settings.META_APP_ID,
         "client_secret": settings.META_APP_SECRET,
-        "fb_exchange_token": short_lived_token,
+        "fb_exchange_token": short_token
     }
-
     try:
         resp = requests.get(url, params=params)
         resp.raise_for_status()
-        data = resp.json()
-        return data.get("access_token")
+        return resp.json().get("access_token")
     except requests.RequestException as e:
-        print(f"Failed to get long-lived token: {e}")
+        print("Failed to get long-lived token:", e)
         return None
 
-def meta_get_ad_accounts(request):
+
+# --- FETCH AD ACCOUNTS ---
+def meta_ad_accounts(request):
     """
-    Example API call using stored access token.
+    Fetch the user's Meta ad accounts and store one advertiser/account in session.
     """
     token = request.session.get("meta_access_token")
     if not token:
-        return redirect("meta_login")
+        return redirect("Demo:meta_login")
 
     url = f"{settings.OAUTH_PROVIDERS['meta']['graph_api_base']}/me/adaccounts"
     params = {"access_token": token}
@@ -1770,9 +1772,70 @@ def meta_get_ad_accounts(request):
         resp = requests.get(url, params=params)
         resp.raise_for_status()
         data = resp.json()
-        return HttpResponse(f"Your Ad Accounts: {data}")
+
+        accounts = data.get("data", [])
+        if not accounts:
+            return HttpResponse("No ad accounts found", status=400)
+
+        # Save the first account by default
+        request.session["meta_ad_account_id"] = accounts[0]["id"]
+
+        # If multiple accounts, render selection
+        if len(accounts) > 1:
+            return render(request, "Demo/meta_select_ad_account.html", {"accounts": accounts})
+
+        return redirect("Demo:meta_campaigns")
+
     except requests.RequestException as e:
         return HttpResponse(f"Failed to fetch ad accounts: {e}", status=500)
+
+
+# --- SELECT ACCOUNT (if multiple) ---
+def meta_select_ad_account(request, account_id=None):
+    if not request.session.get("meta_access_token"):
+        return redirect("Demo:meta_login")
+
+    if account_id:
+        request.session["meta_ad_account_id"] = account_id
+        return redirect("Demo:meta_campaigns")
+
+    # Fetch accounts again
+    token = request.session["meta_access_token"]
+    url = f"{settings.OAUTH_PROVIDERS['meta']['graph_api_base']}/me/adaccounts"
+    params = {"access_token": token}
+    resp = requests.get(url, params=params)
+    accounts = resp.json().get("data", [])
+    return render(request, "Demo/meta_select_ad_account.html", {"accounts": accounts})
+
+
+# --- FETCH CAMPAIGNS ---
+def meta_campaigns(request):
+    token = request.session.get("meta_access_token")
+    account_id = request.session.get("meta_ad_account_id")
+
+    if not token:
+        return redirect("Demo:meta_login")
+    if not account_id:
+        return HttpResponse("No ad account selected", status=400)
+
+    # Fetch campaigns
+    url = f"{settings.OAUTH_PROVIDERS['meta']['graph_api_base']}/{account_id}/campaigns"
+    params = {"access_token": token, "fields": "id,name,status,daily_budget"}
+    resp = requests.get(url, params=params)
+    campaigns = resp.json().get("data", [])
+
+    # Optional: enrich with insights
+    for camp in campaigns:
+        insights_url = f"{settings.OAUTH_PROVIDERS['meta']['graph_api_base']}/{camp['id']}/insights"
+        insights_params = {"access_token": token, "fields": "spend,impressions,clicks,actions"}
+        try:
+            r = requests.get(insights_url, params=insights_params)
+            r.raise_for_status()
+            camp["insights"] = r.json().get("data", [{}])[0]
+        except:
+            camp["insights"] = {}
+
+    return render(request, "Demo/meta_campaigns.html", {"campaigns": campaigns})
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++==
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

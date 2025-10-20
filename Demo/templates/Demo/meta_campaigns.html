@@ -1,0 +1,86 @@
+{% extends "Demo/base.html" %}
+
+{% block title %} Meta Campaigns {% endblock title %}
+
+{% block content %}
+<div class="container py-4">
+  <h2 class="mb-4">Meta Campaigns</h2>
+
+  <div class="mb-3">
+    <a href="{% url 'Demo:meta_select_ad_account' %}" class="btn btn-secondary btn-sm">Change Ad Account</a>
+  </div>
+
+  <!-- Filter Form -->
+  <form method="get" class="mb-4">
+    <div class="row">
+      <div class="col-md-3">
+        <label for="start_date" class="form-label">Start Date</label>
+        <input type="date" id="start_date" name="start_date" class="form-control" value="{{ start_date }}">
+      </div>
+      <div class="col-md-3">
+        <label for="end_date" class="form-label">End Date</label>
+        <input type="date" id="end_date" name="end_date" class="form-control" value="{{ end_date }}">
+      </div>
+      <div class="col-md-3">
+        <label for="status" class="form-label">Campaign Status</label>
+        <select id="status" name="status" class="form-select">
+          <option value="ACTIVE" {% if status_filter == "ACTIVE" %}selected{% endif %}>Active</option>
+          <option value="PAUSED" {% if status_filter == "PAUSED" %}selected{% endif %}>Paused</option>
+          <option value="ARCHIVED" {% if status_filter == "ARCHIVED" %}selected{% endif %}>Archived</option>
+          <option value="ALL" {% if status_filter == "ALL" %}selected{% endif %}>All</option>
+        </select>
+      </div>
+      <div class="col-md-3 d-flex align-items-end mt-3">
+        <button type="submit" class="btn btn-primary w-100">Filter</button>
+      </div>
+    </div>
+  </form>
+
+  {% if campaigns %}
+  <div class="data-wrap">
+    <div class="data-viewport">
+      <div class="data-scroller" role="region" aria-label="Scrollable data table" tabindex="0">
+        <table class="data-table" role="table" aria-label="Meta campaigns dataset">
+          <thead>
+            <tr>
+              <th>On/Off</th>
+              <th>Campaign Name</th>
+              <th>Status</th>
+              <th>Spend</th>
+              <th>Clicks</th>
+              <th>Impressions</th>
+              <th>Purchases</th>
+              <th>ROAS</th>
+              <th>Budget</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for campaign in campaigns %}
+            <tr>
+              <td>
+                {% if campaign.status == 'ACTIVE' %}
+                  <button class="btn btn-sm btn-success" disabled>On</button>
+                {% else %}
+                  <button class="btn btn-sm btn-danger" disabled>Off</button>
+                {% endif %}
+              </td>
+              <td>{{ campaign.name }}</td>
+              <td>{{ campaign.status }}</td>
+              <td>{{ campaign.insights.spend|default:"0" }}</td>
+              <td>{{ campaign.insights.clicks|default:"0" }}</td>
+              <td>{{ campaign.insights.impressions|default:"0" }}</td>
+              <td>{{ campaign.insights.actions.0.value|default:"0" }}</td>
+              <td>{{ campaign.insights.roas|default:"0" }}</td>
+              <td>{{ campaign.daily_budget|default:"0" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  {% else %}
+    <div class="alert alert-info">No campaigns found.</div>
+  {% endif %}
+</div>
+{% endblock %}
