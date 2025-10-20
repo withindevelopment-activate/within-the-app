@@ -1694,7 +1694,6 @@ def meta_login(request):
     )
     return redirect(auth_url)
 
-
 # --- CALLBACK VIEW ---
 def meta_callback(request):
     """
@@ -1720,6 +1719,7 @@ def meta_callback(request):
         resp = requests.get(settings.OAUTH_PROVIDERS['meta']['token_url'], params=data)
         resp.raise_for_status()
         token_data = resp.json()
+        print("Meta token data:", token_data)
         short_lived_token = token_data["access_token"]
 
         # Optional: exchange for long-lived token
@@ -1737,7 +1737,6 @@ def meta_callback(request):
         messages.error(request, f"Token exchange failed: {e}")
         return redirect("Demo:home")
 
-
 # --- EXCHANGE LONG-LIVED TOKEN ---
 def exchange_long_lived_token(short_token):
     url = settings.OAUTH_PROVIDERS['meta']['token_url']
@@ -1750,45 +1749,11 @@ def exchange_long_lived_token(short_token):
     try:
         resp = requests.get(url, params=params)
         resp.raise_for_status()
+        print("Long-lived token response:", resp.json())
         return resp.json().get("access_token")
     except requests.RequestException as e:
         print("Failed to get long-lived token:", e)
         return None
-
-
-# --- FETCH AD ACCOUNTS ---
-# def meta_ad_accounts(request):
-#     """
-#     Fetch the user's Meta ad accounts and store one advertiser/account in session.
-#     """
-#     token = request.session.get("meta_access_token")
-#     if not token:
-#         return redirect("Demo:meta_login")
-
-#     url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/me/adaccounts"
-#     params = {"access_token": token}
-
-#     try:
-#         resp = requests.get(url, params=params)
-#         resp.raise_for_status()
-#         data = resp.json()
-
-#         accounts = data.get("data", [])
-#         if not accounts:
-#             return HttpResponse("No ad accounts found", status=400)
-
-#         # Save the first account by default
-#         request.session["meta_ad_account_id"] = accounts[0]["id"]
-
-#         # If multiple accounts, render selection
-#         if len(accounts) > 1:
-#             return render(request, "Demo/meta_select_ad_account.html", {"accounts": accounts})
-
-#         return redirect("Demo:meta_campaigns")
-
-#     except requests.RequestException as e:
-#         return HttpResponse(f"Failed to fetch ad accounts: {e}", status=500)
-
 
 # --- SELECT ACCOUNT (if multiple) ---
 def meta_select_ad_account(request, account_id=None):
@@ -1807,7 +1772,6 @@ def meta_select_ad_account(request, account_id=None):
     accounts = resp.json().get("data", [])
     messages.info(request, "Please select an ad account to proceed.")
     return render(request, "Demo/meta_select_ad_account.html", {"accounts": accounts})
-
 
 # --- FETCH CAMPAIGNS ---
 def meta_campaigns(request):
