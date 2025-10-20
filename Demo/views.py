@@ -1680,8 +1680,7 @@ def meta_login(request):
     request.session['meta_oauth_state'] = state
 
     scope = ",".join([
-        "ads_read", "ads_management", "business_management", "pages_read_engagement",
-        "pages_show_list", "instagram_basic"
+        "ads_read", "ads_management", "business_management"
     ])
 
     auth_url = (
