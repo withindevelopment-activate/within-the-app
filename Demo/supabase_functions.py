@@ -1,8 +1,7 @@
-import os,json,ast,logging,pandas as pd,hashlib
+import os,json,ast,logging,pandas as pd, pytz
 from supabase import create_client, Client
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
-from django.core.cache import cache
 
 # Import keys
 url: str = os.environ.get('SUPABASE_URL')
@@ -309,9 +308,9 @@ def get_tracking_df():
         df["Visited_at"] = pd.to_datetime(df["Visited_at"], errors="coerce")
     return df
 
-def build_customer_dictionary(df: pd.DataFrame, cache_key_prefix: str = "customer_dict") -> dict:
+def build_customer_dictionary(df: pd.DataFrame) -> dict:
     """
-    Build and cache a dictionary of customers:
+    Build a dictionary of customers:
     - Tracks add_to_cart, purchase, and campaigns used
     - Includes latest customer name
     - Includes all events from any of their visitor IDs
@@ -319,24 +318,6 @@ def build_customer_dictionary(df: pd.DataFrame, cache_key_prefix: str = "custome
     if df.empty:
         return {}
 
-    # 🔹 Generate a stable cache key based on data hash
-    # (This ensures cache invalidates automatically if data changes)
-    df_sample = df[["Visitor_ID", "Session_ID", "Event_Type", "Event_Details", 
-                    "UTM_Campaign", "Customer_ID", "Customer_Email", 
-                    "Customer_Mobile", "Customer_Name", "Visited_at"]].copy()
-
-    # Hash only first N rows to avoid slowing down hashing on huge dataframes
-    # (you can tune 1000 depending on expected changes)
-    hash_input = df_sample.head(1000).to_json(orient="records", date_format="iso")
-    cache_hash = hashlib.md5(hash_input.encode("utf-8")).hexdigest()
-    cache_key = f"{cache_key_prefix}:{cache_hash}"
-
-    # 🔸 Try to get from cache
-    cached_result = cache.get(cache_key)
-    if cached_result is not None:
-        return cached_result
-
-    # 🧪 If not cached → build it
     df = df.copy()
 
     # Normalize columns
@@ -352,7 +333,7 @@ def build_customer_dictionary(df: pd.DataFrame, cache_key_prefix: str = "custome
     )
     df["Visited_at"] = pd.to_datetime(df["Visited_at"], errors="coerce")
 
-    # Extract missing Customer_ID from Event_Details
+    # Extract Customer_ID from Event_Details if missing
     def extract_customer_id(row):
         if row["Customer_ID"]:
             return row["Customer_ID"]
@@ -367,7 +348,7 @@ def build_customer_dictionary(df: pd.DataFrame, cache_key_prefix: str = "custome
 
     df["Customer_ID"] = df.apply(extract_customer_id, axis=1)
 
-    # Unified key
+    # Define unified key
     def get_customer_key(row):
         if row["Customer_ID"]:
             return row["Customer_ID"]
@@ -380,34 +361,31 @@ def build_customer_dictionary(df: pd.DataFrame, cache_key_prefix: str = "custome
     df["customer_key"] = df.apply(get_customer_key, axis=1)
     df = df[df["customer_key"].notna()]
 
-    # Map visitor IDs per customer
+    customer_dict = {}
+
+    # First, get visitor IDs for each customer
     customer_visitors_map = (
         df.groupby("customer_key")["Visitor_ID"]
         .apply(lambda x: set([v for v in x if v]))
         .to_dict()
     )
 
-    customer_dict = {}
-
-    # ⚡ Instead of applying mask repeatedly → pre-index by visitor_id
-    visitor_to_rows = {v: df[df["Visitor_ID"] == v] for v in df["Visitor_ID"].unique() if v}
-
     for key, visitor_ids in customer_visitors_map.items():
-        # Combine customer_key rows and all visitor_id rows
-        customer_rows = df[df["customer_key"] == key]
-        for v in visitor_ids:
-            if v in visitor_to_rows:
-                customer_rows = pd.concat([customer_rows, visitor_to_rows[v]], ignore_index=True)
+        # Filter all rows where customer_key matches OR visitor_id is in this set
+        mask = (df["customer_key"] == key) | (df["Visitor_ID"].isin(visitor_ids))
+        customer_rows = df[mask]
 
-        # Filter relevant events
+        # Only relevant events
         stats_rows = customer_rows[customer_rows["Event_Type"].isin(["add_to_cart", "purchase"])]
 
+        # Stats
         add_to_cart_count = (stats_rows["Event_Type"] == "add_to_cart").sum()
         purchase_count = (stats_rows["Event_Type"] == "purchase").sum()
         campaigns = list(set(stats_rows["UTM_Campaign"]) - {""})
 
-        latest_name = ""
+        # Latest name
         name_rows = customer_rows[customer_rows["Customer_Name"] != ""]
+        latest_name = ""
         if not name_rows.empty:
             latest_name = name_rows.sort_values("Visited_at").iloc[-1]["Customer_Name"]
 
@@ -418,9 +396,6 @@ def build_customer_dictionary(df: pd.DataFrame, cache_key_prefix: str = "custome
             "purchases": int(purchase_count),
             "campaigns": campaigns,
         }
-
-    # ✅ Save to cache for 10 minutes (adjust as needed)
-    cache.set(cache_key, customer_dict, timeout=3600)  # 1 hour
 
     return customer_dict
 
@@ -535,3 +510,97 @@ def attribute_purchases_to_campaigns(df: pd.DataFrame):
 
     return campaign_summary, source_summary
 
+def update_customer_tracking(df: pd.DataFrame):
+    """
+    Update the Customer_Tracking table incrementally.
+    Only process new events per customer after their last updated_at.
+    """
+    if df.empty:
+        return {}
+
+    # Fetch existing customer tracking table
+    customer_tracking_df = fetch_data_from_supabase("Customer_Tracking")
+
+    # Normalize customer_tracking_df
+    if customer_tracking_df.empty:
+        customer_tracking_df = pd.DataFrame(columns=[
+            "customer_key", "customer_name", "visitor_ids",
+            "add_to_cart", "purchases", "campaigns", "updated_at"
+        ])
+    else:
+        # Convert JSON columns back to Python objects
+        customer_tracking_df["visitor_ids"] = customer_tracking_df["visitor_ids"].apply(lambda x: set(json.loads(x) if x else []))
+        customer_tracking_df["campaigns"] = customer_tracking_df["campaigns"].apply(lambda x: list(json.loads(x) if x else []))
+        customer_tracking_df["updated_at"] = pd.to_datetime(customer_tracking_df["updated_at"], errors="coerce")
+
+    # Normalize incoming df
+    for col in ["Customer_ID", "Customer_Email", "Customer_Mobile", "Customer_Name", "Visitor_ID"]:
+        df[col] = df.get(col, "").fillna("").astype(str).str.strip()
+    df["UTM_Campaign"] = df.get("UTM_Campaign", "").fillna("").astype(str).str.replace("+", " ", regex=False).str.strip()
+    df["Visited_at"] = pd.to_datetime(df["Visited_at"], errors="coerce")
+
+    # Extract customer_key
+    def get_customer_key(row):
+        if row["Customer_ID"]:
+            return row["Customer_ID"]
+        elif row["Customer_Email"]:
+            return row["Customer_Email"].lower()
+        elif row["Customer_Mobile"]:
+            return row["Customer_Mobile"]
+        return None
+    df["customer_key"] = df.apply(get_customer_key, axis=1)
+    df = df[df["customer_key"].notna()]
+
+    # Build incremental updates
+    updated_rows = []
+    for key, group in df.groupby("customer_key"):
+        last_updated = customer_tracking_df.loc[customer_tracking_df["customer_key"] == key, "updated_at"]
+        if not last_updated.empty:
+            last_updated = last_updated.iloc[0]
+            group = group[group["Visited_at"] > last_updated]
+
+        if group.empty:
+            continue  # nothing new to process
+
+        # Stats
+        add_to_cart_count = (group["Event_Type"] == "add_to_cart").sum()
+        purchase_count = (group["Event_Type"] == "purchase").sum()
+        campaigns = list(set(group["UTM_Campaign"]) - {""})
+        visitor_ids = set(group["Visitor_ID"])
+
+        # Merge with existing data
+        if key in customer_tracking_df["customer_key"].values:
+            existing = customer_tracking_df.loc[customer_tracking_df["customer_key"] == key].iloc[0]
+            add_to_cart_count += int(existing["add_to_cart"])
+            purchase_count += int(existing["purchases"])
+            campaigns = list(set(existing["campaigns"]) | set(campaigns))
+            visitor_ids = visitor_ids | set(existing["visitor_ids"])
+            latest_name = group.loc[group["Customer_Name"] != "", "Customer_Name"].sort_values().iloc[-1] if not group.loc[group["Customer_Name"] != ""].empty else existing["customer_name"]
+        else:
+            latest_name = group.loc[group["Customer_Name"] != "", "Customer_Name"].sort_values().iloc[-1] if not group.loc[group["Customer_Name"] != ""].empty else ""
+
+        # Update timestamp
+        updated_at = group["Visited_at"].max()
+
+        updated_rows.append({
+            "customer_key": key,
+            "customer_name": latest_name,
+            "visitor_ids": json.dumps(list(visitor_ids)),
+            "add_to_cart": int(add_to_cart_count),
+            "purchases": int(purchase_count),
+            "campaigns": json.dumps(campaigns),
+            "updated_at": updated_at
+        })
+
+    # Upsert back to Supabase
+    for row in updated_rows:
+        supabase.table("Customer_Tracking").upsert(row, on_conflict="customer_key").execute()
+
+    # Return as dictionary for immediate use
+    return {row["customer_key"]: {
+        "customer_name": row["customer_name"],
+        "visitor_ids": set(json.loads(row["visitor_ids"])),
+        "add_to_cart": row["add_to_cart"],
+        "purchases": row["purchases"],
+        "campaigns": json.loads(row["campaigns"])
+    } for row in updated_rows}

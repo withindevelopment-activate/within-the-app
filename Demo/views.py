@@ -16,7 +16,7 @@ from dateutil import parser
 
 
 # Supabase & Supporting imports
-from .supabase_functions import batch_insert_to_supabase, get_next_id_from_supabase_compatible_all, get_tracking_df, build_customer_dictionary, attribute_purchases_to_campaigns
+from .supabase_functions import batch_insert_to_supabase, get_next_id_from_supabase_compatible_all, get_tracking_df, build_customer_dictionary, attribute_purchases_to_campaigns, update_customer_tracking
 from .supporting_functions import get_uae_current_date
 # Marketing Report functions
 from .marketing_report import create_general_analysis, create_product_percentage_amount_spent, landing_performance_5_async, column_check
@@ -826,14 +826,16 @@ def view_tracking(request):
     
     rows = []
     total_visitors = total_sessions = total_pageviews = 0
-    customer_dict = {}
     campaigns_summary = []
     sources_summary = []
     context = {}
 
     try:
+        # --- Fetch tracking events ---
         df = get_tracking_df()
-        df["Visited_at"] = pd.to_datetime(df["Visited_at"])
+        if df.empty:
+            messages.warning(request, "No tracking data available.")
+            return redirect("Demo:home")
 
         # --- Apply filters ---
         visitor_filter = request.GET.get("visitor")
@@ -841,6 +843,7 @@ def view_tracking(request):
         from_date = request.GET.get("from")
         to_date = request.GET.get("to")
 
+        df["Visited_at"] = pd.to_datetime(df["Visited_at"], errors="coerce")
         if visitor_filter:
             df = df[df["Visitor_ID"] == visitor_filter]
         if session_filter:
@@ -850,7 +853,7 @@ def view_tracking(request):
         if to_date:
             df = df[df["Visited_at"] <= to_date]
 
-        # --- Last 30 min stats ---
+        # --- Last 30 minutes stats ---
         thirty_minutes_ago = datetime.now(uae_timezone) - timedelta(minutes=30)
         df_last_30min = df[df["Visited_at"].dt.tz_localize("Asia/Dubai", ambiguous='NaT', nonexistent='shift_forward') >= thirty_minutes_ago]
         total_visitors = df_last_30min["Visitor_ID"].nunique()
@@ -860,15 +863,15 @@ def view_tracking(request):
         # --- Top 50 rows for display ---
         rows = df.sort_values(by="Visited_at", ascending=False).head(50).to_dict(orient="records")
 
-        # --- Customer dictionary ---
-        customer_dict = build_customer_dictionary(df)
+        # --- Incremental customer tracking ---
+        customer_dict = update_customer_tracking(df)
 
-        # --- Campaign results ---
+        # --- Campaign attribution ---
         campaigns_summary_df, sources_summary_df = attribute_purchases_to_campaigns(df)
-
         campaigns_summary = campaigns_summary_df.to_dict(orient="records")
         sources_summary = sources_summary_df.to_dict(orient="records")
 
+        # --- Build context ---
         context = {
             "store_id": store_id,
             "rows": rows,
@@ -891,6 +894,7 @@ def view_tracking(request):
         return redirect("Demo:home")
 
     return render(request, "Demo/tracking_view.html", context=context)
+
 
 def abandoned_carts_page(request):
     token = request.session.get('access_token')
