@@ -1738,7 +1738,7 @@ def meta_callback(request):
 
 # --- EXCHANGE LONG-LIVED TOKEN ---
 def exchange_long_lived_token(short_token):
-    url = settings.OAUTH_PROVIDERS['meta']['long_lived_token_url']
+    url = settings.OAUTH_PROVIDERS['meta']['token_url']
     params = {
         "grant_type": "fb_exchange_token",
         "client_id": settings.META_APP_ID,
