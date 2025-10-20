@@ -1763,7 +1763,7 @@ def meta_ad_accounts(request):
     if not token:
         return redirect("Demo:meta_login")
 
-    url = f"{settings.OAUTH_PROVIDERS['meta']['graph_api_base']}/me/adaccounts"
+    url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/me/adaccounts"
     params = {"access_token": token}
 
     try:
@@ -1799,7 +1799,7 @@ def meta_select_ad_account(request, account_id=None):
 
     # Fetch accounts again
     token = request.session["meta_access_token"]
-    url = f"{settings.OAUTH_PROVIDERS['meta']['graph_api_base']}/me/adaccounts"
+    url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/me/adaccounts"
     params = {"access_token": token}
     resp = requests.get(url, params=params)
     accounts = resp.json().get("data", [])
@@ -1817,14 +1817,14 @@ def meta_campaigns(request):
         return HttpResponse("No ad account selected", status=400)
 
     # Fetch campaigns
-    url = f"{settings.OAUTH_PROVIDERS['meta']['graph_api_base']}/{account_id}/campaigns"
+    url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/{account_id}/campaigns"
     params = {"access_token": token, "fields": "id,name,status,daily_budget"}
     resp = requests.get(url, params=params)
     campaigns = resp.json().get("data", [])
 
     # Optional: enrich with insights
     for camp in campaigns:
-        insights_url = f"{settings.OAUTH_PROVIDERS['meta']['graph_api_base']}/{camp['id']}/insights"
+        insights_url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/{camp['id']}/insights"
         insights_params = {"access_token": token, "fields": "spend,impressions,clicks,actions"}
         try:
             r = requests.get(insights_url, params=insights_params)
