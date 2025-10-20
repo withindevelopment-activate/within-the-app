@@ -1730,7 +1730,7 @@ def meta_callback(request):
         request.session["meta_access_token"] = long_lived_token or short_lived_token
         request.session["meta_token_expires_at"] = expiry.isoformat()
 
-        return redirect("Demo:meta_ad_accounts")
+        return redirect("Demo:meta_select_ad_account")
 
     except requests.RequestException as e:
         return HttpResponse(f"Token exchange failed: {e}", status=500)
