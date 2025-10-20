@@ -443,7 +443,7 @@ def match_orders_with_analytics(request):
 @require_POST
 def save_tracking(request):
     try:
-        print("ENTERED THE TRACKING FUNCTION")
+        #print("ENTERED THE TRACKING FUNCTION")
 
         import json
         try:
@@ -451,7 +451,7 @@ def save_tracking(request):
         except Exception:
             return JsonResponse({"status": "error", "message": "Invalid JSON payload"}, status=400)
 
-        print("The data received is:", data)
+        #print("The data received is:", data)
         if not data:
             return JsonResponse({"status": "error", "message": "No JSON payload received"}, status=400)
 

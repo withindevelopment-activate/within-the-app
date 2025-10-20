@@ -1,0 +1,38 @@
+{% extends "Demo/base.html" %}
+{% block content %}
+<div class="container mt-5">
+  <h2 class="mb-4">📊 Price Change Monitor</h2>
+
+  <table class="table table-striped table-hover">
+    <thead class="table-dark">
+      <tr>
+        <th>SKU</th>
+        <th>Product Name</th>
+        <th>Variant?</th>
+        <th>Old Price</th>
+        <th>New Price</th>
+        <th>Current Price</th>
+        <th>Last Update Date</th>
+        <th>Orders After Update</th>
+        <th>Last Updated</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in records %}
+      <tr>
+        <td>{{ row.SKU }}</td>
+        <td>{{ row.Product_Name }}</td>
+        <td>{{ row.Old_Price }}</td>
+        <td>{{ row.New_Price }}</td>
+        <td>{{ row.Current_Price }}</td>
+        <td>{{ row.Last_Update_Date }}</td>
+        <td>{{ row.Orders_After_Update }}</td>
+        <td>{{ row.Last_Updated }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="9" class="text-center">No records found</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
