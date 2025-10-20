@@ -1154,6 +1154,7 @@ def snapchat_callback(request):
         response = requests.post(token_url, data=data)
         response.raise_for_status()
         token_data = response.json()
+        print("Snapchat's Token Data is:", token_data)
 
         # 4. Store the tokens securely in the session.
         request.session["snapchat_access_token"] = token_data["access_token"]
@@ -1485,7 +1486,7 @@ def tiktok_callback(request):
 
     resp = requests.post(TOKEN_URL, json=data, headers={"Content-Type": "application/json"}, timeout=10)
     tokens = resp.json()
-    print("Parsed tokens:", tokens)
+    print("Tiktok's token data is:", tokens)
 
     if not tokens:
         return redirect("Demo:tiktok_login")
