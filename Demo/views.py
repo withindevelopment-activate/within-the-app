@@ -17,7 +17,7 @@ from dateutil import parser
 
 ## Custom Imports ------------------
 # Supabase & Supporting imports
-from Demo.supporting_files.supabase_functions import batch_insert_to_supabase, get_next_id_from_supabase_compatible_all, get_tracking_df, attribute_purchases_to_campaigns, update_customer_tracking, build_visitor_dictionary
+from Demo.supporting_files.supabase_functions import batch_insert_to_supabase, get_next_id_from_supabase_compatible_all, get_tracking_df, attribute_purchases_to_campaigns, build_visitor_dictionary
 from Demo.supporting_files.supporting_functions import get_uae_current_date
 # Marketing Report functions
 from Demo.supporting_files.marketing_report import create_general_analysis, create_product_percentage_amount_spent, landing_performance_5_async, column_check
