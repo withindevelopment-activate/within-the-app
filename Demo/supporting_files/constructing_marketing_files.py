@@ -158,3 +158,6 @@ def create_tiktok_file(start_date, end_date, store_id):
     print("========== END OF TIKTOK CAMPAIGN FETCH ==========\n")
 
     return enriched
+
+def create_snapchat_file():
+    return
