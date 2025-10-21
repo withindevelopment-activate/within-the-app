@@ -32,6 +32,15 @@
       <label for="end_date" class="form-label">End Date</label>
       <input type="date" id="end_date" name="end_date" class="form-control" value="{{ end_date }}">
     </div>
+    <div class="col-md-3">
+      <label for="status" class="form-label">Campaign Status</label>
+      <select id="status" name="status" class="form-select">
+        <option value="ACTIVE" {% if status_filter == "ACTIVE" %}selected{% endif %}>Active</option>
+        <option value="PAUSED" {% if status_filter == "PAUSED" %}selected{% endif %}>Paused</option>
+        <option value="DELETED" {% if status_filter == "DELETED" %}selected{% endif %}>Deleted</option>
+        <option value="ALL" {% if status_filter == "ALL" %}selected{% endif %}>All</option>
+      </select>
+    </div>
     <div class="col-md-3 d-flex align-items-end mt-3">
       <button type="submit" class="btn btn-primary w-100">Filter</button>
     </div>
