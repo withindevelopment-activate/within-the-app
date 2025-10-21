@@ -1980,6 +1980,12 @@ def meta_select_ad_account(request, account_id=None):
 
 from django.core.paginator import Paginator
 
+import json
+import requests
+from django.conf import settings
+from django.shortcuts import render, redirect
+from django.contrib import messages
+
 def meta_campaigns(request):
     token = request.session.get("meta_access_token")
     account_id = request.session.get("meta_ad_account_id")
@@ -1990,30 +1996,32 @@ def meta_campaigns(request):
         return redirect("Demo:meta_select_ad_account")
 
     # --- Filters ---
-    date_preset = request.GET.get("date_preset", "last_7d")
+    date_preset = request.GET.get("date_preset", "last_7d")  # Default date preset
     start_date = request.GET.get("start_date")
     end_date = request.GET.get("end_date")
-    status_filter = request.GET.get("status", "ACTIVE")  # Default is ACTIVE
+    status_filter = request.GET.getlist("status") or ["ACTIVE"]  # Default ACTIVE
+    is_completed = request.GET.get("is_completed")  # optional
 
-    # --- Prepare campaign params ---
+    # --- Campaign request ---
+    campaigns_url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/{account_id}/campaigns"
+
     campaigns_params = {
         "access_token": token,
         "fields": "id,name,status",
-        "limit": 100
+        "limit": 100,
+        "effective_status": json.dumps(status_filter)
     }
 
-    # Add date range
+    # Add date range or preset
     if start_date and end_date:
         campaigns_params["time_range"] = json.dumps({"since": start_date, "until": end_date})
     else:
         campaigns_params["date_preset"] = date_preset
 
-    # Add status filter for API (Meta accepts effective_status as a list)
-    if status_filter != "ALL":
-        campaigns_params["effective_status"] = json.dumps([status_filter])
+    # Add completion filter if provided
+    if is_completed:
+        campaigns_params["is_completed"] = True
 
-    # --- Fetch campaigns ---
-    campaigns_url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/{account_id}/campaigns"
     try:
         resp = requests.get(campaigns_url, params=campaigns_params)
         resp.raise_for_status()
@@ -2022,79 +2030,89 @@ def meta_campaigns(request):
         messages.error(request, f"Failed to fetch campaigns: {e}")
         campaigns = []
 
-    # --- Fetch ad sets and insights ---
+    all_rows = []
+
+    # --- For each campaign, fetch adsets + insights ---
     for camp in campaigns:
-        adsets_url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/{camp['id']}/adsets"
+        camp_id = camp.get("id")
+        camp_name = camp.get("name")
+        camp_status = camp.get("status")
+
+        # Fetch ad sets
+        adsets_url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/{camp_id}/adsets"
         adsets_params = {
             "access_token": token,
-            "fields": "id,name,daily_budget,budget_remaining,updated_time,campaign_id",
+            "fields": "id,name,daily_budget,budget_remaining,updated_time",
             "limit": 100
         }
-        try:
-            r = requests.get(adsets_url, params=adsets_params)
-            r.raise_for_status()
-            camp["adsets"] = r.json().get("data", [])
-        except requests.RequestException as e:
-            camp["adsets"] = []
-            messages.warning(request, f"Failed to fetch adsets for {camp['name']}: {e}")
 
-        # Insights
-        insights_url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/{camp['id']}/insights"
-        insights_params = {"access_token": token, "fields": "spend,impressions,clicks,actions"}
+        try:
+            ad_resp = requests.get(adsets_url, params=adsets_params)
+            ad_resp.raise_for_status()
+            adsets = ad_resp.json().get("data", [])
+        except requests.RequestException as e:
+            adsets = []
+            messages.warning(request, f"Failed to fetch ad sets for {camp_name}: {e}")
+
+        # Fetch insights
+        insights_url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/{camp_id}/insights"
+        insights_params = {
+            "access_token": token,
+            "fields": "spend,impressions,clicks,actions",
+        }
+
+        # Apply date filter to insights
         if start_date and end_date:
             insights_params["time_range"] = json.dumps({"since": start_date, "until": end_date})
         else:
             insights_params["date_preset"] = date_preset
 
         try:
-            r = requests.get(insights_url, params=insights_params)
-            r.raise_for_status()
-            data = r.json().get("data", [])
-            camp["insights"] = data[0] if data else {}
+            ins_resp = requests.get(insights_url, params=insights_params)
+            ins_resp.raise_for_status()
+            insights_data = ins_resp.json().get("data", [])
+            insights = insights_data[0] if insights_data else {}
         except requests.RequestException as e:
-            camp["insights"] = {}
-            messages.warning(request, f"No insights for {camp['name']}: {e}")
+            insights = {}
+            messages.warning(request, f"No insights for {camp_name}: {e}")
 
-    # Flatten campaigns + adsets for table rows
-    table_rows = []
-    for camp in campaigns:
-        for adset in camp.get("adsets", []):
-            metrics = camp.get("insights", {})
-            purchases_value = 0
-            if "actions" in metrics:
-                for action in metrics["actions"]:
-                    if action.get("action_type") == "purchase":
-                        purchases_value = float(action.get("value", 0))
-            spend = float(metrics.get("spend", 0))
-            adset_row = {
-                "campaign_id": camp["id"],
-                "campaign_name": camp["name"],
-                "campaign_status": camp["status"],
-                "adset_name": adset["name"],
+        # Calculate ROAS and collect metrics
+        spend = float(insights.get("spend", 0))
+        clicks = int(insights.get("clicks", 0))
+        impressions = int(insights.get("impressions", 0))
+        purchases_value = 0
+
+        for act in insights.get("actions", []) or []:
+            if act.get("action_type") == "purchase":
+                purchases_value = float(act.get("value", 0))
+
+        roas = round(purchases_value / spend, 2) if spend else 0
+
+        # Build table data (each ad set = 1 row)
+        for adset in adsets:
+            all_rows.append({
+                "campaign_id": camp_id,
+                "campaign_name": camp_name,
+                "campaign_status": camp_status,
+                "adset_id": adset.get("id"),
+                "adset_name": adset.get("name"),
                 "daily_budget": int(adset.get("daily_budget", 0)),
                 "budget_remaining": int(adset.get("budget_remaining", 0)),
                 "updated_time": adset.get("updated_time"),
-                "roas": round(purchases_value / spend, 2) if spend else 0,
                 "spend": spend,
-                "clicks": int(metrics.get("clicks", 0)),
-                "impressions": int(metrics.get("impressions", 0)),
+                "clicks": clicks,
+                "impressions": impressions,
                 "purchases_value": purchases_value,
-            }
-            table_rows.append(adset_row)
-
-    # Pagination
-    page_number = request.GET.get("page", 1)
-    paginator = Paginator(table_rows, 10)  # 10 rows per page
-    page_obj = paginator.get_page(page_number)
+                "roas": roas,
+            })
 
     return render(request, "Demo/meta_campaigns.html", {
-        "page_obj": page_obj,
+        "table_rows": all_rows,
         "date_preset": date_preset,
         "start_date": start_date,
         "end_date": end_date,
-        "status_filter": status_filter
+        "status_filter": status_filter,
     })
-
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++==
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
