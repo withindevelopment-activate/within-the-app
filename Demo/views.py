@@ -1462,7 +1462,7 @@ def snapchat_select_account(request, org_id, ad_account_id=None):
     # If an ad account is selected, save it and redirect to campaigns
     if ad_account_id:
         request.session["snap_ad_account_id"] = ad_account_id
-        return redirect("Demo:snapchat_campaigns_overview")
+        return redirect("Demo:campaigns_overview")
 
     # Fetch ad accounts for the organization
     accounts_data = snapchat_api_call(request, f"organizations/{org_id}/adaccounts")
@@ -1515,11 +1515,11 @@ def campaigns_overview(request):
     # Step 1: Get org & ad account
     organization_id = request.session.get("snap_org_id")
     if not organization_id:
-        return redirect("Demo:select_org")
+        return redirect("Demo:snapchat_select_organization")
 
     ad_account_id = request.session.get("snap_ad_account_id")
     if not ad_account_id:
-        return redirect("Demo:select_account", org_id=organization_id)
+        return redirect("Demo:snapchat_select_account", org_id=organization_id)
 
     # Step 2: Get campaigns
     campaigns_data = snapchat_api_call(request, f"adaccounts/{ad_account_id}/campaigns")
