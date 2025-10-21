@@ -1995,9 +1995,25 @@ def meta_campaigns(request):
     end_date = request.GET.get("end_date")
     status_filter = request.GET.get("status", "ACTIVE")  # Default is ACTIVE
 
+    # --- Prepare campaign params ---
+    campaigns_params = {
+        "access_token": token,
+        "fields": "id,name,status",
+        "limit": 100
+    }
+
+    # Add date range
+    if start_date and end_date:
+        campaigns_params["time_range"] = json.dumps({"since": start_date, "until": end_date})
+    else:
+        campaigns_params["date_preset"] = date_preset
+
+    # Add status filter for API (Meta accepts effective_status as a list)
+    if status_filter != "ALL":
+        campaigns_params["effective_status"] = json.dumps([status_filter])
+
     # --- Fetch campaigns ---
     campaigns_url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/{account_id}/campaigns"
-    campaigns_params = {"access_token": token, "fields": "id,name,status", "limit": 100}
     try:
         resp = requests.get(campaigns_url, params=campaigns_params)
         resp.raise_for_status()
@@ -2005,10 +2021,6 @@ def meta_campaigns(request):
     except Exception as e:
         messages.error(request, f"Failed to fetch campaigns: {e}")
         campaigns = []
-
-    # --- Apply status filter ---
-    if status_filter != "ALL":
-        campaigns = [c for c in campaigns if c.get("status") == status_filter]
 
     # --- Fetch ad sets and insights ---
     for camp in campaigns:
@@ -2082,6 +2094,7 @@ def meta_campaigns(request):
         "end_date": end_date,
         "status_filter": status_filter
     })
+
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++==
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
