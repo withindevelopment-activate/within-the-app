@@ -2008,7 +2008,7 @@ def meta_campaigns(request):
     campaigns_params = {
         "access_token": token,
         "fields": "id,name,status",
-        "limit": 100,
+        "limit": 10,
         "effective_status": json.dumps(status_filter)
     }
 
@@ -2043,7 +2043,7 @@ def meta_campaigns(request):
         adsets_params = {
             "access_token": token,
             "fields": "id,name,daily_budget,budget_remaining,updated_time",
-            "limit": 100
+            "limit": 10
         }
 
         try:
