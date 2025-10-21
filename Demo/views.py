@@ -17,7 +17,7 @@ from dateutil import parser
 
 ## Custom Imports ------------------
 # Supabase & Supporting imports
-from Demo.supporting_files.supabase_functions import batch_insert_to_supabase, get_next_id_from_supabase_compatible_all, get_tracking_df, build_customer_dictionary, attribute_purchases_to_campaigns, update_customer_tracking
+from Demo.supporting_files.supabase_functions import batch_insert_to_supabase, get_next_id_from_supabase_compatible_all, get_tracking_df, attribute_purchases_to_campaigns, update_customer_tracking, build_visitor_dictionary
 from Demo.supporting_files.supporting_functions import get_uae_current_date
 # Marketing Report functions
 from Demo.supporting_files.marketing_report import create_general_analysis, create_product_percentage_amount_spent, landing_performance_5_async, column_check
@@ -1019,7 +1019,7 @@ def view_tracking(request):
         rows = df.sort_values(by="Visited_at", ascending=False).head(50).to_dict(orient="records")
 
         # --- Incremental customer tracking ---
-        customer_dict = update_customer_tracking(df)
+        customer_dict = build_visitor_dictionary(df)
 
         # --- Campaign attribution ---
         campaigns_summary_df, sources_summary_df = attribute_purchases_to_campaigns(df)

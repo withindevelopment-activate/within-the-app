@@ -166,9 +166,11 @@
         <table class="data-table" role="table" aria-label="Tracking dataset">
           <thead>
             <tr>
-              <th>Customer Key</th>
               <th>Visitor IDs</th>
+              <th>Session IDs</th>
               <th>Name</th>
+              <th>Email</th>
+              <th>Phone</th>
               <th>Campaigns</th>
               <th>Add to Cart</th>
               <th>Purchases</th>
@@ -178,8 +180,10 @@
             {% for key, c in customer_dict.items %}
             <tr>
               <td>{{ key }}</td>
-              <td>{{ c.visitor_ids|join:", " }}</td>
+              <td>{{ c.session_ids|join:", " }}</td>
               <td>{{ c.customer_name }}</td>
+              <td>{{ c.customer_email }}</td>
+              <td>{{ c.customer_phone }}</td>
               <td>{{ c.campaigns|join:", " }}</td>
               <td>{{ c.add_to_cart }}</td>
               <td>{{ c.purchases }}</td>

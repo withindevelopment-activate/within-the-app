@@ -337,24 +337,133 @@ def get_tracking_df():
         df["Visited_at"] = pd.to_datetime(df["Visited_at"], errors="coerce")
     return df
 
-def build_customer_dictionary(df: pd.DataFrame) -> dict:
+# def build_customer_dictionary(df: pd.DataFrame) -> dict:
+#     """
+#     Build a dictionary of customers:
+#     - Tracks add_to_cart, purchase, and campaigns used
+#     - Includes latest customer name
+#     - Includes all events from any of their visitor IDs
+#     """
+#     if df.empty:
+#         return {}
+
+#     df = df.copy()
+
+#     # Normalize columns
+#     for col in ["Customer_ID", "Customer_Email", "Customer_Mobile", "Customer_Name", "Visitor_ID"]:
+#         df[col] = df.get(col, "").fillna("").astype(str).str.strip()
+
+#     df["UTM_Campaign"] = (
+#         df.get("UTM_Campaign", "")
+#         .fillna("")
+#         .astype(str)
+#         .str.replace("+", " ", regex=False)
+#         .str.strip()
+#     )
+#     df["Visited_at"] = pd.to_datetime(df["Visited_at"], errors="coerce")
+
+#     # Extract Customer_ID from Event_Details if missing
+#     def extract_customer_id(row):
+#         if row["Customer_ID"]:
+#             return row["Customer_ID"]
+#         details = row.get("Event_Details")
+#         if pd.isna(details) or not details:
+#             return ""
+#         try:
+#             d = json.loads(details.replace("'", '"'))
+#             return str(d.get("customer_id", "")) or ""
+#         except Exception:
+#             return ""
+
+#     df["Customer_ID"] = df.apply(extract_customer_id, axis=1)
+
+#     # Define unified key
+#     def get_customer_key(row):
+#         if row["Customer_ID"]:
+#             return row["Customer_ID"]
+#         elif row["Customer_Email"]:
+#             return row["Customer_Email"].lower()
+#         elif row["Customer_Mobile"]:
+#             return row["Customer_Mobile"]
+#         return None
+
+#     df["customer_key"] = df.apply(get_customer_key, axis=1)
+#     df = df[df["customer_key"].notna()]
+
+#     customer_dict = {}
+
+#     # First, get visitor IDs for each customer
+#     customer_visitors_map = (
+#         df.groupby("customer_key")["Visitor_ID"]
+#         .apply(lambda x: set([v for v in x if v]))
+#         .to_dict()
+#     )
+
+#     for key, visitor_ids in customer_visitors_map.items():
+#         # Filter all rows where customer_key matches OR visitor_id is in this set
+#         mask = (df["customer_key"] == key) | (df["Visitor_ID"].isin(visitor_ids))
+#         customer_rows = df[mask]
+
+#         # Only relevant events
+#         stats_rows = customer_rows[customer_rows["Event_Type"].isin(["add_to_cart", "purchase"])]
+
+#         # Stats
+#         add_to_cart_count = (stats_rows["Event_Type"] == "add_to_cart").sum()
+#         purchase_count = (stats_rows["Event_Type"] == "purchase").sum()
+#         campaigns = list(set(stats_rows["UTM_Campaign"]) - {""})
+
+#         # Latest name
+#         name_rows = customer_rows[customer_rows["Customer_Name"] != ""]
+#         latest_name = ""
+#         if not name_rows.empty:
+#             latest_name = name_rows.sort_values("Visited_at").iloc[-1]["Customer_Name"]
+
+#         customer_dict[key] = {
+#             "customer_name": latest_name,
+#             "visitor_ids": visitor_ids,
+#             "add_to_cart": int(add_to_cart_count),
+#             "purchases": int(purchase_count),
+#             "campaigns": campaigns,
+#         }
+
+#     return customer_dict
+
+import pandas as pd
+import json
+
+def build_visitor_dictionary(df: pd.DataFrame) -> dict:
     """
-    Build a dictionary of customers:
-    - Tracks add_to_cart, purchase, and campaigns used
-    - Includes latest customer name
-    - Includes all events from any of their visitor IDs
+    Build a dictionary of visitors:
+    - Tracks session_ids, add_to_cart, purchase, and campaigns used
+    - Includes latest customer name, email, and phone
     """
+
     if df.empty:
         return {}
 
     df = df.copy()
 
-    # Normalize columns
-    for col in ["Customer_ID", "Customer_Email", "Customer_Mobile", "Customer_Name", "Visitor_ID"]:
-        df[col] = df.get(col, "").fillna("").astype(str).str.strip()
+    # Normalize expected columns
+    for col in [
+        "Visitor_ID",
+        "Session_ID",
+        "Customer_Name",
+        "Customer_Email",
+        "Customer_Mobile",
+        "UTM_Campaign",
+        "Event_Type",
+        "Visited_at",
+    ]:
+        if col not in df.columns:
+            df[col] = ""
 
+    df["Visitor_ID"] = df["Visitor_ID"].fillna("").astype(str).str.strip()
+    df["Session_ID"] = df["Session_ID"].fillna("").astype(str).str.strip()
+    df["Customer_Name"] = df["Customer_Name"].fillna("").astype(str).str.strip()
+    df["Customer_Email"] = df["Customer_Email"].fillna("").astype(str).str.strip().str.lower()
+    df["Customer_Mobile"] = df["Customer_Mobile"].fillna("").astype(str).str.strip()
     df["UTM_Campaign"] = (
-        df.get("UTM_Campaign", "")
+        df["UTM_Campaign"]
         .fillna("")
         .astype(str)
         .str.replace("+", " ", regex=False)
@@ -362,71 +471,35 @@ def build_customer_dictionary(df: pd.DataFrame) -> dict:
     )
     df["Visited_at"] = pd.to_datetime(df["Visited_at"], errors="coerce")
 
-    # Extract Customer_ID from Event_Details if missing
-    def extract_customer_id(row):
-        if row["Customer_ID"]:
-            return row["Customer_ID"]
-        details = row.get("Event_Details")
-        if pd.isna(details) or not details:
-            return ""
-        try:
-            d = json.loads(details.replace("'", '"'))
-            return str(d.get("customer_id", "")) or ""
-        except Exception:
-            return ""
+    # Filter valid visitor IDs
+    df = df[df["Visitor_ID"] != ""]
+    visitor_dict = {}
 
-    df["Customer_ID"] = df.apply(extract_customer_id, axis=1)
+    for visitor_id, group in df.groupby("Visitor_ID"):
+        # Unique sessions & campaigns
+        session_ids = list(set(group["Session_ID"]) - {""})
+        campaigns = list(set(group["UTM_Campaign"]) - {""})
 
-    # Define unified key
-    def get_customer_key(row):
-        if row["Customer_ID"]:
-            return row["Customer_ID"]
-        elif row["Customer_Email"]:
-            return row["Customer_Email"].lower()
-        elif row["Customer_Mobile"]:
-            return row["Customer_Mobile"]
-        return None
+        # Event counts
+        add_to_cart_count = (group["Event_Type"] == "add_to_cart").sum()
+        purchase_count = (group["Event_Type"] == "purchase").sum()
 
-    df["customer_key"] = df.apply(get_customer_key, axis=1)
-    df = df[df["customer_key"].notna()]
+        # Latest name, email, phone based on visited_at
+        group_sorted = group.sort_values("Visited_at")
+        latest_row = group_sorted.iloc[-1]
 
-    customer_dict = {}
-
-    # First, get visitor IDs for each customer
-    customer_visitors_map = (
-        df.groupby("customer_key")["Visitor_ID"]
-        .apply(lambda x: set([v for v in x if v]))
-        .to_dict()
-    )
-
-    for key, visitor_ids in customer_visitors_map.items():
-        # Filter all rows where customer_key matches OR visitor_id is in this set
-        mask = (df["customer_key"] == key) | (df["Visitor_ID"].isin(visitor_ids))
-        customer_rows = df[mask]
-
-        # Only relevant events
-        stats_rows = customer_rows[customer_rows["Event_Type"].isin(["add_to_cart", "purchase"])]
-
-        # Stats
-        add_to_cart_count = (stats_rows["Event_Type"] == "add_to_cart").sum()
-        purchase_count = (stats_rows["Event_Type"] == "purchase").sum()
-        campaigns = list(set(stats_rows["UTM_Campaign"]) - {""})
-
-        # Latest name
-        name_rows = customer_rows[customer_rows["Customer_Name"] != ""]
-        latest_name = ""
-        if not name_rows.empty:
-            latest_name = name_rows.sort_values("Visited_at").iloc[-1]["Customer_Name"]
-
-        customer_dict[key] = {
-            "customer_name": latest_name,
-            "visitor_ids": visitor_ids,
+        visitor_dict[visitor_id] = {
+            "session_ids": session_ids,
+            "campaigns": campaigns,
             "add_to_cart": int(add_to_cart_count),
             "purchases": int(purchase_count),
-            "campaigns": campaigns,
+            "customer_name": latest_row.get("Customer_Name", ""),
+            "customer_email": latest_row.get("Customer_Email", ""),
+            "customer_phone": latest_row.get("Customer_Mobile", ""),
         }
 
-    return customer_dict
+    return visitor_dict
+
 
 def attribute_purchases_to_campaigns(df: pd.DataFrame):
     """
