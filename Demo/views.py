@@ -2042,7 +2042,7 @@ def meta_campaigns(request):
         adsets_url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/{camp_id}/adsets"
         adsets_params = {
             "access_token": token,
-            "fields": "id,name,daily_budget,budget_remaining,updated_time",
+            "fields": "id,name,daily_budget",
             "limit": 10
         }
 
