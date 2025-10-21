@@ -865,7 +865,7 @@ def process_marketing_report(request):
     start_time = request.POST.get("start_time")
     end_time = request.POST.get("end_time")
     # Retrieve the store id from session
-    store_id = request.session.get("Store_ID")
+    store_id = request.session.get("store_id")
 
     # Loop through expected files 1–6
     for i in range(1, 7):
@@ -1327,10 +1327,10 @@ def snapchat_callback(request):
         request.session["snapchat_token_expires_at"] = expiry_datetime.isoformat()
 
         ## Add them to database
-        store_id = request.session.get("Store_ID")
+        store_id = request.session.get("store_id")
         if not store_id:
-            return HttpResponse("No Store_ID found in session", status=400)
-        
+            return HttpResponse("No store_id found in session", status=400)
+
         # Check if row exists first
         existing = supabase.table("tokens").select("Store_ID").eq("Store_ID", store_id).execute()
 
@@ -1707,9 +1707,9 @@ def tiktok_callback(request):
 
     # --- Store tokens in Supabase ---
     try:
-        store_id = request.session.get("Store_ID")
+        store_id = request.session.get("store_id")
         if not store_id:
-            return HttpResponse("No Store_ID found in session", status=400)
+            return HttpResponse("No store_id found in session", status=400)
 
         # Check if row exists first
         existing = supabase.table("tokens").select("Store_ID").eq("Store_ID", store_id).execute()
