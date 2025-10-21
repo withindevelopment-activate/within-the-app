@@ -2018,10 +2018,6 @@ def meta_campaigns(request):
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++==
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # VIEWING THE PRICE MONITOR UPON PRODUCT PRICE UPDATE AND THEIR ORDER COUNTS
-url: str = os.environ.get('SUPABASE_URL')
-key: str = os.environ.get('SUPABASE_KEY')
-
-supabase: Client = create_client(url, key)
 
 def view_price_monitor(request):
     """
@@ -2036,14 +2032,14 @@ def view_price_monitor(request):
 
         clean_rows = []
         for record in data:
-            sku = record.get("SKU")
-            product_name = record.get("Product_Name")
+            sku = record.get("SKU", "").strip()
+            product_name = record.get("Product_Name", "").strip()
             is_variant = record.get("Is_Variant")
             current_price = record.get("Current_Price")
             product_id = record.get("Product_ID")
-            last_updated = record.get("Last_Updated")
+            last_updated = record.get("Last_Update_Date")  
 
-            # Parse JSON fields safely
+            # get json records
             order_history = record.get("Order_Count_History")
             price_updates = record.get("Price_Updates")
 
@@ -2051,12 +2047,13 @@ def view_price_monitor(request):
                 order_history = json.loads(order_history or "{}")
             if isinstance(price_updates, str):
                 price_updates = json.loads(price_updates or "{}")
+                # Removing white space
+                price_updates = {k.strip(): v for k, v in price_updates.items()}
 
             # Get latest order count entry (highest key)
             latest_update_key = None
             latest_order_count = None
             latest_date = None
-
             if order_history:
                 try:
                     latest_update_key = max(order_history.keys(), key=int)
@@ -2102,6 +2099,8 @@ def view_price_monitor(request):
         traceback.print_exc()
         return render(request, "Demo/price_monitor_view.html", {"records": []})
 
+
+###### Privacy policy & Data Deletion
 def privacy_policy(request):
     return render(request, "Demo/privacy_policy.html")
 
