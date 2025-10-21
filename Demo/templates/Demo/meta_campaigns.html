@@ -55,52 +55,36 @@
         <table class="data-table" role="table" aria-label="Meta campaigns dataset">
           <thead>
             <tr>
-              <th>On/Off</th>
-              <th>Campaign Name</th>
-              <th>Ad Set Name</th>
+              <th>Campaign ID</th>
+              <th>Name</th>
+              <th>Status</th>
+              <th>Effective Status</th>
               <th>Daily Budget</th>
               <th>Budget Remaining</th>
               <th>Updated Time</th>
-              <th>ROAS</th>
               <th>Spend</th>
               <th>Clicks</th>
               <th>Impressions</th>
               <th>Purchases Value</th>
+              <th>ROAS</th>
             </tr>
           </thead>
           <tbody>
-            {% for campaign in campaigns %}
-              {% for adset in campaign.adsets %}
-              <tr>
-                <td>
-                {% if campaign.status == 'ACTIVE' %}
-                  <button class="btn btn-sm btn-success" disabled>On</button>
-                {% else %}
-                  <button class="btn btn-sm btn-danger" disabled>Off</button>
-                {% endif %}
-              </td>
-                <td>{{ campaign.name }}</td>
-                <td>{{ adset.name }}</td>
-                <td>{{ adset.daily_budget|floatformat:2 }}</td>
-                <td>{{ adset.budget_remaining|floatformat:2 }}</td>
-                <td>{{ adset.updated_time }}</td>
-                <td>{{ adset.roas|default:0 }}</td>
-                <td>{{ campaign.insights.spend|default:0 }}</td>
-                <td>{{ campaign.insights.clicks|default:0 }}</td>
-                <td>{{ campaign.insights.impressions|default:0 }}</td>
-                <td>
-                  {% if campaign.insights.actions %}
-                    {% for action in campaign.insights.actions %}
-                      {% if action.action_type == "purchase" %}
-                        {{ action.value }}
-                      {% endif %}
-                    {% endfor %}
-                  {% else %}
-                    0
-                  {% endif %}
-                </td>
-              </tr>
-              {% endfor %}
+            {% for row in table_rows %}
+            <tr>
+              <td>{{ row.campaign_id }}</td>
+              <td>{{ row.campaign_name }}</td>
+              <td>{{ row.campaign_status }}</td>
+              <td>{{ row.effective_status }}</td>
+              <td>{{ row.daily_budget|intcomma }}</td>
+              <td>{{ row.budget_remaining|intcomma }}</td>
+              <td>{{ row.updated_time }}</td>
+              <td>{{ row.spend|floatformat:2 }}</td>
+              <td>{{ row.clicks }}</td>
+              <td>{{ row.impressions }}</td>
+              <td>{{ row.purchases_value|floatformat:2 }}</td>
+              <td>{{ row.roas|floatformat:2 }}</td>
+            </tr>
             {% endfor %}
           </tbody>
         </table>
