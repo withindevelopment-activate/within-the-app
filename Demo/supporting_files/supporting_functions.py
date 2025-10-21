@@ -13,3 +13,4 @@ def get_uae_current_date():
     current_date = now_uae.strftime('%Y-%m-%d %H:%M:%S')
     
     return current_date
+    

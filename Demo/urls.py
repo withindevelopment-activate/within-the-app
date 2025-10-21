@@ -18,7 +18,6 @@ urlpatterns = [
     path("data-deletion/", views.data_deletion, name="data_deletion"),
 
     path("marketing/", views.marketing_page, name="marketing"), # Marketing report section
-    path("marketing_ready/", views.marketing_page_ready, name="marketing_ready"),
     path("process_marketing_report/", views.process_marketing_report, name="process_marketing_report"),
 
     path("save_tracking/", views.save_tracking, name="save_tracking"), # Tracking

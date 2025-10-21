@@ -9,6 +9,35 @@ key: str = os.environ.get('SUPABASE_KEY')
 
 supabase: Client = create_client(url, key)
 
+def get_token(store_id=None):
+    """
+    Fetch token from 'tokens' table.
+    - If store_id is given → fetch that specific store's token.
+    - Otherwise fetch the most recent token (by Distinct_ID).
+    """
+    query = supabase.table("tokens").select("*")
+
+    if store_id:
+        query = query.eq("Store_ID", store_id)
+    else:
+        query = query.order("Distinct_ID", desc=True)
+
+    res = query.limit(1).execute()
+
+    if not res.data:
+        raise ValueError("No matching tokens found in database")
+
+    token_row = res.data[0]
+    return {
+        "access_token": token_row.get("Access"),
+        "authorization_token": token_row.get("Authorization"),
+        "refresh_token": token_row.get("Refresh"),
+        "store_id": token_row.get("Store_ID"),
+        "snapchat_access": token_row.get("Snapchat_Access"),
+        "tiktok_access": token_row.get("Tiktok_Access"),
+        "tiktok_org": token_row.get("Tiktok_Org")
+    }
+
 def fetch_data_from_supabase(table_name):
     response = supabase.table(table_name).select("*").execute()
     

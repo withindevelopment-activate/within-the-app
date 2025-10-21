@@ -198,7 +198,14 @@ TIKTOK_CLIENT_KEY = "7551247511634051088"
 TIKTOK_CLIENT_SECRET = "fef07eae0ea6ed64c02baa5c33f2d3a653877746"
 TIKTOK_REDIRECT_URI = "https://testing-within.onrender.com/oauth/tiktok/callback/"
 TIKTOK_OAUTH_SCOPE = "user.info.basic,video.list,video.upload,ad.account,ad.campaign,ad.adgroup,ad.ad,report.campaign,report.adgroup,report.ad"
+## Tiktok links
+# TikTok API constants
+API_BASE = "https://business-api.tiktok.com/open_api/v1.3"
+OAUTH_URL = "https://business-api.tiktok.com/portal/auth"
+TOKEN_URL = "https://business-api.tiktok.com/open_api/v1.3/oauth2/access_token/"
 
+
+## Sanpchat
 SNAPCHAT_CLIENT_ID = "aa817ccd-7a51-41e5-893c-60266dc4e66f"
 SNAPCHAT_CLIENT_SECRET = "bb5299a6d31993ab2419"
 SNAPCHAT_REDIRECT_URI = "https://testing-within.onrender.com/oauth/snapchat/callback/"

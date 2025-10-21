@@ -15,11 +15,23 @@ from supabase import create_client, Client
 from dateutil import parser
 
 
+## Custom Imports ------------------
 # Supabase & Supporting imports
-from .supabase_functions import batch_insert_to_supabase, get_next_id_from_supabase_compatible_all, get_tracking_df, build_customer_dictionary, attribute_purchases_to_campaigns, update_customer_tracking
-from .supporting_functions import get_uae_current_date
+from Demo.supporting_files.supabase_functions import batch_insert_to_supabase, get_next_id_from_supabase_compatible_all, get_tracking_df, build_customer_dictionary, attribute_purchases_to_campaigns, update_customer_tracking
+from Demo.supporting_files.supporting_functions import get_uae_current_date
 # Marketing Report functions
-from .marketing_report import create_general_analysis, create_product_percentage_amount_spent, landing_performance_5_async, column_check
+from Demo.supporting_files.marketing_report import create_general_analysis, create_product_percentage_amount_spent, landing_performance_5_async, column_check
+# Webhook function imports
+from Demo.supporting_files.hook_tasks import track_price_changes, process_zid_order_logic
+# Constructing the marketing files
+from Demo.supporting_files.constructing_marketing_files import create_tiktok_file, create_snapchat_file
+# ------------------------------------
+# initialize database client
+url: str = os.environ.get('SUPABASE_URL')
+key: str = os.environ.get('SUPABASE_KEY')
+
+supabase: Client = create_client(url, key)
+
 
 # Redirect user to Zid OAuth page
 '''def zid_login(request):
@@ -77,7 +89,7 @@ def zid_callback(request):
         # Fetch user profile to get store ID
         headers = {
             'Authorization': f'Bearer {authorization_token}',
-            'X-MANAGER-TOKEN': access_token,  # Sometimes needed depending on endpoint
+            'X-MANAGER-TOKEN': access_token
         }
 
         # Fetch user profile to get store ID
@@ -90,9 +102,29 @@ def zid_callback(request):
         else:
             print("Store ID not found in profile response.")
 
+        ## Add an entry with the tokens into the database
+        tokens = {
+            "Distinct_ID": int(get_next_id_from_supabase_compatible_all(name='tokens', column='Distinct_ID')),
+            'Access': access_token,
+            'Authorization': authorization_token,
+            'Refresh': refresh_token,
+            'Store_ID': store_id if store_id else 'No Store ID',
+            'Tiktok_Access': '',
+            'Tiktok_Org': '',
+            'Snapchat_Access': '',
+            'Snapchat_Refresh': ''
+        }
+
+        tokens_df = pd.DataFrame([tokens])
+        batch_insert_to_supabase(tokens_df, 'tokens')
+
         ### Subscribe to the products webhook --
+        print("Creating the product webhook")
         subscribe_store_to_product_update(authorization_token, access_token)
-        ##
+        ## Subscribe to the order webhook
+        print("creating the new order webhook")
+        #subscribe_store_to_order_create(authorization_token, access_token)
+
         return redirect('Demo:home')  # go to the home view
 
     except requests.RequestException as e:
@@ -723,7 +755,7 @@ def marketing_page(request):
     return render(request, "Demo/marketing.html", {})
 
 @csrf_exempt
-def process_marketing_report(request):
+def process_marketing_report_file_uploads(request):
     # A dictionary to store the data
     context = {}
     # Mehtod check
@@ -816,6 +848,130 @@ def process_marketing_report(request):
 
     return render(request, "Demo/marketing.html", context)
 
+#### Refined process_marketing_Report that creates files from API
+def process_marketing_report(request):
+    ## This function creates both the tiktok and snapchat files from the API
+    context = {}
+
+    # Validate request
+    if request.method != "POST":
+        return JsonResponse({'status': 'error', 'message': 'Invalid request method'}, status=405)
+
+    uploaded_files = []
+    missing_files = []
+    dataframes = {}
+
+    # Get date range
+    start_time = request.POST.get("start_time")
+    end_time = request.POST.get("end_time")
+    # Retrieve the store id from session
+    store_id = request.session.get("Store_ID")
+
+    # Loop through expected files 1–6
+    for i in range(1, 7):
+
+        # --- AUTO-CREATE FILE 2 (TIKTOK) ---
+        if i == 2:
+            try:
+                print("[INFO] Creating File 2...")
+                file_2 = create_tiktok_file(start_time, end_time, store_id)
+                dataframes[i] = file_2
+                uploaded_files.append("auto_created_file2")
+                print("[SUCCESS] File 2 created successfully.")
+            except Exception as e:
+                return JsonResponse({'status': 'error', 'message': f'Error creating file2: {e}'}, status=500)
+            continue
+
+        # --- AUTO-CREATE FILE 3 ---
+        if i == 3:
+            try:
+                print("[INFO] Creating File 3...")
+                file_3 = create_snapchat_file(start_time, end_time, store_id)
+                dataframes[i] = file_3
+                uploaded_files.append("auto_created_file3")
+                print("[SUCCESS] File 3 created successfully.")
+            except Exception as e:
+                return JsonResponse({'status': 'error', 'message': f'Error creating file3: {e}'}, status=500)
+            continue
+
+        # --- HANDLE UPLOADED FILES (1, 4, 5, 6) ---
+        file = request.FILES.get(f'file{i}')
+        if file:
+            message, response, file_1, file_2, file_3, file_4, file_5, file_6 = column_check(file, i)
+            if not response:
+                return JsonResponse({'status': 'error', 'message': message}, status=400)
+
+            if i == 1:
+                dataframes[i] = file_1
+            elif i == 4:
+                dataframes[i] = file_4
+            elif i == 5:
+                dataframes[i] = file_5
+            elif i == 6:
+                dataframes[i] = file_6
+
+            uploaded_files.append(file.name)
+        else:
+            missing_files.append(f'file{i}')
+
+    # Only consider truly missing files (not 2 & 3)
+    missing_files = [f for f in missing_files if f not in ('file2', 'file3')]
+    if missing_files:
+        return JsonResponse({'status': 'error', 'message': f'Missing files: {", ".join(missing_files)}'}, status=400)
+
+    # --- MAIN DATA PROCESSING ---
+    subsheet_one, subsheet_two, facebook, tiktok, snapchat, google, zid, analytics, orders_breakdown, zid_unfiltered = create_general_analysis(
+        dataframes, start_time, end_time
+    )
+    subsheet_three, subsheet_four, facebook_detailed, snapchat_detailed, tiktok_detailed, full_detailed, facebook, tiktok, snapchat, zid, analytics, vanilla_db, advertised_prods, orders_count_unfiltered, advertised_prods_copied = create_product_percentage_amount_spent(
+        facebook, tiktok, snapchat, zid, analytics, zid_unfiltered
+    )
+    landing = asyncio.run(
+        landing_performance_5_async(analytics, vanilla_db, advertised_prods_copied, full_detailed, orders_count_unfiltered)
+    )
+
+    # --- PREPARE SHEETS FOR TEMPLATE ---
+    sheets_data = {
+        "General_Analysis": subsheet_one,
+        "Orders Analysis": orders_breakdown,
+        "Platforms_Summary": subsheet_two,
+        "Percentages(Orders)": subsheet_three,
+        "AD Amount Spent": subsheet_four,
+        "Facebook Detailed": facebook_detailed,
+        "Snapchat Detailed": snapchat_detailed,
+        "Tiktok Detailed": tiktok_detailed,
+        "Full Detailed": full_detailed,
+        "Landing Performance Main_Vars": landing,
+    }
+
+    template_sheets = {}
+    for sheet_name, df in sheets_data.items():
+        safe_sheet = safe_name(sheet_name)
+        labels = df.iloc[:, 0].fillna("").astype(str).tolist()
+        charts = []
+        for col in df.columns[1:]:
+            values = [safe_numeric(v) for v in df[col].tolist()]
+            charts.append({"column": col, "values": values})
+        template_sheets[sheet_name] = {
+            "columns": df.columns.tolist(),
+            "safe_name": safe_sheet,
+            "rows": df.values.tolist(),
+            "labels": json.dumps(labels, ensure_ascii=False),
+            "charts": charts,
+        }
+
+    context["sheets"] = template_sheets
+    context["start_time"] = start_time
+    context["end_time"] = end_time
+
+    return render(request, "Demo/marketing.html", context)
+
+
+
+
+#############################################################################################
+################################# Viewing the Tracking ######################################
+##
 def view_tracking(request):
     store_id = request.GET.get("store_id") or request.session.get("store_uuid")
     if not store_id:
@@ -895,6 +1051,9 @@ def view_tracking(request):
     return render(request, "Demo/tracking_view.html", context=context)
 
 
+##############################################################################
+###############################################################################
+### Abdandoned Carts
 def abandoned_carts_page(request):
     token = request.session.get('access_token')
     auth_token = request.session.get('authorization_token')
@@ -950,6 +1109,9 @@ def abandoned_carts_page(request):
 
     return render(request, "Demo/abandoned_carts_page.html", context)
 
+########################################################################################
+########################################################################################
+### Customers page -
 def customers_page(request):
     token = request.session.get('access_token')
     auth_token = request.session.get('authorization_token')
@@ -1156,7 +1318,7 @@ def snapchat_callback(request):
         token_data = response.json()
         print("Snapchat's Token Data is:", token_data)
 
-        # 4. Store the tokens securely in the session.
+        # Store the tokens securely in the session.
         request.session["snapchat_access_token"] = token_data["access_token"]
         request.session["snapchat_refresh_token"] = token_data.get("refresh_token")
 
@@ -1164,7 +1326,31 @@ def snapchat_callback(request):
         expiry_datetime = datetime.now() + timedelta(seconds=expires_in_seconds)
         request.session["snapchat_token_expires_at"] = expiry_datetime.isoformat()
 
-        # 5. Redirect the user to the campaigns overview page.
+        ## Add them to database
+        store_id = request.session.get("Store_ID")
+        if not store_id:
+            return HttpResponse("No Store_ID found in session", status=400)
+        
+        # Check if row exists first
+        existing = supabase.table("tokens").select("Store_ID").eq("Store_ID", store_id).execute()
+
+        if not existing.data:
+            # No row found 
+            return HttpResponse(
+                f"No entry found in 'tokens' for Store_ID: {store_id}. Please create it first.",
+                status=404
+            )
+
+        # Row exists, update it
+        update_data = {
+            "Snapchat_Access": token_data["access_token"],
+            "Snapchat_Refresh": token_data.get("refresh_token")
+        }
+
+        response = supabase.table("tokens").update(update_data).eq("Store_ID", store_id).execute()
+        print(f"TikTok tokens updated for Store_ID {store_id}")
+
+        # Redirect the user to the campaigns overview page.
         return redirect("Demo:campaigns_overview")
 
     except requests.RequestException as e:
@@ -1466,10 +1652,11 @@ def tiktok_login(request):
 def tiktok_callback(request):
     code = request.GET.get("auth_code")
     state = request.GET.get("state")
-   
+
     if not code:
         return HttpResponse("No auth_code returned", status=400)
 
+    # Exchange auth_code for access token
     data = {
         "app_id": settings.TIKTOK_CLIENT_KEY,
         "secret": settings.TIKTOK_CLIENT_SECRET,
@@ -1481,47 +1668,77 @@ def tiktok_callback(request):
     tokens = resp.json()
     print("Tiktok's token data is:", tokens)
 
-    if not tokens:
+    if not tokens or "data" not in tokens:
         return redirect("Demo:tiktok_login")
 
-    # Always save access_token
-    request.session["tiktok_access_token"] = tokens["data"]["access_token"]
-
-    # Save advertiser IDs
-    request.session["tiktok_advertiser_ids"] = tokens["data"].get("advertiser_ids", [])
-
-    # Refresh token may not exist
-    if "refresh_token" in tokens["data"]:
-        request.session["tiktok_refresh_token"] = tokens["data"]["refresh_token"]
-
-    # TikTok didn’t return expires_in, so assume default short expiry (e.g. 24h)
+    access_token = tokens["data"]["access_token"]
+    advertiser_ids = tokens["data"].get("advertiser_ids", [])
+    refresh_token = tokens["data"].get("refresh_token")
     expiry_seconds = tokens["data"].get("expires_in", 86400)
-    request.session["tiktok_token_expiry"] = (
-        datetime.now() + timedelta(seconds=expiry_seconds)
-    ).isoformat()
+    expiry_time = (datetime.now() + timedelta(seconds=expiry_seconds)).isoformat()
+
+    # Store in session
+    request.session["tiktok_access_token"] = access_token
+    request.session["tiktok_advertiser_ids"] = advertiser_ids
+    if refresh_token:
+        request.session["tiktok_refresh_token"] = refresh_token
+    request.session["tiktok_token_expiry"] = expiry_time
 
     # --- Fetch advertiser accounts ---
     url = f"{API_BASE}/oauth2/advertiser/get/"
-    headers = {"Access-Token": request.session["tiktok_access_token"]}
+    headers = {"Access-Token": access_token}
     params  = {
         "app_id": settings.TIKTOK_CLIENT_KEY,
         "secret": settings.TIKTOK_CLIENT_SECRET,
     }
     resp = requests.get(url, params=params, headers=headers, timeout=10)
     advertisers = resp.json()
+    print("Advertisers data:", advertisers)
 
     if "data" not in advertisers or "list" not in advertisers["data"]:
         return JsonResponse(advertisers, status=400)
 
-    # For demo: auto-pick the first advertiser
     advertiser_list = advertisers["data"]["list"]
     if advertiser_list:
-        request.session["tiktok_advertiser_id"] = advertiser_list[0]["advertiser_id"]
+        advertiser_id = advertiser_list[0]["advertiser_id"]
+        request.session["tiktok_advertiser_id"] = advertiser_id
+    else:
+        advertiser_id = None
 
-    # Or render a selection page for user if multiple accounts
+    # --- Store tokens in Supabase ---
+    try:
+        store_id = request.session.get("Store_ID")
+        if not store_id:
+            return HttpResponse("No Store_ID found in session", status=400)
+
+        # Check if row exists first
+        existing = supabase.table("tokens").select("Store_ID").eq("Store_ID", store_id).execute()
+
+        if not existing.data:
+            # No row found 
+            return HttpResponse(
+                f"No entry found in 'tokens' for Store_ID: {store_id}. Please create it first.",
+                status=404
+            )
+
+        # Row exists, update it
+        update_data = {
+            "Tiktok_Access": access_token,
+            "Tiktok_Org": advertiser_id
+        }
+
+        response = supabase.table("tokens").update(update_data).eq("Store_ID", store_id).execute()
+        print(f"TikTok tokens updated for Store_ID {store_id}")
+
+    except Exception as e:
+        print(f"Error saving TikTok tokens to table: {e}")
+        return HttpResponse(f"Error saving tokens: {e}", status=500)
+
+    # Redirect or render advertiser selection
     if len(advertiser_list) == 1:
         return redirect("Demo:tiktok_login")
     return render(request, "Demo/tiktok_select_advertiser.html", {"advertisers": advertiser_list})
+
 
 # --- SAVE SELECTED ADVERTISER (if multiple) ---
 def tiktok_select_advertiser(request, advertiser_id=None):
