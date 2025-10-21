@@ -1979,6 +1979,7 @@ def meta_select_ad_account(request, account_id=None):
     url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/me/adaccounts"
     params = {"access_token": token}
     resp = requests.get(url, params=params)
+    print("Meta ad accounts response:", resp.json())
     accounts = resp.json().get("data", [])
     messages.info(request, "Please select an ad account to proceed.")
     return render(request, "Demo/meta_select_ad_account.html", {"accounts": accounts})
@@ -1997,6 +1998,8 @@ def meta_campaigns(request):
     url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/{account_id}/campaigns"
     params = {"access_token": token, "fields": "id,name,status,daily_budget"}
     resp = requests.get(url, params=params)
+    print("Meta campaigns response:", resp.json())
+    messages.info(request, f"Fetched campaigns successfully: {resp.json()}")
     campaigns = resp.json().get("data", [])
 
     # Optional: enrich with insights

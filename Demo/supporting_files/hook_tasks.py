@@ -1,11 +1,6 @@
-import os
+import os, requests, json, pandas as pd, time, http.client
 from Demo.supporting_files.supabase_functions import get_uae_current_date, get_next_id_from_supabase_compatible_all, fetch_data_from_supabase, batch_insert_to_supabase, fetch_data_from_supabase_specific
-import requests
 from supabase import create_client, Client
-import json
-import pandas as pd
-import time
-import http.client
 
 # Import keys
 url: str = os.environ.get('SUPABASE_URL')
