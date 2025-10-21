@@ -9,7 +9,7 @@
   <div class="row">
     {% for acc in ad_accounts %}
     <div class="col-md-6 col-lg-4 mb-3">
-      <a href="{% url 'Demo:snapchat_select_account' org_id=acc.org_id ad_account_id=acc.id %}" class="text-decoration-none">
+      <a href="{% url 'Demo:snapchat_select_account_with_id' org_id=acc.org_id ad_account_id=acc.id %}" class="text-decoration-none">
         <div class="card shadow-sm h-100">
           <div class="card-body d-flex flex-column justify-content-between">
             <div>
