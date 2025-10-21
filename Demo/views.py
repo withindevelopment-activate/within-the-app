@@ -1500,8 +1500,6 @@ def campaigns_overview(request):
     start_time = from_dt.isoformat(timespec="milliseconds") + 'Z'
     end_time = to_dt.isoformat(timespec="milliseconds") + 'Z'
 
-    
-
     if not access_token:
         return redirect('Demo:snapchat_login')
     
@@ -1539,7 +1537,6 @@ def campaigns_overview(request):
     for c in raw_campaigns:
         campaign = c["campaign"]
         stats_resp = snapchat_api_call(request, f"campaigns/{campaign['id']}/stats", params=params)
-        print("Stats response:", stats_resp)
         adsquads_data = snapchat_api_call(request, f"campaigns/{campaign['id']}/adsquads")
         adsquads_raw = adsquads_data.get("adsquads", [])
         daily_budget = 0
@@ -1547,8 +1544,6 @@ def campaigns_overview(request):
             for adsquad in adsquads_raw:
                 daily_budget += adsquad["adsquad"].get("daily_budget_micro", 0) / 1_000_000.0
 
-        # print("adsquads_data -----------",adsquads_data)
-        # print("stats_resp -----------",stats_resp)
         stats = {}
         if stats_resp and "total_stats" in stats_resp:
             stats = stats_resp["total_stats"][0]["total_stat"].get("stats", {})
@@ -1999,20 +1994,31 @@ def meta_campaigns(request):
     params = {"access_token": token, "fields": "id,name,status,daily_budget"}
     resp = requests.get(url, params=params)
     print("Meta campaigns response:", resp.json())
-    messages.info(request, f"Fetched campaigns successfully: {resp.json()}")
-    campaigns = resp.json().get("data", [])
 
-    # Optional: enrich with insights
+    try:
+        resp.raise_for_status()
+        campaigns = resp.json().get("data", [])
+    except Exception as e:
+        messages.error(request, f"Failed to fetch campaigns: {e} campaign data: {resp.text}")
+        campaigns = []
+
+    # Enrich with insights
     for camp in campaigns:
         insights_url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/{camp['id']}/insights"
-        insights_params = {"access_token": token, "fields": "spend,impressions,clicks,actions"}
+        insights_params = {
+            "access_token": token,
+            "fields": "spend,impressions,clicks,actions",
+        }
+
         try:
             r = requests.get(insights_url, params=insights_params)
             r.raise_for_status()
-            camp["insights"] = r.json().get("data", [{}])[0]
+            data = r.json().get("data", [])
+            camp["insights"] = data[0] if data else {}
         except requests.RequestException as e:
             camp["insights"] = {}
-            messages.error(request, f"Failed to fetch insights for campaign {camp['id']}: {e}")
+            messages.error(request, f"Failed to fetch insights for {camp['name']}: {e}")
+
     return render(request, "Demo/meta_campaigns.html", {"campaigns": campaigns})
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++==
