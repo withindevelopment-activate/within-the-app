@@ -1475,7 +1475,7 @@ def snapchat_select_account(request, org_id, ad_account_id=None):
         for acc in accounts_data["adaccounts"]
     ]
 
-    return render(request, "Demo/snapchat_select_account.html", {"ad_accounts": ad_accounts})
+    return render(request, "Demo/snapchat_select_account.html", {"ad_accounts": ad_accounts,"org_id": org_id})
 
 def campaigns_overview(request):
     status = request.GET.get("status") or "ACTIVE"   # default = ACTIVE
