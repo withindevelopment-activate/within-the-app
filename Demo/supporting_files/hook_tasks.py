@@ -1,5 +1,6 @@
 import os
-from Demo.supporting_files.supabase_functions import get_uae_current_date, get_next_id_from_supabase_compatible_all, fetch_data_from_supabase, batch_insert_to_supabase, fetch_data_from_supabase_specific
+from Demo.supporting_files.supabase_functions import get_next_id_from_supabase_compatible_all, fetch_data_from_supabase, batch_insert_to_supabase, fetch_data_from_supabase_specific
+from Demo.supporting_files.supporting_functions import get_uae_current_date
 import requests
 from supabase import create_client, Client
 import json
