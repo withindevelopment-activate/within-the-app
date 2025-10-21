@@ -1974,12 +1974,17 @@ def meta_select_ad_account(request, account_id=None):
     url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/me/adaccounts"
     params = {"access_token": token}
     resp = requests.get(url, params=params)
-    print("Meta ad accounts response:", resp.json())
     accounts = resp.json().get("data", [])
     messages.info(request, "Please select an ad account to proceed.")
     return render(request, "Demo/meta_select_ad_account.html", {"accounts": accounts})
 
 # --- FETCH CAMPAIGNS ---
+import requests, json
+from datetime import datetime, timedelta
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from django.conf import settings
+
 def meta_campaigns(request):
     token = request.session.get("meta_access_token")
     account_id = request.session.get("meta_ad_account_id")
@@ -1989,26 +1994,53 @@ def meta_campaigns(request):
     if not account_id:
         return redirect("Demo:meta_select_ad_account")
 
-    # Fetch campaigns
-    url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/{account_id}/campaigns"
-    params = {"access_token": token, "fields": "id,name,status,daily_budget"}
-    resp = requests.get(url, params=params)
-    print("Meta campaigns response:", resp.json())
+    # --- Date filter ---
+    date_preset = request.GET.get("date_preset", "last_7d")  # default last 7 days
+    start_date = request.GET.get("start_date")
+    end_date = request.GET.get("end_date")
 
+    # --- Fetch campaigns ---
+    campaigns_url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/{account_id}/campaigns"
+    campaigns_params = {
+        "access_token": token,
+        "fields": "id,name,status",
+        "limit": 100
+    }
     try:
+        resp = requests.get(campaigns_url, params=campaigns_params)
         resp.raise_for_status()
         campaigns = resp.json().get("data", [])
     except Exception as e:
-        messages.error(request, f"Failed to fetch campaigns: {e} campaign data: {resp.text}")
+        messages.error(request, f"Failed to fetch campaigns: {e}")
         campaigns = []
 
-    # Enrich with insights
+    # --- Fetch ad sets for each campaign ---
+    for camp in campaigns:
+        adsets_url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/{camp['id']}/adsets"
+        adsets_params = {
+            "access_token": token,
+            "fields": "id,name,daily_budget,budget_remaining,updated_time,campaign_id",
+            "limit": 100
+        }
+        try:
+            r = requests.get(adsets_url, params=adsets_params)
+            r.raise_for_status()
+            camp["adsets"] = r.json().get("data", [])
+        except requests.RequestException as e:
+            camp["adsets"] = []
+            messages.warning(request, f"Failed to fetch adsets for {camp['name']}: {e}")
+
+    # --- Fetch insights for campaigns ---
     for camp in campaigns:
         insights_url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/{camp['id']}/insights"
         insights_params = {
             "access_token": token,
-            "fields": "spend,impressions,clicks,actions",
+            "fields": "spend,impressions,clicks,actions,unique_actions",
         }
+        if start_date and end_date:
+            insights_params["time_range"] = json.dumps({"since": start_date, "until": end_date})
+        else:
+            insights_params["date_preset"] = date_preset
 
         try:
             r = requests.get(insights_url, params=insights_params)
@@ -2017,9 +2049,30 @@ def meta_campaigns(request):
             camp["insights"] = data[0] if data else {}
         except requests.RequestException as e:
             camp["insights"] = {}
-            messages.error(request, f"Failed to fetch insights for {camp['name']}: {e}")
+            messages.warning(request, f"No insights for {camp['name']}: {e}")
 
-    return render(request, "Demo/meta_campaigns.html", {"campaigns": campaigns})
+    # --- Calculate ROAS and enrich adsets ---
+    for camp in campaigns:
+        for adset in camp.get("adsets", []):
+            metrics = camp.get("insights", {})
+            purchases_value = 0
+            if "actions" in metrics:
+                for action in metrics["actions"]:
+                    if action.get("action_type") == "purchase":
+                        purchases_value = float(action.get("value", 0))
+            spend = float(metrics.get("spend", 0))
+            adset["roas"] = round(purchases_value / spend, 2) if spend else 0
+            adset["daily_budget"] = int(adset.get("daily_budget", 0))
+            adset["budget_remaining"] = int(adset.get("budget_remaining", 0))
+            adset["updated_time"] = adset.get("updated_time")
+
+    return render(request, "Demo/meta_campaigns.html", {
+        "campaigns": campaigns,
+        "date_preset": date_preset,
+        "start_date": start_date,
+        "end_date": end_date
+    })
+
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++==
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

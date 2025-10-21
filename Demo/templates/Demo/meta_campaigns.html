@@ -12,29 +12,32 @@
 
   <!-- Filter Form -->
   <form method="get" class="mb-4">
-    <div class="row">
-      <div class="col-md-3">
-        <label for="start_date" class="form-label">Start Date</label>
-        <input type="date" id="start_date" name="start_date" class="form-control" value="{{ start_date }}">
-      </div>
-      <div class="col-md-3">
-        <label for="end_date" class="form-label">End Date</label>
-        <input type="date" id="end_date" name="end_date" class="form-control" value="{{ end_date }}">
-      </div>
-      <div class="col-md-3">
-        <label for="status" class="form-label">Campaign Status</label>
-        <select id="status" name="status" class="form-select">
-          <option value="ACTIVE" {% if status_filter == "ACTIVE" %}selected{% endif %}>Active</option>
-          <option value="PAUSED" {% if status_filter == "PAUSED" %}selected{% endif %}>Paused</option>
-          <option value="ARCHIVED" {% if status_filter == "ARCHIVED" %}selected{% endif %}>Archived</option>
-          <option value="ALL" {% if status_filter == "ALL" %}selected{% endif %}>All</option>
-        </select>
-      </div>
-      <div class="col-md-3 d-flex align-items-end mt-3">
-        <button type="submit" class="btn btn-primary w-100">Filter</button>
-      </div>
+  <div class="row">
+    <div class="col-md-3">
+      <label for="date_preset" class="form-label">Quick Date Range</label>
+      <select id="date_preset" name="date_preset" class="form-select">
+        <option value="today" {% if date_preset == "today" %}selected{% endif %}>Today</option>
+        <option value="yesterday" {% if date_preset == "yesterday" %}selected{% endif %}>Yesterday</option>
+        <option value="last_7d" {% if date_preset == "last_7d" %}selected{% endif %}>Last 7 Days</option>
+        <option value="last_30d" {% if date_preset == "last_30d" %}selected{% endif %}>Last 30 Days</option>
+        <option value="this_month" {% if date_preset == "this_month" %}selected{% endif %}>This Month</option>
+        <option value="last_month" {% if date_preset == "last_month" %}selected{% endif %}>Last Month</option>
+      </select>
     </div>
-  </form>
+    <div class="col-md-3">
+      <label for="start_date" class="form-label">Start Date</label>
+      <input type="date" id="start_date" name="start_date" class="form-control" value="{{ start_date }}">
+    </div>
+    <div class="col-md-3">
+      <label for="end_date" class="form-label">End Date</label>
+      <input type="date" id="end_date" name="end_date" class="form-control" value="{{ end_date }}">
+    </div>
+    <div class="col-md-3 d-flex align-items-end mt-3">
+      <button type="submit" class="btn btn-primary w-100">Filter</button>
+    </div>
+  </div>
+</form>
+
 
   {% if campaigns %}
   <div class="data-wrap">
@@ -45,34 +48,50 @@
             <tr>
               <th>On/Off</th>
               <th>Campaign Name</th>
-              <th>Status</th>
+              <th>Ad Set Name</th>
+              <th>Daily Budget</th>
+              <th>Budget Remaining</th>
+              <th>Updated Time</th>
+              <th>ROAS</th>
               <th>Spend</th>
               <th>Clicks</th>
               <th>Impressions</th>
-              <th>Purchases</th>
-              <th>ROAS</th>
-              <th>Budget</th>
+              <th>Purchases Value</th>
             </tr>
           </thead>
           <tbody>
             {% for campaign in campaigns %}
-            <tr>
-              <td>
+              {% for adset in campaign.adsets %}
+              <tr>
+                <td>
                 {% if campaign.status == 'ACTIVE' %}
                   <button class="btn btn-sm btn-success" disabled>On</button>
                 {% else %}
                   <button class="btn btn-sm btn-danger" disabled>Off</button>
                 {% endif %}
               </td>
-              <td>{{ campaign.name }}</td>
-              <td>{{ campaign.status }}</td>
-              <td>{{ campaign.insights.spend|default:"0" }}</td>
-              <td>{{ campaign.insights.clicks|default:"0" }}</td>
-              <td>{{ campaign.insights.impressions|default:"0" }}</td>
-              <td>{{ campaign.insights.actions.0.value|default:"0" }}</td>
-              <td>{{ campaign.insights.roas|default:"0" }}</td>
-              <td>{{ campaign.daily_budget|default:"0" }}</td>
-            </tr>
+                <td>{{ campaign.name }}</td>
+                <td>{{ adset.name }}</td>
+                <td>{{ adset.daily_budget|floatformat:2 }}</td>
+                <td>{{ adset.budget_remaining|floatformat:2 }}</td>
+                <td>{{ adset.updated_time }}</td>
+                <td>{{ adset.roas|default:0 }}</td>
+                <td>{{ campaign.insights.spend|default:0 }}</td>
+                <td>{{ campaign.insights.clicks|default:0 }}</td>
+                <td>{{ campaign.insights.impressions|default:0 }}</td>
+                <td>
+                  {% if campaign.insights.actions %}
+                    {% for action in campaign.insights.actions %}
+                      {% if action.action_type == "purchase" %}
+                        {{ action.value }}
+                      {% endif %}
+                    {% endfor %}
+                  {% else %}
+                    0
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
             {% endfor %}
           </tbody>
         </table>
