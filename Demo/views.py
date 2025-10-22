@@ -1020,12 +1020,12 @@ def view_tracking(request):
 
         # --- Incremental customer tracking ---
         # df= get_tracking_customers_df()
-        # customer_dict = build_visitor_dictionary(df)
+        customer_dict = build_visitor_dictionary(df)
 
         # --- Campaign attribution ---
-        campaigns_summary_df, sources_summary_df = attribute_purchases_to_campaigns(df)
-        campaigns_summary = campaigns_summary_df.to_dict(orient="records")
-        sources_summary = sources_summary_df.to_dict(orient="records")
+        # campaigns_summary_df, sources_summary_df = attribute_purchases_to_campaigns(df)
+        # campaigns_summary = campaigns_summary_df.to_dict(orient="records")
+        # sources_summary = sources_summary_df.to_dict(orient="records")
 
         # --- Build context ---
         context = {
@@ -1034,13 +1034,13 @@ def view_tracking(request):
             "total_visitors": total_visitors,
             "total_sessions": total_sessions,
             "total_pageviews": total_pageviews,
-            # "customer_dict": customer_dict,
+            "customer_dict": customer_dict,
             "campaigns": campaigns_summary,
             "sources": sources_summary,
-            "campaign_labels": campaigns_summary_df["campaign"].tolist(),
-            "campaign_data": campaigns_summary_df["conversion_credit"].tolist(),
-            "source_labels": sources_summary_df["source"].tolist(),
-            "source_data": sources_summary_df["conversion_credit"].tolist(),
+            # "campaign_labels": campaigns_summary_df["campaign"].tolist(),
+            # "campaign_data": campaigns_summary_df["conversion_credit"].tolist(),
+            # "source_labels": sources_summary_df["source"].tolist(),
+            # "source_data": sources_summary_df["conversion_credit"].tolist(),
             "request": request,
         }
 
@@ -2037,16 +2037,24 @@ def meta_campaigns(request):
             updated_time = camp.get("updated_time")
 
             # Insights
-            insights = camp.get("insights", {}).get("data", [{}])[0]  # Meta may return empty list
+            insights = camp.get("insights", {}).get("data", [{}])[0]
             spend = float(insights.get("spend", 0))
             clicks = int(insights.get("clicks", 0))
             impressions = int(insights.get("impressions", 0))
             purchases_value = 0
             roas = 0
+
+            # Extract purchases_value from actions
             for action in insights.get("actions", []) or []:
                 if action.get("action_type") == "purchase":
                     purchases_value = float(action.get("value", 0))
-                    roas = round(insights.get("purchase_roas", 0) or purchases_value / spend, 2) if spend else 0
+
+            # Extract purchase_roas correctly (list of dicts)
+            purchase_roas_list = insights.get("purchase_roas", [])
+            if isinstance(purchase_roas_list, list) and purchase_roas_list:
+                roas = float(purchase_roas_list[0].get("value", 0))
+            elif spend:
+                roas = round(purchases_value / spend, 2)
 
             table_rows.append({
                 "campaign_id": camp_id,
