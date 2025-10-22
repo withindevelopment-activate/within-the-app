@@ -2004,7 +2004,6 @@ def meta_campaigns(request):
             "insights{clicks,impressions,conversions,conversion_values,purchase_roas,results},"
             "effective_status,budget_remaining,updated_time"
         ),
-        "effective_status": json.dumps(effective_status),
     }
 
     # Add date filters
