@@ -1988,94 +1988,65 @@ def meta_campaigns(request):
     if not account_id:
         return redirect("Demo:meta_select_ad_account")
 
-    # --- Filters ---
+    # Filters
     date_preset = request.GET.get("date_preset", "last_7d")
     start_date = request.GET.get("start_date")
     end_date = request.GET.get("end_date")
     effective_status = request.GET.getlist("status") or ["ACTIVE", "PAUSED"]
 
-    # --- API Endpoint ---
-    url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/act_{account_id}/campaigns"
-
+    # Build API params
     params = {
         "access_token": token,
-        "fields": (
-            "name,objective,"
-            "insights{clicks,impressions,conversions,conversion_values,purchase_roas,results},"
-            "effective_status,budget_remaining,updated_time"
-        ),
+        "fields": "campaign_name,results,campaign_id,purchase_roas,impressions,clicks,spend",
+        "level": "campaign",
     }
 
-    # Add date filters
-    # if start_date and end_date:
-    #     params["time_range"] = json.dumps({"since": start_date, "until": end_date})
-    # else:
-    #     params["date_preset"] = date_preset
+    if start_date and end_date:
+        params["time_range"] = json.dumps({"since": start_date, "until": end_date})
+    else:
+        params["date_preset"] = date_preset
 
-    # --- Fetch Campaigns ---
+    url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/act_{account_id}/insights"
+
     try:
         resp = requests.get(url, params=params)
         resp.raise_for_status()
-        data = resp.json().get("data", [])
+        campaigns = resp.json().get("data", [])
     except Exception as e:
         messages.error(request, f"Failed to fetch campaigns: {e}")
-        data = []
+        campaigns = []
 
-    # --- Process campaigns ---
+    # Process campaigns for template
     table_rows = []
-    for camp in data:
-        try:
-            camp_name = camp.get("name")
-            camp_id = camp.get("id")
-            camp_status = camp.get("effective_status")
-            objective = camp.get("objective")
-            budget_remaining = camp.get("budget_remaining", 0)
-            daily_budget = camp.get("daily_budget", 0)
-            updated_time = camp.get("updated_time")
+    for camp in campaigns:
+        campaign_name = camp.get("campaign_name")
+        campaign_id = camp.get("campaign_id")
+        results = camp.get("results", [])
+        purchase_roas_list = camp.get("purchase_roas", [])
 
-            # Insights
-            insights_data = camp.get("insights", {}).get("data", [{}])[0]
-            clicks = int(insights_data.get("clicks", 0))
-            impressions = int(insights_data.get("impressions", 0))
+        # Get purchase count
+        purchases = 0
+        if results:
+            for r in results:
+                if r.get("indicator") == "actions:offsite_conversion.fb_pixel_purchase":
+                    values = r.get("values", [])
+                    if values:
+                        purchases = int(values[0].get("value", 0))
 
-            # Purchase ROAS
-            purchase_roas = insights_data.get("purchase_roas", [])
-            if purchase_roas and isinstance(purchase_roas, list):
-                roas = float(purchase_roas[0].get("value", 0))
-            else:
-                roas = 0
+        # Get ROAS
+        roas = 0
+        if purchase_roas_list:
+            roas = float(purchase_roas_list[0].get("value", 0))
 
-            # Results (purchases count)
-            results = insights_data.get("results", [])
-            purchases = 0
-            if results and isinstance(results, list):
-                for r in results:
-                    if "values" in r and r.get("indicator", "").endswith("purchase"):
-                        purchases += sum(float(v.get("value", 0)) for v in r["values"])
-
-            # Conversion value (total purchase value)
-            conversion_values = insights_data.get("conversion_values", [])
-            total_value = 0
-            if conversion_values and isinstance(conversion_values, list):
-                for v in conversion_values:
-                    total_value += float(v.get("value", 0))
-
-            table_rows.append({
-                "campaign_id": camp_id,
-                "campaign_name": camp_name,
-                "objective": objective,
-                "status": camp_status,
-                "daily_budget": daily_budget,
-                "budget_remaining": budget_remaining,
-                "updated_time": updated_time,
-                "clicks": clicks,
-                "impressions": impressions,
-                "purchases": purchases,
-                "purchases_value": total_value,
-                "roas": roas,
-            })
-        except Exception as e:
-            messages.warning(request, f"Error processing {camp.get('name')}: {e}")
+        table_rows.append({
+            "campaign_name": campaign_name,
+            "campaign_id": campaign_id,
+            "purchases": purchases,
+            "roas": roas,
+            "clicks": int(camp.get("clicks", 0)),
+            "impressions": int(camp.get("impressions", 0)),
+            "spend": float(camp.get("spend", 0)),
+        })
 
     return render(request, "Demo/meta_campaigns.html", {
         "table_rows": table_rows,
