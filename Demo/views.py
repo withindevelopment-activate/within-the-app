@@ -1981,7 +1981,7 @@ def meta_select_ad_account(request, account_id=None):
 
 def meta_campaigns(request):
     token = request.session.get("meta_access_token")
-    account_id = request.session.get("meta_ad_account_id")  # e.g., act_123456
+    account_id = request.session.get("meta_ad_account_id")
 
     if not token:
         return redirect("Demo:meta_login")
@@ -1989,96 +1989,101 @@ def meta_campaigns(request):
         return redirect("Demo:meta_select_ad_account")
 
     # --- Filters ---
-    date_preset = request.GET.get("date_preset", "last_7d")  # default last 7 days
+    date_preset = request.GET.get("date_preset", "last_7d")
     start_date = request.GET.get("start_date")
     end_date = request.GET.get("end_date")
-    status_filter = request.GET.getlist("status") or ["ACTIVE"]  # default ACTIVE
+    effective_status = request.GET.getlist("status") or ["ACTIVE", "PAUSED"]
 
-    # --- Build campaign fields ---
-    fields = [
-        "id",
-        "name",
-        "status",
-        "effective_status",
-        "daily_budget",
-        "budget_remaining",
-        "updated_time",
-        f"insights.time_range({json.dumps({'since': start_date, 'until': end_date})})" if start_date and end_date else f"insights.date_preset({date_preset})" + "{spend,impressions,clicks,actions,purchase_roas}"
-    ]
-    fields_str = ",".join(fields)
+    # --- API Endpoint ---
+    url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/act_{account_id}/campaigns"
 
-    url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/{account_id}/campaigns"
     params = {
         "access_token": token,
-        "fields": fields_str,
-        # "effective_status": json.dumps(status_filter),
-        "limit": 100
+        "fields": (
+            "name,objective,"
+            "insights{clicks,impressions,conversions,conversion_values,purchase_roas,results},"
+            "effective_status,budget_remaining,updated_time"
+        ),
+        "effective_status": json.dumps(effective_status),
     }
 
+    # Add date filters
+    # if start_date and end_date:
+    #     params["time_range"] = json.dumps({"since": start_date, "until": end_date})
+    # else:
+    #     params["date_preset"] = date_preset
+
+    # --- Fetch Campaigns ---
     try:
         resp = requests.get(url, params=params)
         resp.raise_for_status()
-        campaigns = resp.json().get("data", [])
-    except requests.RequestException as e:
+        data = resp.json().get("data", [])
+    except Exception as e:
         messages.error(request, f"Failed to fetch campaigns: {e}")
-        messages.info(request, f"Campaigns data = {resp.json() if 'resp' in locals() else 'N/A'}")
-        campaigns = []
+        data = []
 
-    # --- Flatten campaigns + adsets for table ---
+    # --- Process campaigns ---
     table_rows = []
-    try:
-        for camp in campaigns:
-            camp_id = camp.get("id")
+    for camp in data:
+        try:
             camp_name = camp.get("name")
-            camp_status = camp.get("status")
-            camp_effective_status = camp.get("effective_status")
-            daily_budget = int(camp.get("daily_budget", 0))
-            budget_remaining = int(camp.get("budget_remaining", 0))
+            camp_id = camp.get("id")
+            camp_status = camp.get("effective_status")
+            objective = camp.get("objective")
+            budget_remaining = camp.get("budget_remaining", 0)
+            daily_budget = camp.get("daily_budget", 0)
             updated_time = camp.get("updated_time")
 
             # Insights
-            insights = camp.get("insights", {}).get("data", [{}])[0]
-            spend = float(insights.get("spend", 0))
-            clicks = int(insights.get("clicks", 0))
-            impressions = int(insights.get("impressions", 0))
-            purchases_value = 0
-            roas = 0
+            insights_data = camp.get("insights", {}).get("data", [{}])[0]
+            clicks = int(insights_data.get("clicks", 0))
+            impressions = int(insights_data.get("impressions", 0))
 
-            # Extract purchases_value from actions
-            for action in insights.get("actions", []) or []:
-                if action.get("action_type") == "purchase":
-                    purchases_value = float(action.get("value", 0))
+            # Purchase ROAS
+            purchase_roas = insights_data.get("purchase_roas", [])
+            if purchase_roas and isinstance(purchase_roas, list):
+                roas = float(purchase_roas[0].get("value", 0))
+            else:
+                roas = 0
 
-            # Extract purchase_roas correctly (list of dicts)
-            purchase_roas_list = insights.get("purchase_roas", [])
-            if isinstance(purchase_roas_list, list) and purchase_roas_list:
-                roas = float(purchase_roas_list[0].get("value", 0))
-            elif spend:
-                roas = round(purchases_value / spend, 2)
+            # Results (purchases count)
+            results = insights_data.get("results", [])
+            purchases = 0
+            if results and isinstance(results, list):
+                for r in results:
+                    if "values" in r and r.get("indicator", "").endswith("purchase"):
+                        purchases += sum(float(v.get("value", 0)) for v in r["values"])
+
+            # Conversion value (total purchase value)
+            conversion_values = insights_data.get("conversion_values", [])
+            total_value = 0
+            if conversion_values and isinstance(conversion_values, list):
+                for v in conversion_values:
+                    total_value += float(v.get("value", 0))
 
             table_rows.append({
                 "campaign_id": camp_id,
                 "campaign_name": camp_name,
-                "campaign_status": camp_status,
-                "effective_status": camp_effective_status,
+                "objective": objective,
+                "status": camp_status,
                 "daily_budget": daily_budget,
                 "budget_remaining": budget_remaining,
                 "updated_time": updated_time,
-                "spend": spend,
                 "clicks": clicks,
                 "impressions": impressions,
-                "purchases_value": purchases_value,
+                "purchases": purchases,
+                "purchases_value": total_value,
                 "roas": roas,
             })
-    except Exception as e:
-        messages.error(request, f"Error processing campaign data: {e}")
+        except Exception as e:
+            messages.warning(request, f"Error processing {camp.get('name')}: {e}")
 
     return render(request, "Demo/meta_campaigns.html", {
         "table_rows": table_rows,
         "date_preset": date_preset,
         "start_date": start_date,
         "end_date": end_date,
-        "status_filter": status_filter,
+        "status_filter": effective_status,
     })
 
 
