@@ -2,6 +2,7 @@ import os,json,ast,logging,pandas as pd, pytz
 from supabase import create_client, Client
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
+from django.core.cache import cache
 
 # Import keys
 url: str = os.environ.get('SUPABASE_URL')
@@ -337,11 +338,6 @@ def get_tracking_df():
         df["Visited_at"] = pd.to_datetime(df["Visited_at"], errors="coerce")
     return df
 
-import pandas as pd
-import json
-import logging
-from django.core.cache import cache
-
 def get_tracking_customers_df():
     """
     Fetch tracking data once and cache it for a short period to prevent repeated
@@ -439,7 +435,6 @@ def build_visitor_dictionary(df: pd.DataFrame) -> dict:
             "customer_email": latest_row.get("Customer_Email", ""),
             "customer_phone": latest_row.get("Customer_Mobile", ""),
         }
-
     return visitor_dict
 
 

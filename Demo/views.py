@@ -1020,7 +1020,7 @@ def view_tracking(request):
 
         # --- Incremental customer tracking ---
         # df= get_tracking_customers_df()
-        customer_dict = build_visitor_dictionary(df)
+        # customer_dict = build_visitor_dictionary(df)
 
         # --- Campaign attribution ---
         campaigns_summary_df, sources_summary_df = attribute_purchases_to_campaigns(df)
@@ -1034,7 +1034,7 @@ def view_tracking(request):
             "total_visitors": total_visitors,
             "total_sessions": total_sessions,
             "total_pageviews": total_pageviews,
-            "customer_dict": customer_dict,
+            # "customer_dict": customer_dict,
             "campaigns": campaigns_summary,
             "sources": sources_summary,
             "campaign_labels": campaigns_summary_df["campaign"].tolist(),
