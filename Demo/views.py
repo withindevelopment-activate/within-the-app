@@ -1996,7 +1996,6 @@ def meta_campaigns(request):
 
     # Build API params
     params = {
-        "access_token": token,
         "fields": "campaign_name,results,campaign_id,purchase_roas,impressions,clicks,spend",
         "level": "campaign",
     }
@@ -2005,6 +2004,9 @@ def meta_campaigns(request):
         params["time_range"] = json.dumps({"since": start_date, "until": end_date})
     else:
         params["date_preset"] = date_preset
+
+    if token:
+        params["access_token"] = token
 
     url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/act_{account_id}/insights"
 
