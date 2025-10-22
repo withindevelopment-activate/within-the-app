@@ -17,7 +17,7 @@ from dateutil import parser
 
 ## Custom Imports ------------------
 # Supabase & Supporting imports
-from Demo.supporting_files.supabase_functions import batch_insert_to_supabase, get_next_id_from_supabase_compatible_all, get_tracking_df, attribute_purchases_to_campaigns, build_visitor_dictionary
+from Demo.supporting_files.supabase_functions import batch_insert_to_supabase, get_next_id_from_supabase_compatible_all, get_tracking_df, attribute_purchases_to_campaigns, build_visitor_dictionary,get_tracking_customers_df
 from Demo.supporting_files.supporting_functions import get_uae_current_date
 # Marketing Report functions
 from Demo.supporting_files.marketing_report import create_general_analysis, create_product_percentage_amount_spent, landing_performance_5_async, column_check
@@ -987,7 +987,7 @@ def view_tracking(request):
 
     try:
         # --- Fetch tracking events ---
-        df = get_tracking_df()
+        df = get_tracking_customers_df()
         if df.empty:
             messages.warning(request, "No tracking data available.")
             return redirect("Demo:home")
@@ -1016,9 +1016,10 @@ def view_tracking(request):
         total_pageviews = len(df_last_30min)
 
         # --- Top 50 rows for display ---
-        rows = df.sort_values(by="Visited_at", ascending=False).head(50).to_dict(orient="records")
+        # rows = df.sort_values(by="Visited_at", ascending=False).head(50).to_dict(orient="records")
 
         # --- Incremental customer tracking ---
+        # df= get_tracking_customers_df()
         customer_dict = build_visitor_dictionary(df)
 
         # --- Campaign attribution ---
@@ -2063,7 +2064,6 @@ def meta_campaigns(request):
             })
     except Exception as e:
         messages.error(request, f"Error processing campaign data: {e}")
-        messages.info(request, )
 
     return render(request, "Demo/meta_campaigns.html", {
         "table_rows": table_rows,
