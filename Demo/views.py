@@ -2042,7 +2042,7 @@ def meta_campaigns(request):
         for action in insights.get("actions", []) or []:
             if action.get("action_type") == "purchase":
                 purchases_value = float(action.get("value", 0))
-        roas = round(insights.get("purchase_roas", 0) or purchases_value / spend, 2) if spend else 0
+                roas = round(insights.get("purchase_roas", 0) or purchases_value / spend, 2) if spend else 0
 
         table_rows.append({
             "campaign_id": camp_id,
