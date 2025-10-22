@@ -2020,44 +2020,50 @@ def meta_campaigns(request):
         campaigns = resp.json().get("data", [])
     except requests.RequestException as e:
         messages.error(request, f"Failed to fetch campaigns: {e}")
+        messages.info(request, f"Campaigns data = {resp.json() if 'resp' in locals() else 'N/A'}")
         campaigns = []
 
     # --- Flatten campaigns + adsets for table ---
     table_rows = []
-    for camp in campaigns:
-        camp_id = camp.get("id")
-        camp_name = camp.get("name")
-        camp_status = camp.get("status")
-        camp_effective_status = camp.get("effective_status")
-        daily_budget = int(camp.get("daily_budget", 0))
-        budget_remaining = int(camp.get("budget_remaining", 0))
-        updated_time = camp.get("updated_time")
+    try:
+        for camp in campaigns:
+            camp_id = camp.get("id")
+            camp_name = camp.get("name")
+            camp_status = camp.get("status")
+            camp_effective_status = camp.get("effective_status")
+            daily_budget = int(camp.get("daily_budget", 0))
+            budget_remaining = int(camp.get("budget_remaining", 0))
+            updated_time = camp.get("updated_time")
 
-        # Insights
-        insights = camp.get("insights", {}).get("data", [{}])[0]  # Meta may return empty list
-        spend = float(insights.get("spend", 0))
-        clicks = int(insights.get("clicks", 0))
-        impressions = int(insights.get("impressions", 0))
-        purchases_value = 0
-        for action in insights.get("actions", []) or []:
-            if action.get("action_type") == "purchase":
-                purchases_value = float(action.get("value", 0))
-                roas = round(insights.get("purchase_roas", 0) or purchases_value / spend, 2) if spend else 0
+            # Insights
+            insights = camp.get("insights", {}).get("data", [{}])[0]  # Meta may return empty list
+            spend = float(insights.get("spend", 0))
+            clicks = int(insights.get("clicks", 0))
+            impressions = int(insights.get("impressions", 0))
+            purchases_value = 0
+            roas = 0
+            for action in insights.get("actions", []) or []:
+                if action.get("action_type") == "purchase":
+                    purchases_value = float(action.get("value", 0))
+                    roas = round(insights.get("purchase_roas", 0) or purchases_value / spend, 2) if spend else 0
 
-        table_rows.append({
-            "campaign_id": camp_id,
-            "campaign_name": camp_name,
-            "campaign_status": camp_status,
-            "effective_status": camp_effective_status,
-            "daily_budget": daily_budget,
-            "budget_remaining": budget_remaining,
-            "updated_time": updated_time,
-            "spend": spend,
-            "clicks": clicks,
-            "impressions": impressions,
-            "purchases_value": purchases_value,
-            "roas": roas,
-        })
+            table_rows.append({
+                "campaign_id": camp_id,
+                "campaign_name": camp_name,
+                "campaign_status": camp_status,
+                "effective_status": camp_effective_status,
+                "daily_budget": daily_budget,
+                "budget_remaining": budget_remaining,
+                "updated_time": updated_time,
+                "spend": spend,
+                "clicks": clicks,
+                "impressions": impressions,
+                "purchases_value": purchases_value,
+                "roas": roas,
+            })
+    except Exception as e:
+        messages.error(request, f"Error processing campaign data: {e}")
+        messages.info(request, )
 
     return render(request, "Demo/meta_campaigns.html", {
         "table_rows": table_rows,
