@@ -2010,7 +2010,7 @@ def meta_campaigns(request):
     params = {
         "access_token": token,
         "fields": fields_str,
-        "effective_status": json.dumps(status_filter),
+        # "effective_status": json.dumps(status_filter),
         "limit": 100
     }
 
