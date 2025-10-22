@@ -2008,7 +2008,7 @@ def meta_campaigns(request):
     if token:
         params["access_token"] = token
 
-    url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/act_{account_id}/insights"
+    url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/{account_id}/insights"
 
     try:
         resp = requests.get(url, params=params)
