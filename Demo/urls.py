@@ -55,6 +55,8 @@ urlpatterns = [
     path("tiktok/select-advertiser/", views.tiktok_select_advertiser, name="tiktok_select_advertiser"),
 
 
-    path("price-monitor/", views.view_price_monitor, name="price_monitor")
+    path("price-monitor/", views.view_price_monitor, name="price_monitor"),
     # path("campaigns/overview/", views.campaigns_overview, name="campaigns_overview"),
+    
+    path("sync-customer-tracking/", views.sync_customer_tracking_view, name="sync_customer_tracking"),
 ]
