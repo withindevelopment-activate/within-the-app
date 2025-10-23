@@ -168,33 +168,7 @@
 <!-- Footer -->
 <footer class="text-center text-muted py-3 mt-auto">
   <small>&copy; {{ now|date:"Y" }} <strong>WithIn</strong> by YourCompany. All rights reserved.</small>
-  <button id="sync-btn" class="btn btn-primary">Sync Next 500 Rows</button>
-  <p id="sync-status">Click the button to start syncing.</p>
 </footer>
-
-<script>
-let offset = 0;  // tracks the next batch offset
-const limit = 200; // rows per batch
-
-document.getElementById("sync-btn").addEventListener("click", function() {
-    fetch(`/sync-customer-tracking/?offset=${offset}&limit=${limit}`)
-        .then(res => res.json())
-        .then(data => {
-            if(data.status === "ok") {
-                document.getElementById("sync-status").textContent =
-                    `✅ Synced ${data.rows_fetched} rows. Next offset: ${data.next_offset}`;
-                offset = data.next_offset;  // prepare for next batch
-            } else if(data.status === "done") {
-                document.getElementById("sync-status").textContent =
-                    "✅ Sync completed! All new data is up to date.";
-            }
-        })
-        .catch(err => {
-            console.error(err);
-            document.getElementById("sync-status").textContent = "❌ Error syncing data.";
-        });
-});
-</script>
 
 
 <script>
