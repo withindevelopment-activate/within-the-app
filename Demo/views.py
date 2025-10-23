@@ -1963,6 +1963,32 @@ def meta_callback(request):
         request.session["meta_access_token"] = long_lived_token or short_lived_token
         request.session["meta_token_expires_at"] = expiry.isoformat()
 
+        ## Save the access token to the db
+        ## Add them to database
+        store_id = request.session.get("store_id")
+        if not store_id:
+            return HttpResponse("No store_id found in session", status=400)
+
+        # Check if row exists first
+        existing = supabase.table("tokens").select("Store_ID").eq("Store_ID", store_id).execute()
+
+        if not existing.data:
+            # No row found 
+            return HttpResponse(
+                f"No entry found in 'tokens' for Store_ID: {store_id}. Please create it first.",
+                status=404
+            )
+
+        # Row exists, update it
+        update_data = {
+            "Meta_Access": request.session.get("meta_access_token")
+        }
+
+        response = supabase.table("tokens").update(update_data).eq("Store_ID", store_id).execute()
+        print(f"TikTok tokens updated for Store_ID {store_id}")
+
+        # your mom
+
         return redirect("Demo:meta_select_ad_account")
 
     except requests.RequestException as e:
