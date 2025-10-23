@@ -1,4 +1,4 @@
-import os,json,ast,logging,pandas as pd, pytz
+import os,json,ast,logging,pandas as pd, pytz,uuid
 from supabase import create_client, Client
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
