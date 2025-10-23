@@ -10,6 +10,10 @@ key: str = os.environ.get('SUPABASE_KEY')
 
 supabase: Client = create_client(url, key)
 
+## yet to be created but to avoid import error
+def sync_customer_tracking_incremental():
+    return
+
 def get_token(store_id=None):
     """
     Fetch token from 'tokens' table.
@@ -36,7 +40,9 @@ def get_token(store_id=None):
         "store_id": token_row.get("Store_ID"),
         "snapchat_access": token_row.get("Snapchat_Access"),
         "tiktok_access": token_row.get("Tiktok_Access"),
-        "tiktok_org": token_row.get("Tiktok_Org")
+        "tiktok_org": token_row.get("Tiktok_Org"),
+        "meta_access": token_row.get("Meta_Access"),
+        "long_snapchat_token": token_row.get("Snapchat_long_term_Access")
     }
 
 def fetch_data_from_supabase(table_name):
