@@ -356,7 +356,7 @@ def sync_customer_tracking_unified():
             "UTM_Source",
             "Visited_at",
         ],
-        filter=query_filter
+        filters=query_filter
     )
 
     if df.empty:
