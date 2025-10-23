@@ -2175,7 +2175,7 @@ def privacy_policy(request):
 def data_deletion(request):
     return render(request, "Demo/data_deletion.html")
 
-from Demo.supporting_files.supabase_functions import sync_customer_tracking_incremental_1  # wherever your function is
+from Demo.supporting_files.supabase_functions import sync_customer_tracking_incremental  # wherever your function is
 
 def sync_customer_tracking_view(request):
     """
@@ -2185,5 +2185,5 @@ def sync_customer_tracking_view(request):
     offset = int(request.GET.get("offset", 0))  # default 0 for first batch
     limit = int(request.GET.get("limit", 500))  # default 500 rows
 
-    result = sync_customer_tracking_incremental_1(limit=limit, offset=offset)
+    result = sync_customer_tracking_incremental(limit=limit, offset=offset)
     return JsonResponse(result)
