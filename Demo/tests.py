@@ -265,3 +265,111 @@ from django.test import TestCase
 #         "purchases": row["purchases"],
 #         "campaigns": json.loads(row["campaigns"])
 #     } for row in updated_rows}
+
+# def sync_customer_tracking_unified():
+#     """
+#     Unified sync for Customer_Tracking:
+#     - Performs full sync if Customer_Tracking is empty.
+#     - Performs incremental sync based on new visits per distinct_id.
+#     - Aggregates visitor/session/event data efficiently.
+#     """
+#     # 1️⃣ Fetch the last updated timestamp from Customer_Tracking
+#     existing_customers = supabase.table("Customer_Tracking").select("*").execute().data
+#     existing_df = pd.DataFrame(existing_customers) if existing_customers else pd.DataFrame()
+
+#     last_updated = None
+#     if not existing_df.empty and "updated_at" in existing_df.columns:
+#         last_updated = pd.to_datetime(existing_df["updated_at"]).max()
+
+#     # 2️⃣ Fetch only relevant tracking rows
+#     query_filter = f"Visited_at > '{last_updated.isoformat()}'" if last_updated else None
+#     df = fetch_data_from_supabase_specific(
+#         "Tracking_Visitors",
+#         columns=[
+#             "distinct_id",  # main key
+#             "Customer_Name",
+#             "Visitor_ID",
+#             "Session_ID",
+#             "Event_Type",
+#             "UTM_Campaign",
+#             "Visited_at",
+#         ],
+#         filter=query_filter
+#     )
+
+#     if df.empty:
+#         print("No new tracking data to sync.")
+#         return
+
+#     # 3️⃣ Normalize columns
+#     for col in ["distinct_id", "Visitor_ID", "Session_ID", "UTM_Campaign"]:
+#         if col in df.columns:
+#             df[col] = df[col].astype(str).fillna("").str.strip().replace("nan", "")
+
+#     df["UTM_Campaign"] = df["UTM_Campaign"].str.replace("+", " ", regex=False)
+#     df["Visited_at"] = pd.to_datetime(df["Visited_at"], errors="coerce")
+#     df = df[df["distinct_id"] != ""]
+
+#     # 4️⃣ Build visitor → sessions mapping
+#     visitor_session_map = df.groupby("Visitor_ID")["Session_ID"].unique().apply(list).to_dict()
+
+#     # 5️⃣ Aggregate by distinct_id
+#     agg_df = (
+#         df.groupby("distinct_id")
+#         .agg(
+#             customer_name=("Customer_Name", lambda x: x.dropna().iloc[-1] if len(x.dropna()) else ""),
+#             visitor_ids=("Visitor_ID", lambda vlist: {vid: visitor_session_map.get(vid, []) for vid in vlist.dropna().unique()}),
+#             add_to_cart=("Event_Type", lambda x: (x == "add_to_cart").sum()),
+#             purchases=("Event_Type", lambda x: (x == "purchase").sum()),
+#             campaigns=("UTM_Campaign", lambda x: list(set(x.dropna()) - {""})),
+#             updated_at=("Visited_at", "max"),
+#         )
+#         .reset_index()
+#         .rename(columns={"distinct_id": "customer_key"})
+#     )
+
+#     if agg_df.empty:
+#         print("No customer summaries to update.")
+#         return
+
+#     # 6️⃣ Merge with existing Customer_Tracking if exists
+#     if not existing_df.empty:
+#         existing_df.set_index("customer_key", inplace=True)
+#         agg_df.set_index("customer_key", inplace=True)
+
+#         for key in agg_df.index:
+#             if key in existing_df.index:
+#                 # Merge visitor_ids
+#                 existing_visitors = existing_df.at[key, "visitor_ids"] or {}
+#                 new_visitors = agg_df.at[key, "visitor_ids"]
+#                 merged_visitors = {**existing_visitors, **new_visitors}
+
+#                 agg_df.at[key, "visitor_ids"] = merged_visitors
+
+#                 # Merge add_to_cart and purchases
+#                 agg_df.at[key, "add_to_cart"] += existing_df.at[key, "add_to_cart"]
+#                 agg_df.at[key, "purchases"] += existing_df.at[key, "purchases"]
+
+#                 # Merge campaigns
+#                 existing_campaigns = set(existing_df.at[key, "campaigns"] or [])
+#                 new_campaigns = set(agg_df.at[key, "campaigns"])
+#                 agg_df.at[key, "campaigns"] = list(existing_campaigns | new_campaigns)
+
+#                 # Take max updated_at
+#                 agg_df.at[key, "updated_at"] = max(existing_df.at[key, "updated_at"], agg_df.at[key, "updated_at"])
+
+#         agg_df.reset_index(inplace=True)
+
+#     # 7️⃣ Bulk upsert in chunks
+#     records = agg_df.to_dict(orient="records")
+#     BATCH_SIZE = 1000
+#     total = len(records)
+
+#     for i in range(0, total, BATCH_SIZE):
+#         batch = records[i:i + BATCH_SIZE]
+#         try:
+#             supabase.table("Customer_Tracking").upsert(batch, on_conflict="customer_key").execute()
+#         except Exception as e:
+#             print(f"Batch {i//BATCH_SIZE + 1} failed: {e}")
+
+#     print(f"✅ Synced {len(agg_df)} customers into Customer_Tracking (unified incremental).")

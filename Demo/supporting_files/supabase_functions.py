@@ -326,225 +326,169 @@ def map_skus(df):
         df['sku'] = df['sku'].map(lambda x: replacement_dict.get(x, x))
     
     return df
-    
-def get_tracking_df():
-    """
-    Fetch all tracking data from the database and return as a DataFrame.
-    """
-    df = fetch_data_from_supabase("Tracking_Visitors")
 
-    # Convert dates properly
-    if "Visited_at" in df.columns:
-        df["Visited_at"] = pd.to_datetime(df["Visited_at"], errors="coerce")
-    return df
+def sync_customer_tracking_unified():
+    """
+    Unified sync for Customer_Tracking:
+    - Performs full sync if Customer_Tracking is empty.
+    - Performs incremental sync based on new visits per distinct_id.
+    - Aggregates visitor/session/event data efficiently.
+    """
+    # 1️⃣ Fetch the last updated timestamp from Customer_Tracking
+    existing_customers = supabase.table("Customer_Tracking").select("*").execute().data
+    existing_df = pd.DataFrame(existing_customers) if existing_customers else pd.DataFrame()
+
+    last_updated = None
+    if not existing_df.empty and "updated_at" in existing_df.columns:
+        last_updated = pd.to_datetime(existing_df["updated_at"]).max()
+
+    # 2️⃣ Fetch only relevant tracking rows
+    query_filter = f"Visited_at > '{last_updated.isoformat()}'" if last_updated else None
+    df = fetch_data_from_supabase_specific(
+        "Tracking_Visitors",
+        columns=[
+            "distinct_id",  # main key
+            "Customer_Name",
+            "Visitor_ID",
+            "Session_ID",
+            "Event_Type",
+            "UTM_Campaign",
+            "UTM_Source",
+            "Visited_at",
+        ],
+        filter=query_filter
+    )
+
+    if df.empty:
+        print("No new tracking data to sync.")
+        return
+
+    # 3️⃣ Normalize columns
+    for col in ["distinct_id", "Visitor_ID", "Session_ID", "UTM_Campaign", "UTM_Source"]:
+        if col in df.columns:
+            df[col] = df[col].astype(str).fillna("").str.strip().replace("nan", "")
+
+    df["UTM_Campaign"] = df["UTM_Campaign"].str.title().replace("+", " ", regex=False)
+    df["UTM_Source"] = df["UTM_Source"].str.title().replace("+", " ", regex=False)
+    df["Visited_at"] = pd.to_datetime(df["Visited_at"], errors="coerce")
+    df = df[df["distinct_id"] != ""]
+
+    # 4️⃣ Build visitor → sessions mapping
+    visitor_session_map = df.groupby("Visitor_ID")["Session_ID"].unique().apply(list).to_dict()
+
+    # 5️⃣ Aggregate by distinct_id
+    agg_df = (
+        df.groupby("distinct_id")
+        .agg(
+            customer_name=("Customer_Name", lambda x: x.dropna().iloc[-1] if len(x.dropna()) else ""),
+            visitor_ids=("Visitor_ID", lambda vlist: {vid: visitor_session_map.get(vid, []) for vid in vlist.dropna().unique()}),
+            add_to_cart=("Event_Type", lambda x: (x == "add_to_cart").sum()),
+            purchases=("Event_Type", lambda x: (x == "purchase").sum()),
+            campaigns=("UTM_Campaign", lambda x: list(set(x.dropna()) - {""})),
+            sources=("UTM_Source", lambda x: list(set(x.dropna()) - {""})),
+            updated_at=("Visited_at", "max"),
+        )
+        .reset_index()
+        .rename(columns={"distinct_id": "customer_key"})
+    )
+
+    if agg_df.empty:
+        print("No customer summaries to update.")
+        return
+
+    # 6️⃣ Merge with existing Customer_Tracking if exists
+    if not existing_df.empty:
+        existing_df.set_index("customer_key", inplace=True)
+        agg_df.set_index("customer_key", inplace=True)
+
+        for key in agg_df.index:
+            if key in existing_df.index:
+                # Merge visitor_ids
+                existing_visitors = existing_df.at[key, "visitor_ids"] or {}
+                new_visitors = agg_df.at[key, "visitor_ids"]
+                merged_visitors = {**existing_visitors, **new_visitors}
+
+                agg_df.at[key, "visitor_ids"] = merged_visitors
+
+                # Merge add_to_cart and purchases
+                agg_df.at[key, "add_to_cart"] += existing_df.at[key, "add_to_cart"]
+                agg_df.at[key, "purchases"] += existing_df.at[key, "purchases"]
+
+                # Merge campaigns
+                existing_campaigns = set(existing_df.at[key, "campaigns"] or [])
+                new_campaigns = set(agg_df.at[key, "campaigns"])
+                agg_df.at[key, "campaigns"] = list(existing_campaigns | new_campaigns)
+
+                # Merge sources
+                existing_sources = set(existing_df.at[key, "sources"] or [])
+                new_sources = set(agg_df.at[key, "sources"])
+                agg_df.at[key, "sources"] = list(existing_sources | new_sources)
+
+                # Take max updated_at
+                agg_df.at[key, "updated_at"] = max(existing_df.at[key, "updated_at"], agg_df.at[key, "updated_at"])
+
+        agg_df.reset_index(inplace=True)
+
+    # 7️⃣ Bulk upsert in chunks
+    records = agg_df.to_dict(orient="records")
+    BATCH_SIZE = 1000
+    total = len(records)
+
+    for i in range(0, total, BATCH_SIZE):
+        batch = records[i:i + BATCH_SIZE]
+        try:
+            supabase.table("Customer_Tracking").upsert(batch, on_conflict="customer_key").execute()
+        except Exception as e:
+            print(f"Batch {i//BATCH_SIZE + 1} failed: {e}")
+
+    print(f"✅ Synced {len(agg_df)} customers into Customer_Tracking (unified incremental).")
 
 def get_tracking_customers_df():
     """
-    Fetch tracking data once and cache it for a short period to prevent repeated
-    heavy Supabase reads and conversions.
+    Runs an incremental sync (sync_customer_tracking_unified) 
+    and then fetches fresh data from 'Customer_Tracking'.
+    Returns a cleaned DataFrame ready for dashboard use.
     """
-    cache_key = "tracking_df"
-    cached_df = cache.get(cache_key)
-    if cached_df is not None:
-        return cached_df
+    try:
+        # 1️⃣ Run incremental sync first
+        sync_customer_tracking_unified()
 
-    df = fetch_data_from_supabase("Tracking_Visitors")
+        # 2️⃣ Fetch fresh customer tracking data
+        data = supabase.table("Customer_Tracking").select("*").execute().data
+        if not data:
+            return pd.DataFrame()
 
-    if df.empty:
+        df = pd.DataFrame(data)
+
+        # 3️⃣ Clean and normalize
+        if "updated_at" in df.columns:
+            df["updated_at"] = pd.to_datetime(df["updated_at"], errors="coerce")
+            uae_tz = pytz.timezone("Asia/Dubai")
+            df["updated_at"] = df["updated_at"].dt.tz_localize("UTC", nonexistent="shift_forward", ambiguous="NaT").dt.tz_convert(uae_tz)
+
+        for col in ["customer_key", "customer_name"]:
+            if col in df.columns:
+                df[col] = df[col].astype(str).fillna("").replace("nan", "")
+
+        # JSON-like fields normalization
+        if "visitor_ids" in df.columns:
+            df["visitor_ids"] = df["visitor_ids"].apply(lambda x: x if isinstance(x, dict) else {})
+
+        if "campaigns" in df.columns:
+            df["campaigns"] = df["campaigns"].apply(lambda x: x if isinstance(x, list) else [])
+        
+        if "sources" in df.columns:
+            df["sources"] = df["sources"].apply(lambda x: x if isinstance(x, list) else [])
+
+        # Numeric fallback
+        for num_col in ["add_to_cart", "purchases"]:
+            if num_col not in df.columns:
+                df[num_col] = 0
+            else:
+                df[num_col] = pd.to_numeric(df[num_col], errors="coerce").fillna(0)
+
         return df
 
-    if "Visited_at" in df.columns:
-        df["Visited_at"] = pd.to_datetime(df["Visited_at"], errors="coerce")
-
-    # Keep only relevant columns to reduce memory
-    keep_cols = [
-        "Visitor_ID", "Session_ID", "Customer_Name", "Customer_Email",
-        "Customer_Mobile", "UTM_Campaign", "UTM_Source", "Event_Type",
-        "Event_Details", "Visited_at"
-    ]
-    df = df[[c for c in keep_cols if c in df.columns]]
-
-    # Cache for 2 minutes
-    cache.set(cache_key, df, timeout=120)
-    return df
-
-
-def build_visitor_dictionary(df: pd.DataFrame) -> dict:
-    """
-    Build a dictionary of visitors:
-    - Tracks session_ids, add_to_cart, purchase, and campaigns used
-    - Includes latest customer name, email, and phone
-    """
-
-    if df.empty:
-        return {}
-
-    df = df.copy()
-
-    # Normalize expected columns
-    for col in [
-        "Visitor_ID",
-        "Session_ID",
-        "Customer_Name",
-        "Customer_Email",
-        "Customer_Mobile",
-        "UTM_Campaign",
-        "Event_Type",
-        "Visited_at",
-    ]:
-        if col not in df.columns:
-            df[col] = ""
-
-    df["Visitor_ID"] = df["Visitor_ID"].fillna("").astype(str).str.strip()
-    df["Session_ID"] = df["Session_ID"].fillna("").astype(str).str.strip()
-    df["Customer_Name"] = df["Customer_Name"].fillna("").astype(str).str.strip()
-    df["Customer_Email"] = df["Customer_Email"].fillna("").astype(str).str.strip().str.lower()
-    df["Customer_Mobile"] = df["Customer_Mobile"].fillna("").astype(str).str.strip()
-    df["UTM_Campaign"] = (
-        df["UTM_Campaign"]
-        .fillna("")
-        .astype(str)
-        .str.replace("+", " ", regex=False)
-        .str.strip()
-    )
-    df["Visited_at"] = pd.to_datetime(df["Visited_at"], errors="coerce")
-
-    # Filter valid visitor IDs
-    df = df[df["Visitor_ID"] != ""]
-    visitor_dict = {}
-
-    for visitor_id, group in df.groupby("Visitor_ID"):
-        # Unique sessions & campaigns
-        session_ids = list(set(group["Session_ID"]) - {""})
-        campaigns = list(set(group["UTM_Campaign"]) - {""})
-
-        # Event counts
-        add_to_cart_count = (group["Event_Type"] == "add_to_cart").sum()
-        purchase_count = (group["Event_Type"] == "purchase").sum()
-
-        # Latest name, email, phone based on visited_at
-        group_sorted = group.sort_values("Visited_at")
-        latest_row = group_sorted.iloc[-1]
-
-        visitor_dict[visitor_id] = {
-            "session_ids": session_ids,
-            "campaigns": campaigns,
-            "add_to_cart": int(add_to_cart_count),
-            "purchases": int(purchase_count),
-            "customer_name": latest_row.get("Customer_Name", ""),
-            "customer_email": latest_row.get("Customer_Email", ""),
-            "customer_phone": latest_row.get("Customer_Mobile", ""),
-        }
-    return visitor_dict
-
-
-def attribute_purchases_to_campaigns(df: pd.DataFrame):
-    """
-    Return campaign-level and source-level attribution summaries with conversion credits.
-    Each campaign/source gets fractional credit if multiple touchpoints exist.
-    """
-    df = df.copy()
-
-    # Normalize columns
-    for col in ["Customer_ID", "Customer_Email", "Customer_Mobile", "Visitor_ID", "Session_ID"]:
-        df[col] = df.get(col, "").fillna("").astype(str).str.strip()
-
-    df["UTM_Campaign"] = (
-        df.get("UTM_Campaign", "")
-        .fillna("")
-        .astype(str)
-        .str.replace("+", " ", regex=False)
-        .str.strip()
-        .str.title()
-    )
-
-    df["UTM_Source"] = (
-        df.get("UTM_Source", "")
-        .fillna("")
-        .astype(str)
-        .str.replace("+", " ", regex=False)
-        .str.strip()
-        .str.title()
-    )
-
-    df["Visited_at"] = pd.to_datetime(df["Visited_at"], errors="coerce")
-
-    # Helper to extract from Event_Details
-    def extract_from_event(details, key):
-        if pd.isna(details) or not details:
-            return ""
-        try:
-            d = json.loads(details.replace("'", '"'))
-            return str(d.get(key, ""))
-        except Exception:
-            return ""
-
-    df["Customer_ID"] = df.apply(
-        lambda row: row["Customer_ID"] or extract_from_event(row.get("Event_Details", ""), "customer_id"),
-        axis=1,
-    )
-    df["order_id"] = df.apply(
-        lambda row: extract_from_event(row.get("Event_Details", ""), "order_id"),
-        axis=1,
-    )
-
-    # Deduplicate purchases by order_id
-    purchase_mask = df["Event_Type"] == "purchase"
-    purchases = df[purchase_mask].drop_duplicates(subset=["order_id"])
-
-    attributions = []
-
-    for _, purchase in purchases.iterrows():
-        session_id = purchase["Session_ID"]
-
-        # Campaign & source interactions prior to purchase
-        session_mask = (
-            (df["Session_ID"] == session_id)
-            & (df["Visited_at"] <= purchase["Visited_at"])
-        )
-
-        session_data = df[session_mask]
-
-        campaigns = session_data[session_data["UTM_Campaign"] != ""]["UTM_Campaign"].unique()
-        sources = session_data[session_data["UTM_Source"] != ""]["UTM_Source"].unique()
-
-        if len(campaigns) == 0:
-            campaigns = ["Direct"]
-        if len(sources) == 0:
-            sources = ["Direct"]
-
-        campaign_credit = 1.0 / len(campaigns)
-        source_credit = 1.0 / len(sources)
-
-        for camp in campaigns:
-            attributions.append({"type": "campaign", "key": camp, "credit": campaign_credit})
-
-        for src in sources:
-            attributions.append({"type": "source", "key": src, "credit": source_credit})
-
-    if not attributions:
-        return pd.DataFrame(columns=["campaign", "conversion_credit"]), pd.DataFrame(columns=["source", "conversion_credit"])
-
-    attr_df = pd.DataFrame(attributions)
-
-    # Aggregate for campaigns
-    campaign_summary = (
-        attr_df[attr_df["type"] == "campaign"]
-        .groupby("key")
-        .agg(conversion_credit=pd.NamedAgg(column="credit", aggfunc="sum"))
-        .reset_index()
-        .rename(columns={"key": "campaign"})
-        .sort_values("conversion_credit", ascending=False)
-    )
-
-    # Aggregate for sources
-    source_summary = (
-        attr_df[attr_df["type"] == "source"]
-        .groupby("key")
-        .agg(conversion_credit=pd.NamedAgg(column="credit", aggfunc="sum"))
-        .reset_index()
-        .rename(columns={"key": "source"})
-        .sort_values("conversion_credit", ascending=False)
-    )
-
-    return campaign_summary, source_summary
+    except Exception as e:
+        print(f"⚠️ Error syncing or fetching Customer_Tracking: {e}")
+        return pd.DataFrame()

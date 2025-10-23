@@ -37,10 +37,7 @@
   <!-- Filters -->
   <form method="get" class="mb-4 row">
     <div class="col-md-3">
-      <input type="text" class="form-control" name="visitor" placeholder="Visitor ID" value="{{ request.GET.visitor }}">
-    </div>
-    <div class="col-md-3">
-      <input type="text" class="form-control" name="session" placeholder="Session ID" value="{{ request.GET.session }}">
+      <input type="text" class="form-control" name="campaign" placeholder="Search Campaign..." value="{{ request.GET.campaign }}">
     </div>
     <div class="col-md-3">
       <input type="date" class="form-control" name="from" value="{{ request.GET.from }}">
@@ -48,12 +45,10 @@
     <div class="col-md-3">
       <input type="date" class="form-control" name="to" value="{{ request.GET.to }}">
     </div>
-    <div class="col-md-12 mt-2">
+    <div class="col-md-3">
       <button class="btn btn-primary w-100">Apply</button>
     </div>
   </form>
-
-  <!-- Tracking Table -->
 
   <div class="row mt-5">
     <!-- Campaign Chart -->
@@ -88,39 +83,35 @@
         <table class="data-table" role="table" aria-label="Tracking dataset">
           <thead>
             <tr>
+              <th>Customer</th>
               <th>Visitor IDs</th>
-              <th>Session IDs</th>
-              <th>Name</th>
-              <th>Email</th>
-              <th>Phone</th>
+              <th>Sessions Count</th>
               <th>Campaigns</th>
               <th>Add to Cart</th>
               <th>Purchases</th>
+              <th>Last Updated</th>
             </tr>
           </thead>
           <tbody>
-            {% for key, c in customer_dict.items %}
+            {% for r in rows %}
             <tr>
-              <td>{{ key }}</td>
-              <td>{{ c.session_ids|join:", " }}</td>
-              <td>{{ c.customer_name }}</td>
-              <td>{{ c.customer_email }}</td>
-              <td>{{ c.customer_phone }}</td>
-              <td>{{ c.campaigns|join:", " }}</td>
-              <td>{{ c.add_to_cart }}</td>
-              <td>{{ c.purchases }}</td>
+              <td>{{ r.customer_name }}</td>
+              <td>{{ r.visitor_ids.keys|join:", " }}</td>
+              <td>{{ r.visitor_ids.values|join:", "|length }}</td>
+              <td>{{ r.campaigns|join:", " }}</td>
+              <td>{{ r.add_to_cart }}</td>
+              <td>{{ r.purchases }}</td>
+              <td>{{ r.updated_at }}</td>
             </tr>
             {% empty %}
-            <tr>
-              <td colspan="7" class="text-center text-muted">No customer data found</td>
-            </tr>
+            <tr><td colspan="7" class="text-center text-muted">No customer data found</td></tr>
             {% endfor %}
           </tbody>
         </table>
       </div>
     </div>
   </div>
-<!--
+
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
   const modernColors = [
@@ -225,6 +216,5 @@
   });
   generateLegend(sourcePieChart, 'sourceLegend');
   </script>
--->
 </div>
 {% endblock %}

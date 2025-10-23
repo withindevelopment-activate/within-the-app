@@ -17,7 +17,8 @@ from dateutil import parser
 
 ## Custom Imports ------------------
 # Supabase & Supporting imports
-from Demo.supporting_files.supabase_functions import batch_insert_to_supabase, get_next_id_from_supabase_compatible_all, get_tracking_df, attribute_purchases_to_campaigns, build_visitor_dictionary,get_tracking_customers_df
+from Demo.supporting_files.supabase_functions import batch_insert_to_supabase, get_next_id_from_supabase_compatible_all, get_tracking_customers_df
+
 from Demo.supporting_files.supporting_functions import get_uae_current_date
 # Marketing Report functions
 from Demo.supporting_files.marketing_report import create_general_analysis, create_product_percentage_amount_spent, landing_performance_5_async, column_check
@@ -966,86 +967,108 @@ def process_marketing_report(request):
 
     return render(request, "Demo/marketing.html", context)
 
-
-
-
 #############################################################################################
 ################################# Viewing the Tracking ######################################
 ##
+from datetime import datetime, timedelta
+import pytz
+import logging
+from django.shortcuts import render, redirect
+from django.contrib import messages
+import pandas as pd
+
 def view_tracking(request):
+    """
+    Displays synced Customer_Tracking data with campaign search.
+    Automatically triggers incremental sync before rendering.
+    """
     store_id = request.GET.get("store_id") or request.session.get("store_uuid")
     if not store_id:
         return redirect("Demo:home")
-    
-    uae_timezone = pytz.timezone('Asia/Dubai')
-    
+
+    uae_timezone = pytz.timezone("Asia/Dubai")
     rows = []
     total_visitors = total_sessions = total_pageviews = 0
-    campaigns_summary = []
-    sources_summary = []
     context = {}
 
     try:
-        # --- Fetch tracking events ---
+        # --- Fetch synced customer tracking data ---
         df = get_tracking_customers_df()
         if df.empty:
-            messages.warning(request, "No tracking data available.")
+            messages.warning(request, "No customer tracking data available.")
             return redirect("Demo:home")
 
-        # --- Apply filters ---
-        visitor_filter = request.GET.get("visitor")
-        session_filter = request.GET.get("session")
+        # --- Filters ---
+        campaign_filter = request.GET.get("campaign")
+        source_filter = request.GET.get("source")
         from_date = request.GET.get("from")
         to_date = request.GET.get("to")
 
-        df["Visited_at"] = pd.to_datetime(df["Visited_at"], errors="coerce")
-        if visitor_filter:
-            df = df[df["Visitor_ID"] == visitor_filter]
-        if session_filter:
-            df = df[df["Session_ID"] == session_filter]
+        # Filter by campaign name (case-insensitive)
+        if campaign_filter:
+            df = df[df["campaigns"].apply(
+                lambda c: any(campaign_filter.lower() in str(x).lower() for x in c)
+            )]
+        
+        # Filter by source
+        if source_filter:
+            df = df[df["source"].apply(
+                lambda c: any(source_filter.lower() in str(x).lower() for x in c)
+            )]
+
+        # Filter by date range
         if from_date:
-            df = df[df["Visited_at"] >= from_date]
+            df = df[df["updated_at"] >= pd.to_datetime(from_date)]
         if to_date:
-            df = df[df["Visited_at"] <= to_date]
+            df = df[df["updated_at"] <= pd.to_datetime(to_date)]
 
         # --- Last 30 minutes stats ---
         thirty_minutes_ago = datetime.now(uae_timezone) - timedelta(minutes=30)
-        df_last_30min = df[df["Visited_at"].dt.tz_localize("Asia/Dubai", ambiguous='NaT', nonexistent='shift_forward') >= thirty_minutes_ago]
-        total_visitors = df_last_30min["Visitor_ID"].nunique()
-        total_sessions = df_last_30min["Session_ID"].nunique()
-        total_pageviews = len(df_last_30min)
+        df_recent = df[df["updated_at"] >= thirty_minutes_ago]
 
-        # --- Top 50 rows for display ---
-        # rows = df.sort_values(by="Visited_at", ascending=False).head(50).to_dict(orient="records")
+        total_visitors = len(df_recent)
+        total_sessions = df_recent["visitor_ids"].apply(lambda x: sum(len(v) for v in x.values())).sum()
+        total_pageviews = df_recent["add_to_cart"].sum() + df_recent["purchases"].sum()
 
-        # --- Incremental customer tracking ---
-        # df= get_tracking_customers_df()
-        customer_dict = build_visitor_dictionary(df)
+        # --- Campaign summary for chart ---
+        all_campaigns = []
+        for c_list in df["campaigns"]:
+            all_campaigns.extend(c_list)
+        campaign_counts = pd.Series(all_campaigns).value_counts().head(10)
 
-        # --- Campaign attribution ---
-        # campaigns_summary_df, sources_summary_df = attribute_purchases_to_campaigns(df)
-        # campaigns_summary = campaigns_summary_df.to_dict(orient="records")
-        # sources_summary = sources_summary_df.to_dict(orient="records")
+        campaign_labels = campaign_counts.index.tolist()
+        campaign_data = campaign_counts.values.tolist()
+
+
+        all_sources = []
+        for s_list in df["source"]:
+            all_sources.extend(s_list)
+        source_counts = pd.Series(all_sources).value_counts().head(10)
+        source_labels = source_counts.index.tolist()
+        source_data = source_counts.values.tolist()
+        # --- Top 50 customers ---
+        rows = (
+            df.sort_values(by="updated_at", ascending=False)
+            .head(50)
+            .to_dict(orient="records")
+        )
 
         # --- Build context ---
         context = {
-            "store_id": store_id,
+            "track_id": store_id,
             "rows": rows,
             "total_visitors": total_visitors,
             "total_sessions": total_sessions,
             "total_pageviews": total_pageviews,
-            "customer_dict": customer_dict,
-            "campaigns": campaigns_summary,
-            "sources": sources_summary,
-            # "campaign_labels": campaigns_summary_df["campaign"].tolist(),
-            # "campaign_data": campaigns_summary_df["conversion_credit"].tolist(),
-            # "source_labels": sources_summary_df["source"].tolist(),
-            # "source_data": sources_summary_df["conversion_credit"].tolist(),
+            "campaign_labels": campaign_labels,
+            "campaign_data": campaign_data,
+            "source_labels": source_labels,
+            "source_data": source_data,
             "request": request,
         }
 
     except Exception as e:
-        logging.error(f"Error fetching tracking data: {str(e)}")
+        logging.error(f"Error in view_tracking: {str(e)}")
         messages.error(request, f"❌ Error fetching tracking data: {str(e)}")
         return redirect("Demo:home")
 
