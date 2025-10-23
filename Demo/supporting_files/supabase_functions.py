@@ -343,7 +343,7 @@ def sync_customer_tracking_unified():
         last_updated = pd.to_datetime(existing_df["updated_at"]).max()
 
     # 2️⃣ Fetch only relevant tracking rows
-    query_filter = f"Visited_at > '{last_updated.isoformat()}'" if last_updated else None
+    query_filter = {"Visited_at": ("gt", last_updated.isoformat())} if last_updated else None
     df = fetch_data_from_supabase_specific(
         "Tracking_Visitors",
         columns=[
