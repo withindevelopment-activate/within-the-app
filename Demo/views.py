@@ -17,7 +17,7 @@ from dateutil import parser
 
 ## Custom Imports ------------------
 # Supabase & Supporting imports
-from Demo.supporting_files.supabase_functions import batch_insert_to_supabase, get_next_id_from_supabase_compatible_all, get_tracking_customers_df
+from Demo.supporting_files.supabase_functions import batch_insert_to_supabase, get_next_id_from_supabase_compatible_all, get_tracking_customers_df, sync_customer_tracking_unified
 
 from Demo.supporting_files.supporting_functions import get_uae_current_date
 # Marketing Report functions
@@ -992,6 +992,7 @@ def view_tracking(request):
     context = {}
 
     try:
+        sync_customer_tracking_unified()
         # --- Fetch synced customer tracking data ---
         df = get_tracking_customers_df()
         if df.empty:
