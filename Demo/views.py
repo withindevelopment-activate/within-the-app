@@ -1365,11 +1365,13 @@ def snapchat_callback(request):
                 f"No entry found in 'tokens' for Store_ID: {store_id}. Please create it first.",
                 status=404
             )
-
+        long_term_access_token = refresh_snapchat_token(request)
+        print("Long term access token is:", long_term_access_token)
         # Row exists, update it
         update_data = {
             "Snapchat_Access": token_data["access_token"],
-            "Snapchat_Refresh": token_data.get("refresh_token")
+            "Snapchat_Refresh": token_data.get("refresh_token"),
+            "Snapchat_long_term_Access": long_term_access_token,
         }
 
         response = supabase.table("tokens").update(update_data).eq("Store_ID", store_id).execute()
@@ -2179,11 +2181,11 @@ from Demo.supporting_files.supabase_functions import sync_customer_tracking_incr
 
 def sync_customer_tracking_view(request):
     """
-    Trigger a batch sync of 500 rows from Tracking_Visitors.
+    Trigger a batch sync of 200 rows from Tracking_Visitors.
     Frontend should call this repeatedly using offset.
     """
     offset = int(request.GET.get("offset", 0))  # default 0 for first batch
-    limit = int(request.GET.get("limit", 500))  # default 500 rows
+    limit = int(request.GET.get("limit", 200))  # default 200 rows
 
     result = sync_customer_tracking_incremental(limit=limit, offset=offset)
     return JsonResponse(result)

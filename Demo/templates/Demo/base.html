@@ -174,7 +174,7 @@
 
 <script>
 let offset = 0;  // tracks the next batch offset
-const limit = 500; // rows per batch
+const limit = 200; // rows per batch
 
 document.getElementById("sync-btn").addEventListener("click", function() {
     fetch(`/sync-customer-tracking/?offset=${offset}&limit=${limit}`)
