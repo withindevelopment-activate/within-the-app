@@ -169,7 +169,6 @@ def home(request):
     user_name = ""
 
     try:
-        copy_rows_between_supabases("Tracking_Visitors", "Tracking_Visitors", limit=200)
         # Fetch profile information
         profile_res = requests.get(f"{settings.ZID_API_BASE}/managers/account/profile", headers=headers)
         profile_res.raise_for_status()
@@ -2197,3 +2196,12 @@ def privacy_policy(request):
 
 def data_deletion(request):
     return render(request, "Demo/data_deletion.html")
+
+def copy_data(request):
+    if request.method == "POST":
+        try:
+            copied = copy_rows_between_supabases("Tracking_Visitors", "Tracking_Visitors", limit=200)
+            return JsonResponse({"success": True, "message": f"Copied {copied} rows!"})
+        except Exception as e:
+            return JsonResponse({"success": False, "message": str(e)})
+    return JsonResponse({"success": False, "message": "Invalid request method"})

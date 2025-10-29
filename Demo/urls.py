@@ -58,5 +58,5 @@ urlpatterns = [
     path("price-monitor/", views.view_price_monitor, name="price_monitor"),
     # path("campaigns/overview/", views.campaigns_overview, name="campaigns_overview"),
     
-    path("sync-customer-tracking/", views.sync_customer_tracking_view, name="sync_customer_tracking"),
+    path('copy_data/', views.copy_data, name='copy_data'),
 ]
