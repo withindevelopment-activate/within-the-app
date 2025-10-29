@@ -497,3 +497,84 @@ def get_tracking_customers_df():
     except Exception as e:
         print(f"⚠️ Error syncing or fetching Customer_Tracking: {e}")
         return pd.DataFrame()
+
+
+# --- Target Database ---
+DEST_URL = os.environ.get("SUPABASE_URL_DEST")
+DEST_KEY = os.environ.get("SUPABASE_KEY_DEST")
+dest_supabase: Client = create_client(DEST_URL, DEST_KEY)
+
+
+def fetch_data_from_supabase_specific(supabase: Client, table_name, columns=None, filters=None, order_by=None, limit=None):
+    """Generic fetch function that supports filters, order, and limits"""
+    if columns:
+        columns = [f'"{col}"' if " " in col or "(" in col else col for col in columns]
+        select_query = ",".join(columns)
+    else:
+        select_query = "*"
+
+    query = supabase.table(table_name).select(select_query)
+
+    # Apply filters if specified
+    if filters:
+        for column, condition in filters.items():
+            if isinstance(condition, tuple) and len(condition) == 2:
+                op, value = condition
+                if op == 'eq':
+                    query = query.eq(column, value)
+                elif op == 'neq':
+                    query = query.neq(column, value)
+                elif op == 'lt':
+                    query = query.lt(column, value)
+                elif op == 'lte':
+                    query = query.lte(column, value)
+                elif op == 'gt':
+                    query = query.gt(column, value)
+                elif op == 'gte':
+                    query = query.gte(column, value)
+                elif op == 'in':
+                    query = query.in_(column, value)
+            else:
+                query = query.eq(column, condition)
+
+    # Apply sorting if specified
+    if order_by:
+        query = query.order(order_by, desc=True)
+
+    # Apply limit if specified
+    if limit:
+        query = query.limit(limit)
+
+    response = query.execute()
+
+    if response.data:
+        return pd.DataFrame(response.data)
+    else:
+        return pd.DataFrame()
+
+# --- Target Database ---
+DEST_URL = 'https://owhmgadiwrkugqqhjohr.supabase.co'
+DEST_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im93aG1nYWRpd3JrdWdxcWhqb2hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAyMjA5MzcsImV4cCI6MjA3NTc5NjkzN30.ja3nCcKApB_U8u-WjA0u7XXkoiwkCehVwaIAtqgbmSk'
+dest_supabase: Client = create_client(DEST_URL, DEST_KEY)
+
+
+def copy_rows_between_supabases(src_table: str, dest_table: str, limit: int = 100):
+    """Fetch rows from source DB and insert them into target DB."""
+    try:
+        # 1️⃣ Fetch 100 rows from source
+        df = fetch_data_from_supabase_specific(supabase, src_table, limit=limit)
+        if df.empty:
+            print("No data found to copy.")
+            return
+
+        # 2️⃣ Convert DataFrame rows to dict
+        records = df.to_dict(orient="records")
+
+        # 3️⃣ Insert into destination Supabase
+        insert_response = dest_supabase.table(dest_table).insert(records).execute()
+
+        print(f"✅ Successfully copied {len(records)} rows from {src_table} → {dest_table}")
+        return insert_response.data
+
+    except Exception as e:
+        print("❌ Error copying data:", e)

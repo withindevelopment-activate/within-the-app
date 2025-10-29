@@ -17,7 +17,7 @@ from dateutil import parser
 
 ## Custom Imports ------------------
 # Supabase & Supporting imports
-from Demo.supporting_files.supabase_functions import batch_insert_to_supabase, get_next_id_from_supabase_compatible_all, get_tracking_customers_df, sync_customer_tracking_unified
+from Demo.supporting_files.supabase_functions import batch_insert_to_supabase, get_next_id_from_supabase_compatible_all, get_tracking_customers_df, sync_customer_tracking_unified, copy_rows_between_supabases
 
 from Demo.supporting_files.supporting_functions import get_uae_current_date
 # Marketing Report functions
@@ -169,6 +169,7 @@ def home(request):
     user_name = ""
 
     try:
+        copy_rows_between_supabases("Tracking_Visitors", "Tracking_Visitors", limit=200)
         # Fetch profile information
         profile_res = requests.get(f"{settings.ZID_API_BASE}/managers/account/profile", headers=headers)
         profile_res.raise_for_status()
@@ -969,13 +970,7 @@ def process_marketing_report(request):
 
 #############################################################################################
 ################################# Viewing the Tracking ######################################
-##
-from datetime import datetime, timedelta
-import pytz
-import logging
-from django.shortcuts import render, redirect
-from django.contrib import messages
-import pandas as pd
+
 
 def view_tracking(request):
     """
@@ -2176,16 +2171,3 @@ def privacy_policy(request):
 
 def data_deletion(request):
     return render(request, "Demo/data_deletion.html")
-
-from Demo.supporting_files.supabase_functions import sync_customer_tracking_incremental  # wherever your function is
-
-def sync_customer_tracking_view(request):
-    """
-    Trigger a batch sync of 200 rows from Tracking_Visitors.
-    Frontend should call this repeatedly using offset.
-    """
-    offset = int(request.GET.get("offset", 0))  # default 0 for first batch
-    limit = int(request.GET.get("limit", 200))  # default 200 rows
-
-    result = sync_customer_tracking_incremental(limit=limit, offset=offset)
-    return JsonResponse(result)
