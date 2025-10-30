@@ -17,7 +17,7 @@ from dateutil import parser
 
 ## Custom Imports ------------------
 # Supabase & Supporting imports
-from Demo.supporting_files.supabase_functions import batch_insert_to_supabase, get_next_id_from_supabase_compatible_all, get_tracking_customers_df, sync_customer_tracking_unified, copy_rows_between_supabases
+from Demo.supporting_files.supabase_functions import batch_insert_to_supabase, get_next_id_from_supabase_compatible_all, get_tracking_customers_df, sync_customer_tracking_unified
 
 from Demo.supporting_files.supporting_functions import get_uae_current_date
 # Marketing Report functions
@@ -2196,12 +2196,3 @@ def privacy_policy(request):
 
 def data_deletion(request):
     return render(request, "Demo/data_deletion.html")
-
-def copy_data(request):
-    if request.method == "POST":
-        try:
-            copied = copy_rows_between_supabases("Tracking_Visitors", "Tracking_Visitors", limit=200)
-            return JsonResponse({"success": True, "message": f"Copied {copied} rows!"})
-        except Exception as e:
-            return JsonResponse({"success": False, "message": str(e)})
-    return JsonResponse({"success": False, "message": "Invalid request method"})

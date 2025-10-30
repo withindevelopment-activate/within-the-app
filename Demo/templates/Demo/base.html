@@ -168,21 +168,8 @@
 <!-- Footer -->
 <footer class="text-center text-muted py-3 mt-auto">
   <small>&copy; {{ now|date:"Y" }} <strong>WithIn</strong> by YourCompany. All rights reserved.</small>
-  <button class="btn btn-outline-secondary text-muted" id="copyButton">Copy 100 Rows</button>
-    <p class="text-center text-muted" id="status"></p>
 </footer>
-<script>
-    document.getElementById("copyButton").addEventListener("click", async () => {
-        document.getElementById("status").innerText = "Copying...";
-        try {
-            const response = await fetch("{% url 'Demo:copy_data' %}", { method: "POST", headers: {'X-CSRFToken': '{{ csrf_token }}'} });
-            const data = await response.json();
-            document.getElementById("status").innerText = data.message;
-        } catch (err) {
-            document.getElementById("status").innerText = "Error: " + err;
-        }
-    });
-</script>
+
 
 
 <script>
