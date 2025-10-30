@@ -175,7 +175,7 @@
     document.getElementById("copyButton").addEventListener("click", async () => {
         document.getElementById("status").innerText = "Copying...";
         try {
-            const response = await fetch("{% url 'copy_data' %}", { method: "POST", headers: {'X-CSRFToken': '{{ csrf_token }}'} });
+            const response = await fetch("{% url 'Demo:copy_data' %}", { method: "POST", headers: {'X-CSRFToken': '{{ csrf_token }}'} });
             const data = await response.json();
             document.getElementById("status").innerText = data.message;
         } catch (err) {
