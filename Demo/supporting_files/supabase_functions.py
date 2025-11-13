@@ -506,7 +506,7 @@ def get_tracking_customers_df():
         return pd.DataFrame()
     
 
-def sync_customer_tracking_unified_sarah():
+'''def sync_customer_tracking_unified_sarah():
     """
     Unified sync for Customer_Tracking with verbose debug logging.
     - Groups by Visitor_ID to capture add_to_cart before login.
@@ -903,4 +903,4 @@ def sync_customer_tracking_unified_sarah():
  
     except Exception as e:
         logger.exception("[SYNC][ERROR] %s", e)
-        return None
+        return None'''
