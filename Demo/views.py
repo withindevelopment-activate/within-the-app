@@ -473,12 +473,11 @@ def match_orders_with_analytics(request):
 
 #############################################################################################################
 ################################## The Visitor Tracking Section #############################################
-@csrf_exempt  # This is added because we are adding the tracking javascript to the app but the store pages likely do not have a <meta name="csrf-token">
+@csrf_exempt
 @require_POST
 def save_tracking(request):
     try:
-
-        import json
+        # 1️⃣ Parse JSON payload
         try:
             data = json.loads(request.body)
         except Exception:
@@ -487,27 +486,74 @@ def save_tracking(request):
         if not data:
             return JsonResponse({"status": "error", "message": "No JSON payload received"}, status=400)
 
-        # Generate unique ID
-        distinct_id = int(get_next_id_from_supabase_compatible_all(name='Tracking_Visitors', column='Distinct_ID'))
+        session_id = data.get("session_id")
+        if not session_id:
+            return JsonResponse({"status": "error", "message": "session_id is required"}, status=400)
 
-        # Flatten visitor info
         visitor_info = data.get('visitor_info', {}) or {}
         client_info = data.get('client_info', {}) or {}
         utm_params = data.get('utm_params', {}) or {}
         traffic_source = data.get('traffic_source', {}) or {}
-        client_ip = get_client_ip(request)
 
+        # 2️⃣ Generate unique ID
+        distinct_id = int(get_next_id_from_supabase_compatible_all(name='Tracking_Visitors', column='Distinct_ID'))
+
+        # 3️⃣ Fetch existing session data to propagate UTM and customer info
+        existing_session_data = []
+        try:
+            existing_session = (
+                supabase.table("Tracking_Visitors")
+                .select(
+                    "UTM_Source,UTM_Medium,UTM_Campaign,UTM_Term,UTM_Content,"
+                    "Customer_ID,Customer_Name,Customer_Email,Customer_Mobile"
+                )
+                .eq("Session_ID", session_id)
+                .execute()
+            )
+            if existing_session and existing_session.data:
+                existing_session_data = existing_session.data
+                print(existing_session_data)
+                
+        except Exception as e:
+            print("⚠️ Failed to fetch existing session:", e)
+            traceback.print_exc()
+
+        # Determine session-level UTM values (take first row with UTM info)
+        for field in ["UTM_Source","UTM_Medium","UTM_Campaign","UTM_Term","UTM_Content"]:
+            for r in existing_session_data:
+                if r.get(field):
+                    utm_params[field.lower()] = r[field]
+                    break
+
+        # Determine session-level customer info (if any row has Customer_ID)
+        customer_fields = ["Customer_ID","Customer_Name","Customer_Email","Customer_Mobile"]
+        session_customer_info = {}
+        for field in customer_fields:
+            for r in existing_session_data:
+                if r.get("Customer_ID"):
+                    session_customer_info[field.lower()] = r[field]
+                    break
+        # If current row has customer_id, override session_customer_info
+        if visitor_info.get("customer_id"):
+            session_customer_info.update({
+                "Customer_ID": int(visitor_info.get("customer_id")),
+                "Customer_Name": visitor_info.get("name"),
+                "Customer_Email": visitor_info.get("email"),
+                "Customer_Mobile": int(visitor_info.get("mobile")) if visitor_info.get("mobile") else None
+            })
+
+        # 4️⃣ Prepare tracking entry
         tracking_entry = {
             'Distinct_ID': distinct_id,
             'Visitor_ID': data.get('visitor_id'),
-            'Session_ID': data.get('session_id'),
+            'Session_ID': session_id,
             'Store_URL': data.get('store_url'),
             'Event_Type': data.get('event_type'),
             'Event_Details': str(data.get('event_details', {})),
             'Page_URL': data.get('page_url'),
             'Visited_at': get_uae_current_date(),
 
-            # UTM Parameters
+            # UTM Parameters (propagated session-level)
             'UTM_Source': utm_params.get('utm_source'),
             'UTM_Medium': utm_params.get('utm_medium'),
             'UTM_Campaign': utm_params.get('utm_campaign'),
@@ -522,11 +568,11 @@ def save_tracking(request):
             'Traffic_Medium': traffic_source.get('medium'),
             'Traffic_Campaign': traffic_source.get('campaign'),
 
-            # Visitor Info
-            'Customer_ID': visitor_info.get('customer_id'),
-            'Customer_Name': visitor_info.get('name'),
-            'Customer_Email': visitor_info.get('email'),
-            'Customer_Mobile': visitor_info.get('mobile'),
+            # Visitor Info (propagated session-level customer info)
+            'Customer_ID': session_customer_info.get('Customer_ID'),
+            'Customer_Name': session_customer_info.get('Customer_Name'),
+            'Customer_Email': session_customer_info.get('Customer_Email'),
+            'Customer_Mobile': session_customer_info.get('Customer_Mobile'),
 
             # Client Info
             'User_Agent': client_info.get('user_agent'),
@@ -534,24 +580,43 @@ def save_tracking(request):
             'Timezone': client_info.get('timezone'),
             'Platform': client_info.get('platform'),
             'Screen_Resolution': client_info.get('screen_resolution'),
-            'Device_Memory': client_info.get('device_memory'),
-            'Client_IP': client_ip,
+            'Device_Memory': int(client_info.get('device_memory')) if client_info.get('device_memory') else None,
         }
 
-        print("ABOUT TO BATCH INSERT")
+        # 5️⃣ Convert to DataFrame and batch insert
+        tracking_entry_df = pd.DataFrame([tracking_entry])
 
-        try:
-            tracking_entry_df = pd.DataFrame([tracking_entry])
-            batch_insert_to_supabase(tracking_entry_df, 'Tracking_Visitors')
-        except Exception as e:
-            print("Failed to insert tracking entry into Supabase:", e)
-            traceback.print_exc()
+        # Fix bigint columns
+        for col in ['Distinct_ID','Customer_Mobile','Device_Memory']:
+            if col in tracking_entry_df.columns:
+                tracking_entry_df[col] = tracking_entry_df[col].fillna(0).astype('int64')
+
+        # Fill NaNs for string columns
+        text_cols = [
+            'Visitor_ID','Session_ID','Store_URL','Event_Type','Event_Details','Page_URL',
+            'UTM_Source','UTM_Medium','UTM_Campaign','UTM_Term','UTM_Content',
+            'Referrer_Platform','Traffic_Source','Traffic_Medium','Traffic_Campaign',
+            'Customer_Name','Customer_Email','User_Agent','Language','Timezone',
+            'Platform','Screen_Resolution','Client_IP'
+        ]
+        for col in text_cols:
+            if col in tracking_entry_df.columns:
+                tracking_entry_df[col] = tracking_entry_df[col].fillna("")
+
+        # Format Visited_at
+        tracking_entry_df['Visited_at'] = pd.to_datetime(tracking_entry_df['Visited_at'], utc=True, errors='coerce')
+        tracking_entry_df['Visited_at'] = tracking_entry_df['Visited_at'].dt.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+
+        # Batch insert to Supabase
+        batch_insert_to_supabase(tracking_entry_df, 'Tracking_Visitors')
 
         return JsonResponse({"status": "success"})
-    
+
     except Exception as e:
         print("TRACKING FUNCTION ERROR:", e)
+        traceback.print_exc()
         return JsonResponse({"status": "error", "message": str(e)}, status=500)
+
 
 # The route to render the tracking javascript -- 
 def tracking_snippet(request):
