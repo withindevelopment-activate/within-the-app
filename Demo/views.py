@@ -473,7 +473,7 @@ def match_orders_with_analytics(request):
 
 #############################################################################################################
 ################################## The Visitor Tracking Section #############################################
-@csrf_exempt
+'''@csrf_exempt
 @require_POST
 def save_tracking(request):
     try:
@@ -614,6 +614,169 @@ def save_tracking(request):
 
     except Exception as e:
         print("TRACKING FUNCTION ERROR:", e)
+        traceback.print_exc()
+        return JsonResponse({"status": "error", "message": str(e)}, status=500)
+'''
+
+@csrf_exempt
+@require_POST
+def save_tracking(request):
+    try:
+        # 1️⃣ Parse JSON payload
+        try:
+            data = json.loads(request.body)
+        except Exception:
+            return JsonResponse({"status": "error", "message": "Invalid JSON payload"}, status=400)
+
+        if not data:
+            return JsonResponse({"status": "error", "message": "No JSON payload received"}, status=400)
+
+        session_id = data.get("session_id")
+        if not session_id:
+            return JsonResponse({"status": "error", "message": "session_id is required"}, status=400)
+
+        visitor_info = data.get('visitor_info', {}) or {}
+        client_info = data.get('client_info', {}) or {}
+        utm_params = data.get('utm_params', {}) or {}
+        traffic_source = data.get('traffic_source', {}) or {}
+
+        # 2️⃣ Generate unique ID
+        distinct_id = int(get_next_id_from_supabase_compatible_all(name='Tracking_Visitors', column='Distinct_ID'))
+
+        # 3️⃣ Fetch existing session data (to propagate UTM and Customer info)
+        existing_session_data = []
+        try:
+            existing_session = (
+                supabase.table("Tracking_Visitors")
+                .select(
+                    "Distinct_ID,UTM_Source,UTM_Medium,UTM_Campaign,UTM_Term,UTM_Content,"
+                    "Customer_ID,Customer_Name,Customer_Email,Customer_Mobile"
+                )
+                .eq("Session_ID", session_id)
+                .execute()
+            )
+            if existing_session and existing_session.data:
+                existing_session_data = existing_session.data
+        except Exception as e:
+            traceback.print_exc()
+
+        # 4️⃣ Determine session-level UTM values (use first non-null)
+        for field in ["UTM_Source", "UTM_Medium", "UTM_Campaign", "UTM_Term", "UTM_Content"]:
+            for r in existing_session_data:
+                if r.get(field):
+                    utm_params[field.lower()] = r[field]
+                    break
+
+
+        # 5️⃣ Determine customer info
+        session_customer_info = {}
+
+        # If current payload has customer info → use it
+        if visitor_info.get("customer_id"):
+            session_customer_info.update({
+                "Customer_ID": int(visitor_info.get("customer_id")),
+                "Customer_Name": visitor_info.get("name"),
+                "Customer_Email": visitor_info.get("email"),
+                "Customer_Mobile": int(visitor_info.get("mobile")) if visitor_info.get("mobile") else None
+            })
+
+        # Otherwise, pull from existing session if any row had Customer_ID
+        if not session_customer_info:
+            for r in existing_session_data:
+                if r.get("Customer_ID"):
+                    session_customer_info.update({
+                        "Customer_ID": r.get("Customer_ID"),
+                        "Customer_Name": r.get("Customer_Name"),
+                        "Customer_Email": r.get("Customer_Email"),
+                        "Customer_Mobile": r.get("Customer_Mobile"),
+                    })
+                    print("👤 Using customer info from existing session:", session_customer_info)
+                    break
+
+        # 6️⃣ Build tracking entry
+        tracking_entry = {
+            'Distinct_ID': distinct_id,
+            'Visitor_ID': data.get('visitor_id'),
+            'Session_ID': session_id,
+            'Store_URL': data.get('store_url'),
+            'Event_Type': data.get('event_type'),
+            'Event_Details': str(data.get('event_details', {})),
+            'Page_URL': data.get('page_url'),
+            'Visited_at': get_uae_current_date(),
+
+            # UTM Parameters
+            'UTM_Source': utm_params.get('utm_source'),
+            'UTM_Medium': utm_params.get('utm_medium'),
+            'UTM_Campaign': utm_params.get('utm_campaign'),
+            'UTM_Term': utm_params.get('utm_term'),
+            'UTM_Content': utm_params.get('utm_content'),
+
+            # Referrer + traffic
+            'Referrer_Platform': data.get('referrer'),
+            'Traffic_Source': traffic_source.get('source'),
+            'Traffic_Medium': traffic_source.get('medium'),
+            'Traffic_Campaign': traffic_source.get('campaign'),
+
+            # Customer info
+            'Customer_ID': session_customer_info.get('Customer_ID'),
+            'Customer_Name': session_customer_info.get('Customer_Name'),
+            'Customer_Email': session_customer_info.get('Customer_Email'),
+            'Customer_Mobile': session_customer_info.get('Customer_Mobile'),
+
+            # Client info
+            'User_Agent': client_info.get('user_agent'),
+            'Language': client_info.get('language'),
+            'Timezone': client_info.get('timezone'),
+            'Platform': client_info.get('platform'),
+            'Screen_Resolution': client_info.get('screen_resolution'),
+            'Device_Memory': int(client_info.get('device_memory')) if client_info.get('device_memory') else None,
+        }
+
+        # 7️⃣ Convert to DataFrame
+        tracking_entry_df = pd.DataFrame([tracking_entry])
+
+        # Fix bigint columns
+        for col in ['Distinct_ID', 'Customer_Mobile', 'Device_Memory']:
+            if col in tracking_entry_df.columns:
+                tracking_entry_df[col] = tracking_entry_df[col].fillna(0).astype('int64')
+
+        # Fill NaNs for strings
+        text_cols = [
+            'Visitor_ID','Session_ID','Store_URL','Event_Type','Event_Details','Page_URL',
+            'UTM_Source','UTM_Medium','UTM_Campaign','UTM_Term','UTM_Content',
+            'Referrer_Platform','Traffic_Source','Traffic_Medium','Traffic_Campaign',
+            'Customer_Name','Customer_Email','User_Agent','Language','Timezone',
+            'Platform','Screen_Resolution','Client_IP'
+        ]
+        for col in text_cols:
+            if col in tracking_entry_df.columns:
+                tracking_entry_df[col] = tracking_entry_df[col].fillna("")
+
+        # Format Visited_at
+        tracking_entry_df['Visited_at'] = pd.to_datetime(tracking_entry_df['Visited_at'], utc=True, errors='coerce')
+        tracking_entry_df['Visited_at'] = tracking_entry_df['Visited_at'].dt.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+
+        # 8️⃣ Batch insert new tracking event
+        batch_insert_to_supabase(tracking_entry_df, 'Tracking_Visitors')
+
+        # 9️⃣ If we now have customer info → update all rows in that session
+        if session_customer_info.get("Customer_ID"):
+            try:
+                supabase.table("Tracking_Visitors").update({
+                    "Customer_ID": session_customer_info["Customer_ID"],
+                    "Customer_Name": session_customer_info.get("Customer_Name"),
+                    "Customer_Email": session_customer_info.get("Customer_Email"),
+                    "Customer_Mobile": session_customer_info.get("Customer_Mobile")
+                }).eq("Session_ID", session_id).execute()
+                print(f"🔁 Updated all rows in session {session_id} with customer info")
+            except Exception as e:
+                print("⚠️ Failed to update previous rows in session with customer info:", e)
+                traceback.print_exc()
+
+        return JsonResponse({"status": "success"})
+
+    except Exception as e:
+        print("❌ TRACKING FUNCTION ERROR:", e)
         traceback.print_exc()
         return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
@@ -1035,7 +1198,7 @@ def process_marketing_report(request):
 #############################################################################################
 ################################# Viewing the Tracking ######################################
 
-
+'''
 def view_tracking(request):
     """
     Displays synced Customer_Tracking data with campaign search.
@@ -1133,6 +1296,133 @@ def view_tracking(request):
         return redirect("Demo:home")
 
     return render(request, "Demo/tracking_view.html", context=context)
+'''
+
+
+def view_tracking(request):
+    """
+    Displays summarized Customer_Tracking data.
+    Handles multiple visitor_ids per customer and merged customer records.
+    """
+    store_id = request.GET.get("store_id") or request.session.get("store_uuid")
+    if not store_id:
+        return redirect("Demo:home")
+
+    dubai_tz = pytz.timezone("Asia/Dubai")
+
+    try:
+        # 🔄 Import your sync function (keeps Supabase fresh)
+        sync_customer_tracking_unified()
+
+        # 🧠 Fetch from Supabase
+        data = supabase.table("Customer_Tracking").select("*").execute().data or []
+        if not data:
+            return render(request, "Demo/tracking_view.html", {"rows": [], "track_id": store_id})
+
+        df = pd.DataFrame(data)
+
+        # 🕒 Normalize timestamps
+        if "updated_at" in df.columns:
+            df["updated_at"] = pd.to_datetime(df["updated_at"], errors="coerce")
+            if df["updated_at"].dt.tz is None:
+                df["updated_at"] = df["updated_at"].dt.tz_localize("UTC")
+            df["updated_at"] = df["updated_at"].dt.tz_convert(dubai_tz)
+
+        if "last_visit" in df.columns:
+            df["last_visit"] = pd.to_datetime(df["last_visit"], errors="coerce")
+            if df["updated_at"].dt.tz is None:
+                df["updated_at"] = df["updated_at"].dt.tz_localize("UTC")
+            df["updated_at"] = df["updated_at"].dt.tz_convert(dubai_tz)
+            
+
+        # 🧾 Ensure visitor_ids is always a list
+        def normalize_visitors(v):
+            if isinstance(v, list):
+                return v
+            if isinstance(v, str):
+                try:
+                    parsed = json.loads(v)
+                    return parsed if isinstance(parsed, list) else [parsed]
+                except Exception:
+                    return [v]
+            return []
+        df["visitor_ids"] = df.get("visitor_ids", [[]]).apply(normalize_visitors)
+
+        # 🧠 Parse JSON fields if still strings
+        json_cols = ["customer_info", "campaigns", "campaign_source"]
+        for col in json_cols:
+            if col in df.columns:
+                df[col] = df[col].apply(
+                    lambda x: json.loads(x)
+                    if isinstance(x, str) and (x.strip().startswith("[") or x.strip().startswith("{"))
+                    else x
+                )
+
+        # 🧮 Calculate Totals
+        total_customers = len(df)
+        total_purchases = df["purchases"].sum() if "purchases" in df else 0
+
+        # 📊 Campaign & Source summaries
+        campaign_counts, source_counts = {}, {}
+
+        if "campaigns" in df.columns:
+            for row in df["campaigns"].dropna():
+                if isinstance(row, list):
+                    for c in row:
+                        name = c.get("campaign") or "Unknown"
+                        campaign_counts[name] = campaign_counts.get(name, 0) + c.get("purchases", 0)
+
+        if "campaign_source" in df.columns:
+            for row in df["campaign_source"].dropna():
+                if isinstance(row, list):
+                    for s in row:
+                        name = s.get("source") or "Unknown"
+                        source_counts[name] = source_counts.get(name, 0) + s.get("purchases", 0)
+
+        campaign_labels = list(campaign_counts.keys())
+        campaign_purchases = list(campaign_counts.values())
+        source_labels = list(source_counts.keys())
+        source_purchases = list(source_counts.values())
+
+        # 🧰 Apply filters (optional)
+        campaign_filter = request.GET.get("campaign")
+        date_from = request.GET.get("from")
+        date_to = request.GET.get("to")
+
+        if campaign_filter:
+            df = df[df["campaigns"].apply(lambda lst: any(campaign_filter.lower() in (c.get("campaign", "").lower()) for c in (lst or [])))]
+        if date_from:
+            df = df[df["updated_at"] >= pd.to_datetime(date_from)]
+        if date_to:
+            df = df[df["updated_at"] <= pd.to_datetime(date_to) + pd.Timedelta(days=1)]
+
+        # 🧾 Convert timestamps to readable strings for display
+        for col in ["updated_at", "last_visit"]:
+            if col in df.columns:
+                df[col] = df[col].dt.strftime("%Y-%m-%d %H:%M")
+
+        # 🧩 Build Context
+        context = {
+            "track_id": store_id,
+            "rows": df.to_dict("records"),
+            "total_customers": total_customers,
+            "total_purchases": total_purchases,
+            "campaign_labels": json.dumps(campaign_labels or []),
+            "campaign_purchases": json.dumps(campaign_purchases or []),
+            "source_labels": json.dumps(source_labels or []),
+            "source_purchases": json.dumps(source_purchases or []),
+            "last_sync": datetime.now(dubai_tz).strftime("%Y-%m-%d %H:%M"),
+        }
+
+        return render(request, "Demo/tracking_view.html", context)
+
+    except Exception as e:
+        logging.error("Error in view_tracking()", exc_info=True)
+        return render(request, "Demo/tracking_view.html", {
+            "rows": [],
+            "error": str(e),
+            "track_id": store_id
+        })
 
 
 ##############################################################################
