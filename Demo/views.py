@@ -72,7 +72,10 @@ def zid_callback(request):
     }
 
     try:
-        df = fetch_data_from_supabase("Tracking_Visitors_old")
+        df = fetch_data_from_supabase_sepcific("Tracking_Visitors_old", 
+                                               filters= {
+                                                   'Distinct_ID': ('gt', 205000)
+                                               })
         df.to_excel("visiting.xlsx", index=False)
 
         # Exchange code for access token
