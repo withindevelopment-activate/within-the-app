@@ -17,7 +17,7 @@ from dateutil import parser
 
 ## Custom Imports ------------------
 # Supabase & Supporting imports
-from Demo.supporting_files.supabase_functions import batch_insert_to_supabase, get_next_id_from_supabase_compatible_all, get_tracking_customers_df, sync_customer_tracking_unified
+from Demo.supporting_files.supabase_functions import *
 
 from Demo.supporting_files.supporting_functions import get_uae_current_date
 # Marketing Report functions
@@ -72,6 +72,9 @@ def zid_callback(request):
     }
 
     try:
+        df = fetch_data_from_supabase("Tracking_Visitors_old")
+        df.to_excel("visiting.xlsx", index=False)
+
         # Exchange code for access token
         response = requests.post(settings.ZID_TOKEN_URL, data=data)
         response.raise_for_status()
