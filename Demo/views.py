@@ -2524,9 +2524,60 @@ def view_price_monitor(request):
         return render(request, "Demo/price_monitor_view.html", {"records": []})
 
 
-###### Privacy policy & Data Deletion
+###### Privacy policy & Data Deletion for meta
 def privacy_policy(request):
     return render(request, "Demo/privacy_policy.html")
 
 def data_deletion(request):
     return render(request, "Demo/data_deletion.html")
+
+#Database pageview - Remaz
+def events_table_view(request):
+    # Get filters from GET params
+    event_type = request.GET.get("event_type")
+    limit = int(request.GET.get("limit", 100))
+    date_after = request.GET.get("date_after")
+    print("Date after is:", date_after)
+    session_search = request.GET.get("session_id")
+    visitor_search = request.GET.get("visitor_id")
+
+    # Build filters dictionary
+    filters = {}
+
+    # Event Type filter
+    if event_type:
+        filters["Event_Type"] = ("in", [event_type])
+
+    # Date filter (Created_At > selected date)
+    if date_after:
+        # Ensure ISO datetime, append time if needed
+        if len(date_after) == 10:  # Only date, no time
+            date_after += "T00:00:00"
+        filters["Created_At"] = ("gt", date_after)
+
+    # Search filters
+    if session_search:
+        filters["Session_ID"] = ("contains", session_search)
+
+    if visitor_search:
+        filters["Visitor_ID"] = ("contains", visitor_search)
+
+    # Fetch data using your function
+    df = fetch_data_from_supabase_specific(
+        table_name="Tracking_Events",  # put your table name
+        filters=filters,
+        limit=limit,
+        offset=0
+    )
+
+    # Convert DataFrame to list of dicts
+    data = df.to_dict(orient="records") if df is not None else []
+
+    return render(request, "ads_api/events_table.html", {
+        "data": data,
+        "selected_event_type": event_type,
+        "selected_limit": limit,
+        "selected_date": date_after,
+        "session_search": session_search,
+        "visitor_search": visitor_search,
+    })

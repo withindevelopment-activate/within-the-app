@@ -1,0 +1,84 @@
+{% extends 'Demo/base.html' %}
+{% load static %}
+
+{% block content %}
+
+<div class="container mt-4">
+    <h3 class="mb-4">Tracking Events Viewer</h3>
+
+    <!-- Filters Form -->
+    <form method="GET" class="row g-3 mb-4">
+
+        <!-- Event Type -->
+        <div class="col-md-3">
+            <label class="form-label">Event Type</label>
+            <select name="event_type" class="form-select">
+                <option value="">All</option>
+                <option value="purchase" {% if selected_event_type == "purchase" %}selected{% endif %}>Purchase</option>
+                <option value="add_to_cart" {% if selected_event_type == "add_to_cart" %}selected{% endif %}>Add to Cart</option>
+                <option value="pageview" {% if selected_event_type == "pageview" %}selected{% endif %}>Pageview</option>
+            </select>
+        </div>
+
+        <!-- Limit -->
+        <div class="col-md-2">
+            <label class="form-label">Limit</label>
+            <select name="limit" class="form-select">
+                <option value="50" {% if selected_limit == 50 %}selected{% endif %}>50</option>
+                <option value="100" {% if selected_limit == 100 %}selected{% endif %}>100</option>
+            </select>
+        </div>
+
+        <!-- Date After -->
+        <div class="col-md-3">
+            <label class="form-label">Date After</label>
+            <input type="datetime-local" name="date_after" value="{{ selected_date }}" class="form-control">
+        </div>
+
+        <!-- Search Session ID -->
+        <div class="col-md-2">
+            <label class="form-label">Session ID</label>
+            <input type="text" name="session_id" value="{{ session_search }}" class="form-control">
+        </div>
+
+        <!-- Search Visitor ID -->
+        <div class="col-md-2">
+            <label class="form-label">Visitor ID</label>
+            <input type="text" name="visitor_id" value="{{ visitor_search }}" class="form-control">
+        </div>
+
+        <div class="col-md-12 text-end">
+            <button class="btn btn-primary">Apply Filters</button>
+        </div>
+    </form>
+
+    <!-- Data Table -->
+    <div class="table-responsive">
+        <table class="table table-striped table-hover table-bordered">
+            <thead class="table-dark">
+                <tr>
+                    {% if data %}
+                        {% for col in data.0.keys %}
+                            <th>{{ col }}</th>
+                        {% endfor %}
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in data %}
+                    <tr>
+                        {% for val in row.values %}
+                            <td>{{ val }}</td>
+                        {% endfor %}
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="20" class="text-center">No data found.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endblock %}

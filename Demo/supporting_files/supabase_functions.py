@@ -341,7 +341,7 @@ def sync_customer_tracking_unified():
     - Uses existing distinct_id from Customer_Tracking for updates.
     """
 
-    # 1️⃣ Fetch existing Customer_Tracking
+    # 1️ Fetch existing Customer_Tracking
     existing_customers = supabase.table("Customer_Tracking").select("*").execute().data
     existing_df = pd.DataFrame(existing_customers) if existing_customers else pd.DataFrame()
 
@@ -349,7 +349,7 @@ def sync_customer_tracking_unified():
     if not existing_df.empty and "updated_at" in existing_df.columns:
         last_updated = pd.to_datetime(existing_df["updated_at"]).max()
 
-    # 2️⃣ Fetch new or all Tracking_Visitors rows
+    # 2️ Fetch new or all Tracking_Visitors rows
     filters = {"Visited_at": ("gt", last_updated.isoformat())} if last_updated else None
     df = fetch_data_from_supabase_specific(
         "Tracking_Visitors",
@@ -365,7 +365,7 @@ def sync_customer_tracking_unified():
         print("No new tracking data to sync.")
         return
 
-    # 3️⃣ Normalize identifiers
+    # 3️ Normalize identifiers
     for col in ["Customer_ID", "Customer_Email", "Customer_Mobile", "Visitor_ID", "Session_ID", "UTM_Campaign", "UTM_Source"]:
         if col in df.columns:
             df[col] = df[col].astype(str).fillna("").str.strip().replace("nan", "")
@@ -375,7 +375,7 @@ def sync_customer_tracking_unified():
     df["UTM_Source"] = df["UTM_Source"].str.title().replace("+", " ", regex=False)
     df["Visited_at"] = pd.to_datetime(df["Visited_at"], errors="coerce")
 
-    # 4️⃣ Create unified customer_key
+    # 4️ Create unified customer_key
     df["customer_key"] = (
         df["Customer_ID"].replace("", pd.NA)
         .fillna(df["Customer_Email"])
@@ -384,10 +384,10 @@ def sync_customer_tracking_unified():
     )
     df = df.dropna(subset=["customer_key"])
 
-    # 5️⃣ Build visitor → session mapping
+    # 5️ Build visitor → session mapping
     visitor_session_map = df.groupby("Visitor_ID")["Session_ID"].unique().apply(list).to_dict()
 
-    # 6️⃣ Aggregate new data
+    # 6️ Aggregate new data
     agg_df = (
         df.groupby("customer_key")
         .agg(
@@ -406,7 +406,7 @@ def sync_customer_tracking_unified():
         print("No aggregated data found.")
         return
 
-    # 7️⃣ Merge with existing data (incremental)
+    # 7️ Merge with existing data (incremental)
     if not existing_df.empty:
         existing_df.set_index("customer_key", inplace=True)
         agg_df.set_index("customer_key", inplace=True)
@@ -437,12 +437,12 @@ def sync_customer_tracking_unified():
 
         agg_df.reset_index(inplace=True)
 
-    # 8️⃣ Generate new distinct_ids for new customers
+    # 8️ Generate new distinct_ids for new customers
     if "distinct_id" not in agg_df.columns:
         agg_df["distinct_id"] = None
     agg_df["distinct_id"] = agg_df["distinct_id"].fillna([str(uuid.uuid4()) for _ in range(len(agg_df))])
 
-    # 9️⃣ Upsert in chunks
+    # 9️ Upsert in chunks
     records = agg_df.to_dict(orient="records")
     BATCH_SIZE = 1000
     for i in range(0, len(records), BATCH_SIZE):
