@@ -1,8 +1,11 @@
-import os,json,ast,logging,pandas as pd, pytz,uuid
+import os, json, ast, logging, pandas as pd, pytz, uuid, re
 from supabase import create_client, Client
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from django.core.cache import cache
+import itertools
+from Demo.supporting_files.supporting_functions import get_uae_current_date
+import requests
 
 # Import keys
 url: str = os.environ.get('SUPABASE_URL')
@@ -333,12 +336,17 @@ def map_skus(df):
     
     return df
 
+'''
+#### The old syncing fucntion -----
+
 def sync_customer_tracking_unified():
     """
-    Unified sync for Customer_Tracking:
-    - Performs full sync if Customer_Tracking is empty.
-    - Performs incremental sync based on new visits (Visited_at).
-    - Uses existing distinct_id from Customer_Tracking for updates.
+    Unified sync for Customer_Tracking with verbose debug logging.
+    - Groups by Visitor_ID to capture add_to_cart before login.
+    - Detects assisted purchases and credits +0.5 to the add_to_cart campaign/source.
+    - Merges with existing Customer_Tracking by customer_id or any visitor_id overlap.
+    - Preserves customer_info unless new non-empty info is present.
+    Extensive logging added after each step for debugging.
     """
 
     # 1️ Fetch existing Customer_Tracking
@@ -399,43 +407,153 @@ def sync_customer_tracking_unified():
             sources=("UTM_Source", lambda x: list(set(x.dropna()) - {""})),
             updated_at=("Visited_at", "max"),
         )
-        .reset_index()
-    )
+        last_distinct_id = int(existing_latest[0].get("distinct_id") or 0) if existing_latest else 0
+        logger.info("Last synced distinct_id = %s", last_distinct_id)
+ 
+        # 2️⃣ Fetch new visitor events
+        visitors = fetch_data_from_supabase_specific(
+            "Tracking_Visitors",
+            columns=[
+                "Distinct_ID", "Customer_ID", "Visitor_ID", "Event_Type",
+                "Visited_at", "UTM_Campaign", "UTM_Source", "Event_Details",
+                "Customer_Name", "Customer_Email", "Customer_Mobile"
+            ],
+            filters={
+                "Distinct_ID": ("gt", last_distinct_id),
+                "Event_Type": ("in", ["purchase", "add_to_cart"])
+            }
+        )
+ 
+        logger.info("Fetched visitors shape: %s", None if visitors is None else getattr(visitors, "shape", str(visitors)))
+        if visitors is None or visitors.empty:
+            logger.info("No new visitors to sync. Exiting.")
+            return {"synced_customers": 0, "last_sync": now_dubai(), "last_distinct_id": last_distinct_id}
+ 
+        logger.info("Sample visitors (first 5 rows):\n%s", visitors.head(5).to_dict(orient="records"))
+ 
+        # Normalize timestamps and extract product names
+        visitors["Visited_at"] = pd.to_datetime(visitors["Visited_at"], errors="coerce", utc=True).dt.tz_convert(dubai_tz)
+        visitors["Customer_ID"] = visitors["Customer_ID"].replace("", None)
+        visitors["Visitor_ID"] = visitors["Visitor_ID"].str.strip().astype(str)
+        visitors["product_names"] = visitors.apply(lambda r: extract_product_name(r.get("Event_Details"), r.get("Event_Type")), axis=1)
+ 
+        logger.info("After normalization - sample with product_names:\n%s", visitors[["Distinct_ID", "Visitor_ID", "Customer_ID", "UTM_Campaign", "Event_Type", "product_names"]].to_dict(orient="records"))
+ 
+        # 4 -- Group by Visitor_ID
+        grouped_data = []
+        for visitor_id, group in visitors.groupby("Visitor_ID"):
+            customer_id = group["Customer_ID"].dropna().iloc[0] if group["Customer_ID"].notna().any() else None
+            visitor_ids = list(group["Visitor_ID"].unique())
+            campaigns_summary = {}  # campaign -> dict
+            sources_summary = {}    # source -> dict
+ 
+            purchases = group[group["Event_Type"] == "purchase"]
+            add_to_carts = group[group["Event_Type"] == "add_to_cart"]
+ 
+            # Normal counts (use floats for purchases so +0.5 is allowed)
+            for _, row in group.iterrows():
+                evt = row["Event_Type"]
+                camp = str(row.get("UTM_Campaign") or "Direct")
+                src = str(row.get("UTM_Source") or "Direct")
+                key = "purchases" if evt == "purchase" else "add_to_cart"
+ 
+                campaigns_summary.setdefault(camp, {"campaign": camp, "purchases": 0.0, "add_to_cart": 0})
+                sources_summary.setdefault(src, {"source": src, "purchases": 0.0, "add_to_cart": 0})
+ 
+                # increment as float for purchases (so assisted +0.5 works)
+                if key == "purchases":
+                    campaigns_summary[camp]["purchases"] += 1.0
+                    sources_summary[src]["purchases"] += 1.0
+                else:
+                    campaigns_summary[camp]["add_to_cart"] += 1
+                    sources_summary[src]["add_to_cart"] += 1
+ 
+            logger.info(
+                "Visitor group %s: purchases=%s add_to_cart=%s campaigns=%s",
+                visitor_id,
+                int(purchases.shape[0]),
+                int(add_to_carts.shape[0]),
+                list(campaigns_summary.keys())
+            )
+ 
+            # Assisted purchase logic: find purchases and prior add_to_cart with same product but different campaign
+            # Assisted purchase logic with percentage normalization
+            assisted_summary = {}  # to track contribution percentages per campaign
 
-    if agg_df.empty:
-        print("No aggregated data found.")
-        return
+            for _,addto_row in add_to_carts.iterrows():
+                add_to_cart_products = set([an for an in (addto_row.get("product_names") or []) if an])
+                add_to_cart_campaign = str(addto_row.get("UTM_Campaign") or "Direct")
+                add_to_cart_source = str(addto_row.get("UTM_Source") or "Direct")
 
     # 7️ Merge with existing data (incremental)
     if not existing_df.empty:
         existing_df.set_index("customer_key", inplace=True)
         agg_df.set_index("customer_key", inplace=True)
 
-        for key in agg_df.index:
-            if key in existing_df.index:
-                existing = existing_df.loc[key]
+                # skip if product_names empty
+                if not purchase_products:
+                    logger.info("No product names found for purchase row %s — skipping.", p_row.get("Distinct_ID"))
+                    continue
 
-                # Keep distinct_id
-                agg_df.at[key, "distinct_id"] = existing.get("distinct_id")
+                # find all add_to_cart rows with same product(s)
+                logger.info("purchase_products = %s add_to_cart_products = %s",purchase_products,add_to_cart_products)
+                add_rows = add_to_carts[
+                    add_to_carts["product_names"].apply(
+                        lambda x: bool(
+                            (set(p.strip() for p in x.split(",") if p.strip()) 
+                            if isinstance(x, str) 
+                            else set(p for p in (x or []) if p)
+                            ) 
+                            & purchase_products
+                        )
+                    )
+                ]
+                add_campaigns = set(add_rows["UTM_Campaign"].fillna("Direct"))
+                logger.info("add_campaigns = %s add_rows = %s" , add_campaigns,add_rows)
 
-                # Merge visitor_ids
-                old_visitors = existing.get("visitor_ids") or {}
-                new_visitors = agg_df.at[key, "visitor_ids"]
-                merged_visitors = {**old_visitors, **new_visitors}
-                agg_df.at[key, "visitor_ids"] = merged_visitors
+                # CASE 1 -- same campaign (direct purchase from same source)
+                if purchase_campaign in add_campaigns or not add_campaigns:
+                    # 100% credit to this campaign
+                    # assisted_summary[purchase_campaign] = assisted_summary.get(purchase_campaign, 0) + 1.0
+                    logger.info("[FULL CREDIT] %s got 100%% for purchase %s", purchase_campaign, p_row.get("Distinct_ID"))
+                else:
+                    # CASE 2 -- assisted by other campaigns
+                    num_assists = len(add_campaigns)
+                    assist_share = 0.5  # 50% split across assist campaigns
+                    purchase_share = 0.5              # 50% to the final campaign
 
-                # Sum events
-                agg_df.at[key, "add_to_cart"] += existing.get("add_to_cart", 0)
-                agg_df.at[key, "purchases"] += existing.get("purchases", 0)
+                    # distribute shares
+                    assisted_summary[purchase_campaign] = assisted_summary.get(purchase_campaign, 0) + purchase_share
+                    for ac in add_campaigns:
+                        assisted_summary[ac] = assisted_summary.get(ac, 0) + assist_share
 
-                # Union campaigns & sources
-                agg_df.at[key, "campaigns"] = list(set(existing.get("campaigns", [])) | set(agg_df.at[key, "campaigns"]))
-                agg_df.at[key, "sources"] = list(set(existing.get("sources", [])) | set(agg_df.at[key, "sources"]))
+                    logger.info(
+                        "[ASSISTED] %s got %.2f%% (final) and %s got %.2f%% each (assist) for purchase %s",
+                        purchase_campaign, purchase_share * 100, add_campaigns, assist_share * 100, p_row.get("Distinct_ID")
+                    )
 
-                # Take max updated_at
-                agg_df.at[key, "updated_at"] = max(existing.get("updated_at"), agg_df.at[key, "updated_at"])
+            # Store normalized contributions into campaigns_summary
+            for camp, share in assisted_summary.items():
+                campaigns_summary.setdefault(camp, {"campaign": camp, "purchases": 0.0, "add_to_cart": 0})
+                campaigns_summary[camp]["purchases"] += share  # share sums up to 1.0 per purchase
 
-        agg_df.reset_index(inplace=True)
+ 
+            grouped_data.append({
+                "distinct_id": int(group["Distinct_ID"].max()),
+                "customer_id": customer_id,
+                "visitor_ids": visitor_ids,
+                "campaigns": list(campaigns_summary.values()),
+                "campaign_source": list(sources_summary.values()),
+                "purchases": int(group["Event_Type"].eq("purchase").sum()),   # overall integer count for purchases
+                "add_to_cart": int(group["Event_Type"].eq("add_to_cart").sum()),
+                "last_visit": group["Visited_at"].max().strftime("%Y-%m-%dT%H:%M:%S"),
+                "updated_at": now_dubai(),
+                "customer_info": {
+                    "name": group["Customer_Name"].dropna().iloc[0] if group["Customer_Name"].notna().any() else "",
+                    "email": group["Customer_Email"].dropna().iloc[0] if group["Customer_Email"].notna().any() else "",
+                    "mobile": int(group["Customer_Mobile"].dropna().iloc[0]) if group["Customer_Mobile"].notna().any() else ""
+                }
+            })
 
     # 8️ Generate new distinct_ids for new customers
     if "distinct_id" not in agg_df.columns:
@@ -463,7 +581,7 @@ def get_tracking_customers_df():
     """
     try:
         # 1️⃣ Run incremental sync first
-        sync_customer_tracking_unified()
+         #sync_customer_tracking_unified()
 
         # 2️⃣ Fetch fresh customer tracking data
         data = supabase.table("Customer_Tracking").select("*").execute().data
@@ -497,17 +615,152 @@ def get_tracking_customers_df():
             if num_col not in df.columns:
                 df[num_col] = 0
             else:
-                df[num_col] = pd.to_numeric(df[num_col], errors="coerce").fillna(0)
-
-        return df
-
+                # Try any visitor match
+                for v in new_visitors:
+                    if v in visitor_lookup:
+                        matched_row = visitor_lookup[v]
+                        logger.info("Matched by visitor_id=%s (customer_id=%s)", v, matched_row.get("customer_id"))
+                        break
+ 
+            # Use key based on customer_id if present, otherwise first visitor_id
+            key = customer_id if customer_id else next(iter(new_visitors), None)
+ 
+            if key in merged_records_dict:
+                # incremental merge into already accumulated merged record
+                rec = merged_records_dict[key]
+                rec_visitors_before = set(rec["visitor_ids"])
+                rec["visitor_ids"] = sorted(set(rec["visitor_ids"]) | new_visitors)
+ 
+                rec["purchases"] = int(rec.get("purchases", 0)) + int(new_row.get("purchases", 0))
+                rec["add_to_cart"] = int(rec.get("add_to_cart", 0)) + int(new_row.get("add_to_cart", 0))
+ 
+                # merge campaign/source dicts
+                for c in new_row.get("campaigns", []):
+                    cd = rec["campaigns_dict"].setdefault(c["campaign"], {"campaign": c["campaign"], "purchases": 0.0, "add_to_cart": 0})
+                    cd["purchases"] += float(c.get("purchases", 0) or 0.0)
+                    cd["add_to_cart"] += int(c.get("add_to_cart", 0) or 0)
+ 
+                for s in new_row.get("campaign_source", []):
+                    sd = rec["sources_dict"].setdefault(s["source"], {"source": s["source"], "purchases": 0.0, "add_to_cart": 0})
+                    sd["purchases"] += float(s.get("purchases", 0) or 0.0)
+                    sd["add_to_cart"] += int(s.get("add_to_cart", 0) or 0)
+ 
+                # keep latest last_visit
+                rec["last_visit"] = max(rec["last_visit"], new_row["last_visit"])
+                rec["updated_at"] = now_dubai()
+                logger.info("Merged into existing merged_records_dict[%s]: visitors before=%s after=%s",
+                             key, rec_visitors_before, rec["visitor_ids"])
+            else:
+                # start a new merged record (seed from matched_row if exists)
+                if matched_row is not None:
+                    # seed from existing DB row
+                    seed_visitors = json.loads(matched_row["visitor_ids"]) if isinstance(matched_row["visitor_ids"], str) else matched_row["visitor_ids"]
+                    seed_campaigns = json.loads(matched_row["campaigns"]) if isinstance(matched_row.get("campaigns"), str) else matched_row.get("campaigns") or []
+                    seed_sources = json.loads(matched_row["campaign_source"]) if isinstance(matched_row.get("campaign_source"), str) else matched_row.get("campaign_source") or []
+ 
+                    seed_purchases = int(matched_row.get("purchases", 0) or 0)
+                    seed_add_to_cart = int(matched_row.get("add_to_cart", 0) or 0)
+                    seed_last_visit = str(matched_row.get("last_visit") or new_row["last_visit"])
+ 
+                    campaigns_dict = {c["campaign"]: {"campaign": c["campaign"], "purchases": float(c.get("purchases", 0) or 0.0), "add_to_cart": int(c.get("add_to_cart", 0) or 0)} for c in seed_campaigns}
+                    sources_dict = {s["source"]: {"source": s["source"], "purchases": float(s.get("purchases", 0) or 0.0), "add_to_cart": int(s.get("add_to_cart", 0) or 0)} for s in seed_sources}
+ 
+                    # add new_row campaign/source values into dicts
+                    for c in new_row.get("campaigns", []):
+                        cd = campaigns_dict.setdefault(c["campaign"], {"campaign": c["campaign"], "purchases": 0.0, "add_to_cart": 0})
+                        cd["purchases"] += float(c.get("purchases", 0) or 0.0)
+                        cd["add_to_cart"] += int(c.get("add_to_cart", 0) or 0)
+ 
+                    for s in new_row.get("campaign_source", []):
+                        sd = sources_dict.setdefault(s["source"], {"source": s["source"], "purchases": 0.0, "add_to_cart": 0})
+                        sd["purchases"] += float(s.get("purchases", 0) or 0.0)
+                        sd["add_to_cart"] += int(s.get("add_to_cart", 0) or 0)
+ 
+                    merged_records_dict[key] = {
+                        "distinct_id": int(max(new_row.get("distinct_id", 0), int(matched_row.get("distinct_id", 0) or 0))),
+                        "customer_id": matched_row.get("customer_id") or customer_id,
+                        "visitor_ids": sorted(set(seed_visitors) | new_visitors),
+                        "campaigns_dict": campaigns_dict,
+                        "sources_dict": sources_dict,
+                        "purchases": seed_purchases + int(new_row.get("purchases", 0)),
+                        "add_to_cart": seed_add_to_cart + int(new_row.get("add_to_cart", 0)),
+                        "last_visit": max(seed_last_visit, new_row["last_visit"]),
+                        "updated_at": now_dubai(),
+                        "customer_info": json.loads(matched_row["customer_info"]) if matched_row.get("customer_info") else new_row.get("customer_info") or {"name": "", "email": "", "mobile": ""}
+                    }
+                    logger.info("Seeded merged record from existing matched_row for key=%s", key)
+                else:
+                    # brand new record (no matched_row)
+                    campaigns_dict = {c["campaign"]: {"campaign": c["campaign"], "purchases": float(c.get("purchases", 0) or 0.0), "add_to_cart": int(c.get("add_to_cart", 0) or 0)} for c in new_row.get("campaigns", [])}
+                    sources_dict = {s["source"]: {"source": s["source"], "purchases": float(s.get("purchases", 0) or 0.0), "add_to_cart": int(s.get("add_to_cart", 0) or 0)} for s in new_row.get("campaign_source", [])}
+ 
+                    merged_records_dict[key] = {
+                        "distinct_id": int(new_row.get("distinct_id", 0)),
+                        "customer_id": customer_id,
+                        "visitor_ids": sorted(new_row["visitor_ids"]),
+                        "campaigns_dict": campaigns_dict,
+                        "sources_dict": sources_dict,
+                        "purchases": int(new_row.get("purchases", 0)),
+                        "add_to_cart": int(new_row.get("add_to_cart", 0)),
+                        "last_visit": new_row["last_visit"],
+                        "updated_at": now_dubai(),
+                        "customer_info": new_row.get("customer_info") or {"name": "", "email": "", "mobile": ""}
+                    }
+                    logger.info("Created new merged record for key=%s", key)
+ 
+        logger.info("Before finalize merged_records_dict size=%s sample keys=%s", len(merged_records_dict), list(merged_records_dict.keys())[:5])
+ 
+        # 7️⃣ Finalize merged records (convert dicts to lists)
+        final_rows = []
+        for key, rec in merged_records_dict.items():
+            campaigns_list = list(rec.pop("campaigns_dict").values())
+            sources_list = list(rec.pop("sources_dict").values())
+ 
+            final = {
+                "distinct_id": int(rec.get("distinct_id", 0)),
+                "customer_id": rec.get("customer_id"),
+                "visitor_ids": rec.get("visitor_ids"),
+                "campaigns": campaigns_list,
+                "campaign_source": sources_list,
+                "purchases": int(rec.get("purchases", 0)),
+                "add_to_cart": int(rec.get("add_to_cart", 0)),
+                "last_visit": rec.get("last_visit"),
+                "updated_at": rec.get("updated_at"),
+                "customer_info": rec.get("customer_info") or {"name": "", "email": "", "mobile": ""}
+            }
+            final_rows.append(final)
+ 
+        merged_df = pd.DataFrame(final_rows)
+        logger.info("After finalize merged_df shape=%s", merged_df.shape)
+        logger.info("Merged sample (first row): %s", merged_df.head(1).to_dict(orient="records"))
+ 
+        # 8️⃣ JSON-serialize columns safely
+        def safe_dump(x):
+            try:
+                return json.dumps(x)
+            except Exception:
+                return json.dumps(str(x))
+ 
+        for col in ["visitor_ids", "campaigns", "campaign_source", "customer_info"]:
+            if col in merged_df.columns:
+                merged_df[col] = merged_df[col].apply(safe_dump)
+ 
+        # 9️⃣ Upsert to Supabase (by customer_id)
+        if not merged_df.empty:
+            records = merged_df.to_dict("records")
+            logger.info("Upserting %s records to Customer_Tracking", len(records))
+            supabase.table("Customer_Tracking").upsert(records, on_conflict="visitor_ids").execute()
+            logger.info("✅ Upsert complete for %s records", len(records))
+        else:
+            logger.info("No merged rows to upsert.")
+ 
+        return {"synced_customers": len(merged_df), "last_sync": now_dubai(), "last_distinct_id": int(new_df["distinct_id"].max())}
+ 
     except Exception as e:
-        print(f"⚠️ Error syncing or fetching Customer_Tracking: {e}")
-        return pd.DataFrame()
-    
+        logger.exception("[SYNC][ERROR] %s", e)
+        return None
 
-
-'''def sync_customer_tracking_unified_sarah():
+def sync_customer_tracking_unified_sarah():
     """
     Unified sync for Customer_Tracking with verbose debug logging.
     - Groups by Visitor_ID to capture add_to_cart before login.
@@ -905,3 +1158,442 @@ def get_tracking_customers_df():
     except Exception as e:
         logger.exception("[SYNC][ERROR] %s", e)
         return None'''
+
+########################################
+######### Syncing both the main tracking_db and creating the sub customers db
+## Function 1 -- basic syncing and updating sessions
+
+def update_customer_tracking(tracking_df, customer_tracking_df):
+    # Decalre list to store entries
+    customer_entries = []
+    # A list for changed ids to only send those for session percentage computation
+    changed_ids = []
+
+
+    # ---------------------------------------------------------
+    # FAST LOOKUP SETS 
+    existing_customer_ids = set(customer_tracking_df["Customer_ID"].dropna().astype(str))
+    existing_visitor_ids  = set(customer_tracking_df["Visitor_ID"].dropna().astype(str))
+
+    # record checkpoint --- greatest Distinct_ID in the main tracking df
+    tracking_df['Distinct_ID'] = tracking_df['Distinct_ID'].astype(int)
+    tracking_df['Visitor_ID'] = tracking_df['Visitor_ID'].str.strip().astype(str)
+
+    last_distinct_checkpoint = (
+        tracking_df["Distinct_ID"].iloc[-1]
+        if len(tracking_df) > 0
+        else None
+    )
+
+    # Get the latest distinct id from the customer tracking df
+    distinct_id = int(get_next_id_from_supabase_compatible_all(name='Customer_Tracking', column='Distinct_ID'))
+
+    # ---------------------------------------------------------
+    # Group by Visitor_IDs and record events
+    for visitor_id, group in tracking_df.groupby("Visitor_ID"):
+        customer_id = group["Customer_ID"].dropna().iloc[0] if group["Customer_ID"].notna().any() else 00000
+        identifier = str(customer_id or visitor_id)
+        ### Now check if the visitor id or the customer_id exists in the customer_tracking_df or not
+        entry_exists_in_df = (
+            (identifier in existing_customer_ids) or
+            (identifier in existing_visitor_ids)
+        )
+
+        # ----------------------------
+        # Update sessions / totals
+        # ----------------------------
+        # Get the row that exists in the customers df
+        if entry_exists_in_df:
+            mask = (
+                (customer_tracking_df["Distinct_ID"] == identifier) |
+                (customer_tracking_df["Customer_ID"] == identifier)
+            )
+            row_index = customer_tracking_df.index[mask][0]
+
+            # Visitor_IDs
+            vis_list = customer_tracking_df.at[row_index, "Visitor_IDs"] or []
+            if visitor_id not in vis_list:
+                vis_list.append(visitor_id)
+            customer_tracking_df.at[row_index, "Visitor_IDs"] = vis_list
+
+            # Sessions dictionary
+            sessions = customer_tracking_df.at[row_index, "Sessions"] or {}
+
+            ### improvement
+            # Here, let's call the entry from supabase -- update it, and then push it right back.
+
+        else:
+            # New entry 
+            row0 = group.iloc[0]
+            entry = {
+                "Distinct_ID": distinct_id,
+                "Customer_ID": customer_id,
+                "Customer_Info": {
+                    "name": row0.get("Customer_Name"),
+                    "email": row0.get("Customer_Email"),
+                    "mobile": row0.get("Customer_Mobile")
+                },
+                "Visitor_IDs": [visitor_id],
+                "Add_to_Cart": 0,
+                "Purchases": 0,
+                "Sessions": {},
+                "Updated_at": None,
+                "Last_Visit": None,
+                "Last_ID_Map": None,
+                "Distinct_Checkpoint": 0,
+                "Campaign_Contributions": ''
+            }
+
+            sessions = entry["Sessions"]
+
+            # update lookup
+            existing_customer_ids.add(identifier)
+            existing_visitor_ids.add(identifier)
+            identifier += 1
+
+        # ----------------------------
+        # Iterate events in this visitor group -- updating the 'sessions' dict
+        # ----------------------------
+        for _, row in group.iterrows():
+            session_id = row["Session_ID"]
+            evt = row["Event_Type"]
+            details = row.get("Event_Details")
+            visited_at = row["Visited_at"]
+            camp = str(row.get("UTM_Campaign") or "Direct")
+            src = str(row.get("UTM_Source") or "Direct")
+
+            # Session creation
+            if session_id not in sessions: ## as in, if the session id in the row for the said group does not exist in the session dict for the said entry in the customers df -- update it.
+                sessions[session_id] = {
+                    "date_first_seen": visited_at,
+                    "date_last_seen": visited_at,
+                    "campaign": camp,
+                    "source": src,
+                    "pageviews": 0,
+                    "add_to_cart": 0,
+                    "purchases": 0
+                }
+
+            s = sessions[session_id]
+
+            # Update timestamps
+            if visited_at > s["date_last_seen"]:
+                s["date_last_seen"] = visited_at
+
+            # Update session counters
+            if evt == "pageview":
+                s["pageviews"] += 1
+            elif evt == "add_to_cart":
+                s["add_to_cart"] += 1
+
+                # --- ADD TO CART DETAILS ---
+                if isinstance(details, dict):
+                    s.setdefault("add_to_cart_details", []).append({
+                        "id": details.get("id"),
+                        "name": details.get("name"),
+                        "sku": details.get("sku"),
+                        "quantity": details.get("quantity"),
+                    })
+
+            elif evt == "purchase":
+                s["purchases"] += 1
+
+                # --- PURCHASE DETAILS ---
+                if isinstance(details, dict):
+                    order_total_raw = details.get("order_total_string")
+
+                    # extract numeric part only (e.g. "130.00 SAR" → 130.00)
+                    order_total_num = None
+                    if isinstance(order_total_raw, str):
+                        match = re.search(r"[\d\.]+", order_total_raw)
+                        if match:
+                            order_total_num = float(match.group())
+
+                    s.setdefault("purchase_details", []).append({
+                        "order_id": details.get("order_id"),
+                        "order_total": order_total_num,
+                        "products_name": details.get("products_name"),
+                    })
+
+            # Update total counters
+            if entry_exists_in_df:
+                if evt == "add_to_cart":
+                    customer_tracking_df.at[row_index, "Add_to_Cart"] += 1
+                elif evt == "purchase":
+                    customer_tracking_df.at[row_index, "Purchases"] += 1
+            else:
+                if evt == "add_to_cart":
+                    entry["Add_to_Cart"] += 1
+                elif evt == "purchase":
+                    entry["Purchases"] += 1
+
+
+        # ----------------------------
+        # Save back sessions n other details --
+        # ----------------------------
+        if entry_exists_in_df:
+            customer_tracking_df.at[row_index, "Sessions"] = sessions
+            customer_tracking_df.at[row_index, "Updated_at"] = get_uae_current_date()
+            customer_tracking_df.at[row_index, "Last_Visit"] = visited_at
+            customer_tracking_df.at[row_index, "Last_ID_Map"] = visitor_id
+
+            ## put this ditinct id in the list
+            existing_distinct = customer_tracking_df.at[row_index, "Distinct_ID"]
+            if existing_distinct not in changed_ids:
+                changed_ids.append(existing_distinct)
+        else:
+            entry["Sessions"] = sessions
+            entry["Updated_at"] = get_uae_current_date()
+            entry["Last_Visit"] = visited_at
+            entry["Last_ID_Map"] = visitor_id
+            entry["Distinct_Checkpoint"] = last_distinct_checkpoint
+
+            # Append the entry now
+            customer_entries.append(entry)
+            # Add the distinct id to the changed list
+            new_distinct = entry["Distinct_ID"]
+            if new_distinct not in changed_ids:
+                changed_ids.append(new_distinct)
+
+    # Upsert partial the changed rows
+    upsert_partial(customer_tracking_df, 'Customer_Tracking', 'Distinct_ID')
+    
+    if customer_entries:
+        # Convert entries into a df
+        entries_df = pd.DataFrame(customer_entries)
+        # Batch insert the new entries.
+        batch_insert_to_supabase(entries_df, 'Customer_Tracking')
+
+    return True, changed_ids
+
+### Function to get the tokens
+def get_latest_token():
+    """Fetch the most recent token from the database by highest Distinct_ID."""
+    res = supabase.table("tokens") \
+        .select("*") \
+        .order("Distinct_ID", desc=True) \
+        .limit(1) \
+        .execute()
+
+    if not res.data:
+        raise ValueError("No tokens found in database")
+    
+    token_row = res.data[0]
+    return {
+        "access_token": token_row["Access"],
+        "authorization_token": token_row["Authorization"],
+        "refresh_token": token_row["Refresh"],
+        "store_id": token_row["Store_ID"]
+    }
+
+### Supporting function to get the product sku from the name in the final purchase.
+def get_item_skus(order_id):
+    # Get the order from zid and get the skus, put them in a list and then return the list.
+    # Fetch access token
+    tokens = get_latest_token()
+    authorization = tokens["authorization_token"]
+    access_token = tokens['access_token']
+    
+    # Create the headers
+    headers = {
+            'Authorization': f'Bearer {authorization}',
+            'X-MANAGER-TOKEN': access_token,
+        }
+    
+    # A function to get the order -- 
+    def get_order_from_zid(order_id, headers):
+        """
+        Fetch a single order from Zid API.
+        Returns the full order dict as returned by Zid, or None on error.
+        """
+        url = f"https://api.zid.sa/v1/managers/store/orders/{order_id}/view"
+
+        try:
+            r = requests.get(url, headers=headers, timeout=10)
+            r.raise_for_status()
+            data = r.json()
+            order = data.get("order")
+            return order  # return the full order object
+        except Exception as e:
+            print(f"Error fetching order {order_id}: {e}")
+            return None
+    
+    order_data = get_order_from_zid(order_id, headers)
+    if not order_data:
+        print("COULD NOT GET ORDER FROM ZID")
+        return 
+    
+    products = pd.DataFrame(order_data.get("products", [])) ### Access the products in the order from the products -- 
+    products['sku'] = products['sku'].str.strip().astype(str)
+    sku_list = products['sku'].tolist()
+
+    return sku_list
+
+
+#### Function 2 -- the function that would calculate the contributing percentages per each product in the purchase, atc, or a mere pageview process.
+def compute_campaign_percentages(sessions):
+    """
+    Compute campaign contribution percentages for a customer based on sessions.
+    
+    Args:
+        sessions (dict): Customer sessions dictionary with structure:
+            {
+                session_id: {
+                    'pageviews': int,
+                    'add_to_cart': int,
+                    'add_to_cart_details': [{ 'id','name','sku','quantity','campaign'}],
+                    'purchases': int,
+                    'purchase_details': [{ 'order_id','products_name','campaign'}],
+                    ...
+                },
+                ...
+            }
+
+    Returns:
+        dict: campaign contribution percentages per product.
+    """
+    campaign_contrib = {}
+
+    # Keep track of previous purchases
+    last_purchase_index = -1
+    session_keys = list(sessions.keys())
+    
+    # Sort sessions chronologically by date_first_seen
+    session_keys.sort(key=lambda s: sessions[s]["date_first_seen"])
+
+    for idx, session_id in enumerate(session_keys):
+        session = sessions[session_id]
+
+        # Skip sessions with only pageviews if there is no ATC or purchase yet
+        has_purchase = session.get("purchases", 0) > 0
+        has_atc = len(session.get("add_to_cart_details", [])) > 0
+        if not has_purchase and not has_atc:
+            continue
+
+        # Gather pageview campaigns
+        pv_campaigns = []
+        if "pageviews" in session and session["pageviews"] > 0:
+            if "campaign" in session:
+                pv_campaigns = [session["campaign"]]  # assume single campaign per session pageviews
+
+        # Gather ATC campaigns
+        atc_campaigns = []
+        for atc in session.get("add_to_cart_details", []):
+            atc_campaigns.append(atc.get("campaign"))
+
+        # Process purchase if exists
+        purchases = session.get("purchase_details", [])
+        for purchase in purchases:
+            purchase_campaign = purchase.get("campaign")
+            order_id = purchase.get('order_id')
+            #product_names = [p.strip() for p in purchase.get("products_name", "").split(",")]
+            purchase_skus_list = get_item_skus(order_id)
+
+            # Filter ATCs to only those that contributed to purchased products
+            relevant_atc_campaigns = []
+            for s_idx in range(last_purchase_index + 1, idx + 1):
+                s = sessions[session_keys[s_idx]]
+                for atc in s.get("add_to_cart_details", []):
+                    # Use lookup_sku helper to match product
+                    sku_of_product = str(atc["sku"].strip())
+                    if sku_of_product in purchase_skus_list:
+                        relevant_atc_campaigns.append(atc.get("campaign"))
+
+            # Remove duplicates
+            relevant_atc_campaigns = list(set(relevant_atc_campaigns))
+            pv_campaigns_unique = list(set(pv_campaigns))
+
+            # Assign percentages
+            # 50% → purchase, 25% → ATC, 25% → pageview
+            if purchase_campaign:
+                campaign_contrib[purchase_campaign] = campaign_contrib.get(purchase_campaign, 0) + 50
+
+            if relevant_atc_campaigns:
+                share = 25 / len(relevant_atc_campaigns)
+                for c in relevant_atc_campaigns:
+                    campaign_contrib[c] = campaign_contrib.get(c, 0) + share
+
+            if pv_campaigns_unique:
+                share = 25 / len(pv_campaigns_unique)
+                for c in pv_campaigns_unique:
+                    campaign_contrib[c] = campaign_contrib.get(c, 0) + share
+
+            # Update last purchase index
+            last_purchase_index = idx
+
+        # Handle sessions with ATCs but no purchase (percentage-only)
+        if not purchases and has_atc:
+            relevant_atc_campaigns = list(set(atc_campaigns))
+            pv_campaigns_unique = list(set(pv_campaigns))
+
+            # 50% → ATC, 50% → pageview
+            if relevant_atc_campaigns:
+                share = 50 / len(relevant_atc_campaigns)
+                for c in relevant_atc_campaigns:
+                    campaign_contrib[c] = campaign_contrib.get(c, 0) + share
+            if pv_campaigns_unique:
+                share = 50 / len(pv_campaigns_unique)
+                for c in pv_campaigns_unique:
+                    campaign_contrib[c] = campaign_contrib.get(c, 0) + share
+
+    # Normalize contributions to sum to 100% if needed
+    total = sum(campaign_contrib.values())
+    if total > 0:
+        for c in campaign_contrib:
+            campaign_contrib[c] = round((campaign_contrib[c] / total) * 100, 2)
+
+    return campaign_contrib
+
+
+##########################
+##########################
+##### Main Syncing Function -- 
+
+def sync_customers():
+    ## Get the databases
+    ## Retrieve the checkpoint for the last distinct id processed from the customers_tracking db
+    customers = fetch_data_from_supabase_specific("Customer_Tracking")
+    customers['Distinct_Checkpoint'] = customers['Distinct_Checkpoint'].astype(int)
+
+    checkpoint_value = int(customers['Distinct_Checkpoint'].max())
+
+
+    # Retrieve the tracking values beyong the checkpoint_value
+    new_tracking = fetch_data_from_supabase_specific("Tracking_Visitors",
+                                                        filters={
+                                                            'Distinct_ID': ('gt', checkpoint_value)
+                                                        })
+                                                        
+    
+    ### Send the data over to the first step
+    response, changed_ids = update_customer_tracking(new_tracking, customers)
+
+    print("successfully synced customers")
+    return
+
+    '''
+    ## Commenting this section for now to test the bare customer tracking --- 
+
+    ## Get the changed id entries + do the percetnage computation
+    if response and len(changed_ids) > 0:
+        # Call the database with the distinct ids
+        changed = fetch_data_from_supabase_specific("Customer_Tracking",
+                                                        filters = {
+                                                            'Distinct_ID': ('in', changed_ids)
+                                                        }
+                                                    )
+        ## Do the sessions percentage computation -- 
+        if not changed.empty:
+            for i, row in changed.iterrows():
+                cid = row["Distinct_ID"]
+
+                sessions = row["Sessions"]
+                pct = compute_campaign_percentages(sessions)
+
+                # Write back into entries_df so it's inserted with contributions
+                changed.at[i, "Campaign_Contributions"] = pct
+
+            ## After updates, upsert the changed rows
+            upsert_partial(changed, 'Customer_Tracking', 'Distinct_ID')'''
+        
+    
