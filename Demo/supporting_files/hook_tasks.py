@@ -210,6 +210,7 @@ def initial_fetch_products(auth_token, token, store_id):
             "Parent_Price": parent_price,
             "Variation_SKUs": variation_skus_json,
             "Variation_Price_Map": variation_price_map_json,
+            "Price_Updates": {},
             "Last_Updated": get_uae_current_date()
         }
 

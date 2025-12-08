@@ -17,7 +17,7 @@ from dateutil import parser
 
 ## Custom Imports ------------------
 # Supabase & Supporting imports
-from Demo.supporting_files.supabase_functions import *
+from Demo.supporting_files.supabase_functions import get_next_id_from_supabase_compatible_all, batch_insert_to_supabase, sync_customers
 
 from Demo.supporting_files.supporting_functions import *
 # Marketing Report functions
@@ -1290,8 +1290,8 @@ def view_tracking(request):
     dubai_tz = pytz.timezone("Asia/Dubai")
 
     try:
-        # 🔄 Import your sync function (keeps Supabase fresh)
-        sync_customer_tracking_unified()
+        # Import your sync function (keeps Supabase fresh)
+        sync_customers()
 
         # 🧠 Fetch from Supabase
         data = supabase.table("Customer_Tracking").select("*").execute().data or []
