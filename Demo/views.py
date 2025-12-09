@@ -17,9 +17,9 @@ from dateutil import parser
 
 ## Custom Imports ------------------
 # Supabase & Supporting imports
-from Demo.supporting_files.supabase_functions import get_next_id_from_supabase_compatible_all, batch_insert_to_supabase, sync_customers
+from Demo.supporting_files.supabase_functions import get_next_id_from_supabase_compatible_all, batch_insert_to_supabase, sync_customers, fetch_data_from_supabase_specific
 
-from Demo.supporting_files.supporting_functions import *
+from Demo.supporting_files.supporting_functions import get_uae_current_date, detect_source_from_url_or_domain
 # Marketing Report functions
 from Demo.supporting_files.marketing_report import create_general_analysis, create_product_percentage_amount_spent, landing_performance_5_async, column_check
 # Webhook function imports
@@ -1290,17 +1290,17 @@ def view_tracking(request):
     dubai_tz = pytz.timezone("Asia/Dubai")
 
     try:
-        # Import your sync function (keeps Supabase fresh)
-        sync_customers()
+        # Updating the customers db
+        ##### --------------> commented for the time being --/ sync_customers()
 
-        # 🧠 Fetch from Supabase
+        # Fetch from Supabase
         data = supabase.table("Customer_Tracking").select("*").execute().data or []
         if not data:
             return render(request, "Demo/tracking_view.html", {"rows": [], "track_id": store_id})
 
         df = pd.DataFrame(data)
 
-        # 🕒 Normalize timestamps
+        # Normalize timestamps
         if "updated_at" in df.columns:
             df["updated_at"] = pd.to_datetime(df["updated_at"], errors="coerce")
             if df["updated_at"].dt.tz is None:
