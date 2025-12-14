@@ -2623,11 +2623,7 @@ def events_table_view(request):
             )
 
             # Recombine
-            df = (
-                with_order
-                .append(without_order, ignore_index=True)
-                .drop(columns=["_order_id_tmp"])
-            )
+            df = pd.concat([with_order, without_order], ignore_index=True).drop(columns=["_order_id_tmp"])
 
         # ------------------------------------------------
         # 3️⃣ GLOBAL sort by Distinct_ID (FINAL STEP)
