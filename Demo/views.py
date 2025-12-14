@@ -2567,7 +2567,6 @@ def events_table_view(request):
         table_name="Tracking_Events",  # put your table name
         filters=filters,
         limit=limit,
-        offset=0
     )
 
     # Convert DataFrame to list of dicts
