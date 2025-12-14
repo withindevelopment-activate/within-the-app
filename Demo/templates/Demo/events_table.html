@@ -52,6 +52,19 @@
         </div>
     </form>
 
+    <div class="row mb-5">
+        <div class="col-md-6">
+            <h5 class="text-center">UTM Source Distribution (%)</h5>
+            <canvas id="utmSourceChart"></canvas>
+        </div>
+
+        <div class="col-md-6">
+            <h5 class="text-center">UTM Campaign Distribution (%)</h5>
+            <canvas id="utmCampaignChart"></canvas>
+        </div>
+    </div>
+
+
     <!-- Data Table -->
     <div class="data-wrap">
         <div class="data-viewport">
@@ -84,5 +97,54 @@
         </div>
     </div>
 </div>
+
+<script>
+    const utmSourceData = {
+        labels: {{ utm_source_pct.keys|list|safe }},
+        datasets: [{
+            data: {{ utm_source_pct.values|list|safe }},
+        }]
+    };
+
+    const utmCampaignData = {
+        labels: {{ utm_campaign_pct.keys|list|safe }},
+        datasets: [{
+            data: {{ utm_campaign_pct.values|list|safe }},
+        }]
+    };
+
+    function pieOptions(title) {
+        return {
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.label + ': ' + context.parsed + '%';
+                        }
+                    }
+                },
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        };
+    }
+
+    if (utmSourceData.labels.length > 0) {
+        new Chart(document.getElementById('utmSourceChart'), {
+            type: 'pie',
+            data: utmSourceData,
+            options: pieOptions('UTM Source')
+        });
+    }
+
+    if (utmCampaignData.labels.length > 0) {
+        new Chart(document.getElementById('utmCampaignChart'), {
+            type: 'pie',
+            data: utmCampaignData,
+            options: pieOptions('UTM Campaign')
+        });
+    }
+</script>
 
 {% endblock %}

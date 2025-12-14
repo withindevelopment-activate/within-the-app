@@ -2532,46 +2532,57 @@ def data_deletion(request):
     return render(request, "Demo/data_deletion.html")
 
 #Database pageview - Remaz
+from collections import Counter
+
 def events_table_view(request):
     # Get filters from GET params
     event_type = request.GET.get("event_type")
     limit = int(request.GET.get("limit", 100))
     date_after = request.GET.get("date_after")
-    print("Date after is:", date_after)
     session_search = request.GET.get("session_id")
     visitor_search = request.GET.get("visitor_id")
 
-    # Build filters dictionary
     filters = {}
 
-    # Event Type filter
-    if event_type and event_type != "":
+    if event_type:
         filters["Event_Type"] = ("eq", str(event_type))
 
-    # Date filter (Created_At > selected date)
-    if date_after and date_after != "":
-        # Ensure ISO datetime, append time if needed
-        if len(date_after) == 10:  # Only date, no time
+    if date_after:
+        if len(date_after) == 10:
             date_after += "T00:00:00"
         filters["Visited_at"] = ("gt", date_after)
 
-    # Search filters
     if session_search and session_search != "None":
         filters["Session_ID"] = ("eq", str(session_search))
 
     if visitor_search and visitor_search != "None":
         filters["Visitor_ID"] = ("eq", str(visitor_search))
 
-    # Fetch data using your function
     df = fetch_data_from_supabase_specific(
-        table_name="Tracking_Visitors", 
+        table_name="Tracking_Visitors",
         filters=filters,
         limit=limit,
     )
 
-    # Convert DataFrame to list of dicts
     data = df.to_dict(orient="records") if df is not None else []
-    messages.info(request, f"filters applied: {filters}, records found: {len(data)}")
+
+    # --- UTM aggregation ---
+    utm_sources = [row.get("UTM_Source") for row in data if row.get("UTM_Source")]
+    utm_campaigns = [row.get("UTM_Campaign") for row in data if row.get("UTM_Campaign")]
+
+    source_counts = Counter(utm_sources)
+    campaign_counts = Counter(utm_campaigns)
+
+    def to_percentages(counter):
+        total = sum(counter.values())
+        return {
+            k: round((v / total) * 100, 2)
+            for k, v in counter.items()
+        } if total > 0 else {}
+
+    utm_source_pct = to_percentages(source_counts)
+    utm_campaign_pct = to_percentages(campaign_counts)
+
     return render(request, "Demo/events_table.html", {
         "data": data,
         "selected_event_type": event_type,
@@ -2579,4 +2590,6 @@ def events_table_view(request):
         "selected_date": date_after,
         "session_search": session_search,
         "visitor_search": visitor_search,
+        "utm_source_pct": utm_source_pct,
+        "utm_campaign_pct": utm_campaign_pct,
     })
