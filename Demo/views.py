@@ -2583,6 +2583,12 @@ def events_table_view(request):
     utm_source_pct = to_percentages(source_counts)
     utm_campaign_pct = to_percentages(campaign_counts)
 
+    utm_source_labels = list(utm_source_pct.keys())
+    utm_source_values = list(utm_source_pct.values())
+
+    utm_campaign_labels = list(utm_campaign_pct.keys())
+    utm_campaign_values = list(utm_campaign_pct.values())
+
     return render(request, "Demo/events_table.html", {
         "data": data,
         "selected_event_type": event_type,
@@ -2590,6 +2596,8 @@ def events_table_view(request):
         "selected_date": date_after,
         "session_search": session_search,
         "visitor_search": visitor_search,
-        "utm_source_pct": utm_source_pct,
-        "utm_campaign_pct": utm_campaign_pct,
+        "utm_source_labels": json.dumps(utm_source_labels),
+        "utm_source_values": json.dumps(utm_source_values),
+        "utm_campaign_labels": json.dumps(utm_campaign_labels),
+        "utm_campaign_values": json.dumps(utm_campaign_values),
     })
