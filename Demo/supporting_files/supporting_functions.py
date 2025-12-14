@@ -41,7 +41,8 @@ PARAM_MAPPING = {
     "wbraid": "google",
     "gbraid": "google",
     "sccid": "snapchat",
-    "sc_cid": "snapchat"
+    "sc_cid": "snapchat",
+    "srsltid": "google"
 }
 
 OWN_DOMAIN = "sleepy-cloud.ae"

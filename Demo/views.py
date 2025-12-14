@@ -2564,7 +2564,7 @@ def events_table_view(request):
 
     # Fetch data using your function
     df = fetch_data_from_supabase_specific(
-        table_name="Tracking_Events",  # put your table name
+        table_name="Tracking_Visitors", 
         filters=filters,
         limit=limit,
     )
