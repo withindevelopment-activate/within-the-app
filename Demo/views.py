@@ -640,12 +640,17 @@ def save_tracking(request):
         utm_params = data.get('utm_params', {}) or {}
         traffic_source = data.get('traffic_source', {}) or {}
         referrer = data.get("referrer") or ""
-        agent = data.get('user_agent')
+        agent = data.get('user_agent') or ""
         crawlers = ["crawler","bingbot","Googlebot","GoogleOther","Applebot","AdsBot","AhrefsBot"]
- 
+
+        is_crawler = False
         for word in crawlers:
-            if word in agent:
-                continue
+            if word.lower() in agent.lower():
+                is_crawler = True
+                break
+
+        if is_crawler:
+            return JsonResponse({"status": "skipped", "message": "Crawler detected"})
  
 
         # --------------- NEW: Detect source from referrer URL ------------------
