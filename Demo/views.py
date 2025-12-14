@@ -2545,21 +2545,21 @@ def events_table_view(request):
     filters = {}
 
     # Event Type filter
-    if event_type:
+    if event_type and event_type != "":
         filters["Event_Type"] = ("in", event_type)
 
     # Date filter (Created_At > selected date)
-    if date_after:
+    if date_after and date_after != "":
         # Ensure ISO datetime, append time if needed
         if len(date_after) == 10:  # Only date, no time
             date_after += "T00:00:00"
         filters["Created_At"] = ("gt", date_after)
 
     # Search filters
-    if session_search:
+    if session_search and session_search != "":
         filters["Session_ID"] = ("eq", session_search)
 
-    if visitor_search:
+    if visitor_search and visitor_search != "":
         filters["Visitor_ID"] = ("eq", visitor_search)
 
     # Fetch data using your function
@@ -2571,7 +2571,7 @@ def events_table_view(request):
 
     # Convert DataFrame to list of dicts
     data = df.to_dict(orient="records") if df is not None else []
-
+    messages.info(request, f"filters applied: {filters}, records found: {len(data)}")
     return render(request, "Demo/events_table.html", {
         "data": data,
         "selected_event_type": event_type,
