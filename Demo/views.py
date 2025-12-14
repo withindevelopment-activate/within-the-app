@@ -2601,11 +2601,32 @@ def events_table_view(request):
             agent = str(agent).lower()
             return any(bot in agent for bot in crawlers)
 
-        if "user_agent" in df.columns:
-            df = df[~df["user_agent"].apply(is_bot)]
+        if "User_Agent" in df.columns:
+            df = df[~df["User_Agent"].apply(is_bot)]
 
         # ------------------------------------------------
-        # 2️⃣ Deduplicate by order_id INSIDE Event_Details
+        # 2️⃣ Determine primary UTM source from Referrer_Platform
+        # ------------------------------------------------
+        primary_sources = {}
+        if "Referrer_Platform" in df.columns:
+            for session_id_val in df["Session_ID"].unique():
+                session_rows = df[df["Session_ID"] == session_id_val]
+                referrers = session_rows["Referrer_Platform"].dropna().tolist()
+                primary_source = None
+                for ref in referrers:
+                    detected = detect_source_from_url_or_domain(ref)
+                    if detected:
+                        primary_source = detected
+                        break
+                if primary_source:
+                    primary_sources[session_id_val] = primary_source
+        # Apply primary UTM to all rows in the session
+        df["UTM_Source"] = df.apply(
+            lambda row: primary_sources.get(row["Session_ID"], row.get("UTM_Source")), axis=1
+        )
+
+        # ------------------------------------------------
+        # 3️⃣ Deduplicate by order_id INSIDE Event_Details
         # ------------------------------------------------
         if "Event_Details" in df.columns:
 
@@ -2639,7 +2660,7 @@ def events_table_view(request):
             df = pd.concat([with_order, without_order], ignore_index=True).drop(columns=["_order_id_tmp"])
 
         # ------------------------------------------------
-        # 3️⃣ GLOBAL sort by Distinct_ID (FINAL STEP)
+        # 4️⃣ GLOBAL sort by Distinct_ID (FINAL STEP)
         # ------------------------------------------------
         if "Distinct_ID" in df.columns:
             df = df.sort_values("Distinct_ID", ascending=False)
@@ -2647,7 +2668,7 @@ def events_table_view(request):
         data = df.to_dict(orient="records")
 
     # ------------------------------------------------
-    # 4️⃣ UTM aggregation
+    # 5️⃣ UTM aggregation
     # ------------------------------------------------
     utm_sources = [r.get("UTM_Source") for r in data if r.get("UTM_Source")]
     utm_campaigns = [r.get("UTM_Campaign") for r in data if r.get("UTM_Campaign")]
