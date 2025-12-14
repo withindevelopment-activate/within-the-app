@@ -2546,7 +2546,7 @@ def events_table_view(request):
 
     # Event Type filter
     if event_type and event_type != "":
-        filters["Event_Type"] = ("eq", event_type)
+        filters["Event_Type"] = ("eq", str(event_type))
 
     # Date filter (Created_At > selected date)
     if date_after and date_after != "":
@@ -2556,11 +2556,11 @@ def events_table_view(request):
         filters["Created_At"] = ("gt", date_after)
 
     # Search filters
-    if session_search and session_search != "":
-        filters["Session_ID"] = ("eq", session_search)
+    if session_search and session_search != "None":
+        filters["Session_ID"] = ("eq", str(session_search))
 
-    if visitor_search and visitor_search != "":
-        filters["Visitor_ID"] = ("eq", visitor_search)
+    if visitor_search and visitor_search != "None":
+        filters["Visitor_ID"] = ("eq", str(visitor_search))
 
     # Fetch data using your function
     df = fetch_data_from_supabase_specific(
