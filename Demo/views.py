@@ -2553,7 +2553,7 @@ def events_table_view(request):
         # Ensure ISO datetime, append time if needed
         if len(date_after) == 10:  # Only date, no time
             date_after += "T00:00:00"
-        filters["Created_At"] = ("gt", date_after)
+        filters["Visited_at"] = ("gt", date_after)
 
     # Search filters
     if session_search and session_search != "None":
