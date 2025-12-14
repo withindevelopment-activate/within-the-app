@@ -2546,7 +2546,7 @@ def events_table_view(request):
 
     # Event Type filter
     if event_type:
-        filters["Event_Type"] = ("in", [event_type])
+        filters["Event_Type"] = ("in", event_type)
 
     # Date filter (Created_At > selected date)
     if date_after:
@@ -2557,10 +2557,10 @@ def events_table_view(request):
 
     # Search filters
     if session_search:
-        filters["Session_ID"] = ("contains", session_search)
+        filters["Session_ID"] = ("eq", session_search)
 
     if visitor_search:
-        filters["Visitor_ID"] = ("contains", visitor_search)
+        filters["Visitor_ID"] = ("eq", visitor_search)
 
     # Fetch data using your function
     df = fetch_data_from_supabase_specific(
@@ -2573,7 +2573,7 @@ def events_table_view(request):
     # Convert DataFrame to list of dicts
     data = df.to_dict(orient="records") if df is not None else []
 
-    return render(request, "ads_api/events_table.html", {
+    return render(request, "Demo/events_table.html", {
         "data": data,
         "selected_event_type": event_type,
         "selected_limit": limit,

@@ -56,6 +56,7 @@ urlpatterns = [
 
 
     path("price-monitor/", views.view_price_monitor, name="price_monitor"),
+    path("events-table/", views.events_table_view, name="events_table"),
     # path("campaigns/overview/", views.campaigns_overview, name="campaigns_overview"),
 
 ]

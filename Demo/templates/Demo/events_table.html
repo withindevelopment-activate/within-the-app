@@ -53,31 +53,35 @@
     </form>
 
     <!-- Data Table -->
-    <div class="table-responsive">
-        <table class="table table-striped table-hover table-bordered">
-            <thead class="table-dark">
-                <tr>
-                    {% if data %}
-                        {% for col in data.0.keys %}
-                            <th>{{ col }}</th>
+    <div class="data-wrap">
+        <div class="data-viewport">
+            <div class="data-scroller" role="region" aria-label="Scrollable data table" tabindex="0">
+                <table class="data-table" role="table" aria-label="Meta campaigns dataset">
+                    <thead class="table-dark">
+                        <tr>
+                            {% if data %}
+                                {% for col in data.0.keys %}
+                                    <th>{{ col }}</th>
+                                {% endfor %}
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in data %}
+                            <tr>
+                                {% for val in row.values %}
+                                    <td>{{ val }}</td>
+                                {% endfor %}
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="20" class="text-center">No data found.</td>
+                            </tr>
                         {% endfor %}
-                    {% endif %}
-                </tr>
-            </thead>
-            <tbody>
-                {% for row in data %}
-                    <tr>
-                        {% for val in row.values %}
-                            <td>{{ val }}</td>
-                        {% endfor %}
-                    </tr>
-                {% empty %}
-                    <tr>
-                        <td colspan="20" class="text-center">No data found.</td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 </div>
 
