@@ -2552,30 +2552,23 @@ def data_deletion(request):
     return render(request, "Demo/data_deletion.html")
 
 #Database pageview - Remaz
-import ast
-from collections import Counter
-
 def events_table_view(request):
     event_type = request.GET.get("event_type")
     limit = int(request.GET.get("limit", 100))
     date_after = request.GET.get("date_after")
     session_search = request.GET.get("session_id")
     visitor_search = request.GET.get("visitor_id")
-    sort_by = request.GET.get("sort_by", "Distinct_ID")
+    sort_field = request.GET.get("sort_field") 
 
     filters = {}
-
     if event_type:
         filters["Event_Type"] = ("eq", str(event_type))
-
     if date_after:
         if len(date_after) == 10:
             date_after += "T00:00:00"
         filters["Visited_at"] = ("gt", date_after)
-
     if session_search and session_search != "None":
         filters["Session_ID"] = ("eq", str(session_search))
-
     if visitor_search and visitor_search != "None":
         filters["Visitor_ID"] = ("eq", str(visitor_search))
 
@@ -2588,89 +2581,48 @@ def events_table_view(request):
     if df is None or df.empty:
         data = []
     else:
-        # ------------------------------------------------
-        # 1️⃣ Remove bot / crawler traffic
-        # ------------------------------------------------
-        crawlers = [
-            "crawler", "bingbot", "googlebot", "googleother",
-            "applebot", "adsbot", "ahrefsbot"
-        ]
+        # ---- Remove bots ----
+        crawlers = ["crawler","bingbot","googlebot","googleother","applebot","adsbot","ahrefsbot"]
+        df = df[~df["user_agent"].fillna("").str.lower().apply(lambda x: any(bot in x for bot in crawlers))]
 
-        def is_bot(agent):
-            if not agent:
-                return False
-            agent = str(agent).lower()
-            return any(bot in agent for bot in crawlers)
-
-        if "User_Agent" in df.columns:
-            df = df[~df["User_Agent"].apply(is_bot)]
-
-        # ------------------------------------------------
-        # 2️⃣ Determine primary UTM source from Referrer_Platform
-        # ------------------------------------------------
-        primary_sources = {}
-        if "Referrer_Platform" in df.columns:
-            for session_id_val in df["Session_ID"].unique():
-                session_rows = df[df["Session_ID"] == session_id_val]
-                referrers = session_rows["Referrer_Platform"].dropna().tolist()
-                primary_source = None
-                for ref in referrers:
-                    detected = detect_source_from_url_or_domain(ref)
-                    if detected:
-                        primary_source = detected
-                        break
-                if primary_source:
-                    primary_sources[session_id_val] = primary_source
-        # Apply primary UTM to all rows in the session
-        df["UTM_Source"] = df.apply(
-            lambda row: primary_sources.get(row["Session_ID"], row.get("UTM_Source")), axis=1
-        )
-
-        # ------------------------------------------------
-        # 3️⃣ Deduplicate by order_id INSIDE Event_Details
-        # ------------------------------------------------
-        if "Event_Details" in df.columns:
-
-            def extract_order_id(val):
-                if not val:
-                    return None
-                if isinstance(val, dict):
-                    return val.get("order_id")
-                try:
-                    parsed = ast.literal_eval(val)
-                    if isinstance(parsed, dict):
-                        return parsed.get("order_id")
-                except Exception:
-                    return None
+        # ---- Deduplicate order_id in Event_Details ----
+        import ast
+        def extract_order_id(val):
+            if not val:
                 return None
+            if isinstance(val, dict):
+                return val.get("order_id")
+            try:
+                parsed = ast.literal_eval(val)
+                if isinstance(parsed, dict):
+                    return parsed.get("order_id")
+            except Exception:
+                return None
+            return None
 
-            # Temporary extraction ONLY for deduplication
-            df["_order_id_tmp"] = df["Event_Details"].apply(extract_order_id)
+        df["_order_id_tmp"] = df["Event_Details"].apply(extract_order_id)
+        with_order = df[df["_order_id_tmp"].notna()].drop_duplicates(subset=["_order_id_tmp"], keep="last")
+        without_order = df[df["_order_id_tmp"].isna()]
+        df = pd.concat([with_order, without_order], ignore_index=True).drop(columns=["_order_id_tmp"])
 
-            # Split rows with and without order_id
-            with_order = df[df["_order_id_tmp"].notna()]
-            without_order = df[df["_order_id_tmp"].isna()]
+        # ---- Apply primary UTM propagation across session rows ----
+        for session_id in df["Session_ID"].unique():
+            session_rows = df[df["Session_ID"] == session_id]
+            primary_sources = session_rows["Referrer_Platform"].dropna().apply(detect_primary_source)
+            if not primary_sources.empty:
+                primary_source = primary_sources.iloc[0]
+                df.loc[df["Session_ID"] == session_id, "UTM_Source"] = primary_source
 
-            # Deduplicate purchases by order_id (keep latest row)
-            with_order = with_order.drop_duplicates(
-                subset=["_order_id_tmp"],
-                keep="last"
-            )
-
-            # Recombine
-            df = pd.concat([with_order, without_order], ignore_index=True).drop(columns=["_order_id_tmp"])
-
-        # ------------------------------------------------
-        # 4️⃣ GLOBAL sort by Distinct_ID (FINAL STEP)
-        # ------------------------------------------------
-        if sort_by in df.columns:
-            df = df.sort_values(sort_by, ascending=False)
+        # ---- Sorting ----
+        if sort_field in ["Session_ID", "Visitor_ID", "Distinct_ID"]:
+            df = df.sort_values(sort_field, ascending=False)
+        else:
+            df = df.sort_values("Distinct_ID", ascending=False)
 
         data = df.to_dict(orient="records")
 
-    # ------------------------------------------------
-    # 5️⃣ UTM aggregation
-    # ------------------------------------------------
+    # ---- UTM aggregation ----
+    from collections import Counter
     utm_sources = [r.get("UTM_Source") for r in data if r.get("UTM_Source")]
     utm_campaigns = [r.get("UTM_Campaign") for r in data if r.get("UTM_Campaign")]
 
