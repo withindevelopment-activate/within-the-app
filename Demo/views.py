@@ -640,6 +640,13 @@ def save_tracking(request):
         utm_params = data.get('utm_params', {}) or {}
         traffic_source = data.get('traffic_source', {}) or {}
         referrer = data.get("referrer") or ""
+        agent = data.get('user_agent')
+        crawlers = ["crawler","bingbot","Googlebot","GoogleOther","Applebot","AdsBot","AhrefsBot"]
+ 
+        for word in crawlers:
+            if word in agent:
+                continue
+ 
 
         # --------------- NEW: Detect source from referrer URL ------------------
         detected_source = detect_source_from_url_or_domain(referrer)
@@ -2532,10 +2539,10 @@ def data_deletion(request):
     return render(request, "Demo/data_deletion.html")
 
 #Database pageview - Remaz
+import ast
 from collections import Counter
 
 def events_table_view(request):
-    # Get filters from GET params
     event_type = request.GET.get("event_type")
     limit = int(request.GET.get("limit", 100))
     date_after = request.GET.get("date_after")
@@ -2564,30 +2571,84 @@ def events_table_view(request):
         limit=limit,
     )
 
-    data = df.to_dict(orient="records") if df is not None else []
+    if df is None or df.empty:
+        data = []
+    else:
+        # ------------------------------------------------
+        # 1️⃣ Remove bot / crawler traffic
+        # ------------------------------------------------
+        crawlers = [
+            "crawler", "bingbot", "googlebot", "googleother",
+            "applebot", "adsbot", "ahrefsbot"
+        ]
 
-    # --- UTM aggregation ---
-    utm_sources = [row.get("UTM_Source") for row in data if row.get("UTM_Source")]
-    utm_campaigns = [row.get("UTM_Campaign") for row in data if row.get("UTM_Campaign")]
+        def is_bot(agent):
+            if not agent:
+                return False
+            agent = str(agent).lower()
+            return any(bot in agent for bot in crawlers)
 
-    source_counts = Counter(utm_sources)
-    campaign_counts = Counter(utm_campaigns)
+        if "user_agent" in df.columns:
+            df = df[~df["user_agent"].apply(is_bot)]
 
-    def to_percentages(counter):
+        # ------------------------------------------------
+        # 2️⃣ Deduplicate by order_id INSIDE Event_Details
+        # ------------------------------------------------
+        if "Event_Details" in df.columns:
+
+            def extract_order_id(val):
+                if not val:
+                    return None
+                if isinstance(val, dict):
+                    return val.get("order_id")
+                try:
+                    parsed = ast.literal_eval(val)
+                    if isinstance(parsed, dict):
+                        return parsed.get("order_id")
+                except Exception:
+                    return None
+                return None
+
+            # Temporary extraction ONLY for deduplication
+            df["_order_id_tmp"] = df["Event_Details"].apply(extract_order_id)
+
+            # Split rows with and without order_id
+            with_order = df[df["_order_id_tmp"].notna()]
+            without_order = df[df["_order_id_tmp"].isna()]
+
+            # Deduplicate purchases by order_id (keep latest row)
+            with_order = with_order.drop_duplicates(
+                subset=["_order_id_tmp"],
+                keep="last"
+            )
+
+            # Recombine
+            df = (
+                with_order
+                .append(without_order, ignore_index=True)
+                .drop(columns=["_order_id_tmp"])
+            )
+
+        # ------------------------------------------------
+        # 3️⃣ GLOBAL sort by Distinct_ID (FINAL STEP)
+        # ------------------------------------------------
+        if "Distinct_ID" in df.columns:
+            df = df.sort_values("Distinct_ID", ascending=False)
+
+        data = df.to_dict(orient="records")
+
+    # ------------------------------------------------
+    # 4️⃣ UTM aggregation
+    # ------------------------------------------------
+    utm_sources = [r.get("UTM_Source") for r in data if r.get("UTM_Source")]
+    utm_campaigns = [r.get("UTM_Campaign") for r in data if r.get("UTM_Campaign")]
+
+    def to_pct(counter):
         total = sum(counter.values())
-        return {
-            k: round((v / total) * 100, 2)
-            for k, v in counter.items()
-        } if total > 0 else {}
+        return {k: round((v / total) * 100, 2) for k, v in counter.items()} if total else {}
 
-    utm_source_pct = to_percentages(source_counts)
-    utm_campaign_pct = to_percentages(campaign_counts)
-
-    utm_source_labels = list(utm_source_pct.keys())
-    utm_source_values = list(utm_source_pct.values())
-
-    utm_campaign_labels = list(utm_campaign_pct.keys())
-    utm_campaign_values = list(utm_campaign_pct.values())
+    source_pct = to_pct(Counter(utm_sources))
+    campaign_pct = to_pct(Counter(utm_campaigns))
 
     return render(request, "Demo/events_table.html", {
         "data": data,
@@ -2596,8 +2657,8 @@ def events_table_view(request):
         "selected_date": date_after,
         "session_search": session_search,
         "visitor_search": visitor_search,
-        "utm_source_labels": json.dumps(utm_source_labels),
-        "utm_source_values": json.dumps(utm_source_values),
-        "utm_campaign_labels": json.dumps(utm_campaign_labels),
-        "utm_campaign_values": json.dumps(utm_campaign_values),
+        "utm_source_labels": json.dumps(list(source_pct.keys())),
+        "utm_source_values": json.dumps(list(source_pct.values())),
+        "utm_campaign_labels": json.dumps(list(campaign_pct.keys())),
+        "utm_campaign_values": json.dumps(list(campaign_pct.values())),
     })
