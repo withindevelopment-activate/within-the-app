@@ -2546,7 +2546,7 @@ def events_table_view(request):
 
     # Event Type filter
     if event_type and event_type != "":
-        filters["Event_Type"] = ("in", event_type)
+        filters["Event_Type"] = ("eq", event_type)
 
     # Date filter (Created_At > selected date)
     if date_after and date_after != "":
