@@ -2561,6 +2561,7 @@ def events_table_view(request):
     date_after = request.GET.get("date_after")
     session_search = request.GET.get("session_id")
     visitor_search = request.GET.get("visitor_id")
+    sort_by = request.GET.get("sort_by", "Distinct_ID")
 
     filters = {}
 
@@ -2662,8 +2663,8 @@ def events_table_view(request):
         # ------------------------------------------------
         # 4️⃣ GLOBAL sort by Distinct_ID (FINAL STEP)
         # ------------------------------------------------
-        if "Distinct_ID" in df.columns:
-            df = df.sort_values("Distinct_ID", ascending=False)
+        if sort_by in df.columns:
+            df = df.sort_values(sort_by, ascending=False)
 
         data = df.to_dict(orient="records")
 

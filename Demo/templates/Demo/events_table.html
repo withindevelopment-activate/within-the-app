@@ -47,6 +47,16 @@
             <input type="text" name="visitor_id" value="{{ visitor_search }}" class="form-control">
         </div>
 
+        <!-- Sorting -->
+        <div class="col-md-2">
+            <label class="form-label">Sort By</label>
+            <select name="sort_by" class="form-select">
+                <option value="Distinct_ID">Distinct_ID</option>
+                <option value="Session_ID" {% if request.GET.sort_by == "Session_ID" %}selected{% endif %}>Session ID</option>
+                <option value="Visitor_ID" {% if request.GET.sort_by == "Visitor_ID" %}selected{% endif %}>Visitor ID</option>
+            </select>
+        </div>
+
         <div class="col-md-12 text-end">
             <button class="btn btn-primary">Apply Filters</button>
         </div>
@@ -64,12 +74,11 @@
         </div>
     </div>
 
-
     <!-- Data Table -->
     <div class="data-wrap">
         <div class="data-viewport">
             <div class="data-scroller" role="region" aria-label="Scrollable data table" tabindex="0">
-                <table class="data-table" role="table" aria-label="Meta campaigns dataset">
+                <table class="table table-bordered table-striped">
                     <thead class="table-dark">
                         <tr>
                             {% if data %}
