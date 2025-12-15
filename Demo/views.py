@@ -2598,12 +2598,12 @@ def events_table_view(request):
         df = pd.concat([with_order, without_order], ignore_index=True).drop(columns=["_order_id_tmp"])
 
         # ---- Apply primary UTM propagation across session rows ----
-        # for session_id in df["Session_ID"].unique():
-        #     session_rows = df[df["Session_ID"] == session_id]
-        #     primary_sources = session_rows["Referrer_Platform"].dropna().apply(detect_primary_source)
-        #     if not primary_sources.empty:
-        #         primary_source = primary_sources.iloc[0]
-        #         df.loc[df["Session_ID"] == session_id, "UTM_Source"] = primary_source
+        for session_id in df["Session_ID"].unique():
+            session_rows = df[df["Session_ID"] == session_id]
+            primary_sources = session_rows["Referrer_Platform"].dropna().apply(detect_primary_source)
+            if not primary_sources.empty:
+                primary_source = primary_sources.iloc[0]
+                df.loc[df["Session_ID"] == session_id, "UTM_Source"] = primary_source
 
         # ---- Sorting ----
         if sort_field in ["Session_ID", "Visitor_ID", "Distinct_ID"]:
