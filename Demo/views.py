@@ -2583,7 +2583,7 @@ def events_table_view(request):
     else:
         # ---- Remove bots ----
         crawlers = ["crawler","bingbot","googlebot","googleother","applebot","adsbot","ahrefsbot"]
-        df = df[~df["user_agent"].fillna("").str.lower().apply(lambda x: any(bot in x for bot in crawlers))]
+        df = df[~df["User_Agent"].fillna("").str.lower().apply(lambda x: any(bot in x for bot in crawlers))]
 
         # ---- Deduplicate order_id in Event_Details ----
         import ast
