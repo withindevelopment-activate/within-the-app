@@ -6,6 +6,7 @@ from django.core.cache import cache
 import itertools
 from Demo.supporting_files.supporting_functions import get_uae_current_date
 import requests
+from django.contrib import messages
 
 # Import keys
 url: str = os.environ.get('SUPABASE_URL')
@@ -1597,3 +1598,18 @@ def sync_customers():
             upsert_partial(changed, 'Customer_Tracking', 'Distinct_ID')'''
         
     
+def update_database_after_filter(request, df):
+    updated_rows = 0
+
+    for _, row in df.iterrows():
+        supabase.table("Tracking_Visitors").update({
+            "UTM_Source": row.get("UTM_Source"),
+            "Referrer_Platform": row.get("Referrer_Platform"),
+        }).eq("Distinct_ID", row["Distinct_ID"]).execute()
+
+        updated_rows += 1
+
+    return messages.success(
+        request,
+        f"{updated_rows} records updated successfully."
+    )

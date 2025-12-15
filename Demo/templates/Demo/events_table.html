@@ -57,9 +57,27 @@
             </select>
         </div>
 
-        <div class="col-md-12 text-end">
-            <button class="btn btn-primary">Apply Filters</button>
+        <div class="col-md-12 d-flex justify-content-end gap-2">
+            <button type="submit"
+                    class="btn btn-primary"
+                    onclick="document.getElementById('action-field').value='filter'">
+                Apply Filters
+            </button>
+
+            <button type="submit"
+                    class="btn btn-outline-success"
+                    onclick="document.getElementById('action-field').value='export_excel'">
+                Export Excel
+            </button>
+
+            <button type="submit"
+                    class="btn btn-outline-warning"
+                    onclick="return confirm('Update database using current filters?') &&
+                            (document.getElementById('action-field').value='update_db')">
+                Update Database
+            </button>
         </div>
+        <input type="hidden" name="action" id="action-field">
     </form>
 
     <div class="row mb-5">

@@ -17,7 +17,7 @@ from dateutil import parser
 
 ## Custom Imports ------------------
 # Supabase & Supporting imports
-from Demo.supporting_files.supabase_functions import get_next_id_from_supabase_compatible_all, batch_insert_to_supabase, sync_customers, fetch_data_from_supabase_specific
+from Demo.supporting_files.supabase_functions import get_next_id_from_supabase_compatible_all, batch_insert_to_supabase, sync_customers, fetch_data_from_supabase_specific, update_database_after_filter
 
 from Demo.supporting_files.supporting_functions import get_uae_current_date, detect_source_from_url_or_domain, detect_primary_source
 # Marketing Report functions
@@ -2551,6 +2551,7 @@ def events_table_view(request):
     session_search = request.GET.get("session_id")
     visitor_search = request.GET.get("visitor_id")
     sort_field = request.GET.get("sort_field") 
+    action = request.GET.get("action", "filter")
 
     filters = {}
     if event_type:
@@ -2612,6 +2613,36 @@ def events_table_view(request):
             df = df.sort_values("Distinct_ID", ascending=False)
 
         data = df.to_dict(orient="records")
+
+        if action == "export_excel":
+            from openpyxl import Workbook
+
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "Tracking Sheet"
+
+            headers = list(df.columns)
+            ws.append(headers)
+
+            for _, row in df.iterrows():
+                ws.append([str(row[col]) if row[col] is not None else "" for col in headers])
+
+            response = HttpResponse(
+                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+            response["Content-Disposition"] = "attachment; filename=tracking_sheet.xlsx"
+            wb.save(response)
+
+            return response
+    
+        if action == "update_db" and filters:
+            # Example: update Referrer_Platform or UTM_Source in Supabase
+            update_database_after_filter(request, df)
+
+        if action == "update_db" and not filters:
+            messages.error(request, "You must apply at least one filter before updating.")
+            action = "filter"
+
 
     # ---- UTM aggregation ----
     from collections import Counter
