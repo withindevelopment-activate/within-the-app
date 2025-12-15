@@ -617,6 +617,7 @@ def save_tracking(request):
         traceback.print_exc()
         return JsonResponse({"status": "error", "message": str(e)}, status=500)
 '''
+
 @csrf_exempt
 @require_POST
 def save_tracking(request):
@@ -642,10 +643,24 @@ def save_tracking(request):
         agent = data.get('user_agent') or ""
         crawlers = ["crawler","bingbot","Googlebot","GoogleOther","Applebot","AdsBot","AhrefsBot"]
 
-        # ---- Crawler detection ----
-        is_crawler = any(word.lower() in agent.lower() for word in crawlers)
+        is_crawler = False
+        for word in crawlers:
+            if word.lower() in agent.lower():
+                is_crawler = True
+                break
+
         if is_crawler:
             return JsonResponse({"status": "skipped", "message": "Crawler detected"})
+ 
+
+        # --------------- NEW: Detect source from referrer URL ------------------
+        detected_source = detect_source_from_url_or_domain(referrer)
+
+        # 2) If detected_source exists → override UTM_Source
+        if detected_source:
+            utm_params["utm_source"] = detected_source
+
+        # -----------------------------------------------------------------------
 
         # ---- Fetch existing session rows for UTM merge ----
         existing_session_data = []
@@ -664,43 +679,20 @@ def save_tracking(request):
         except Exception:
             traceback.print_exc()
 
-        # ---- Determine primary UTM source ----
-        primary_source = None
-
-        # 1) Check Referrer_Platform first
-        if referrer and referrer.strip() != "":
-            primary_source = detect_source_from_url_or_domain(referrer)
-        if primary_source:
-            utm_params["utm_source"] = primary_source
-
-        # 2) If still no utm_source, try to get from existing session
-        if not utm_params.get("utm_source"):
-            for r in existing_session_data:
-                if r.get("UTM_Source"):
-                    utm_params["utm_source"] = r.get("UTM_Source")
-                    break
-
-        # 3) Fallback to "direct" if still not set
-        if not utm_params.get("utm_source"):
-            utm_params["utm_source"] = "direct"
-
-        # ---- Propagate UTM_Source to all existing rows in the session ----
-        try:
-            supabase.table("Tracking_Visitors").update({
-                "UTM_Source": utm_params["utm_source"]
-            }).eq("Session_ID", session_id).execute()
-        except Exception:
-            traceback.print_exc()
-
-        # ---- Propagate other UTM fields from existing session if missing ----
-        for field in ["UTM_Medium","UTM_Campaign","UTM_Term","UTM_Content"]:
+        # ---- Propagate UTM from existing session rows ----
+        for field in ["UTM_Source","UTM_Medium","UTM_Campaign","UTM_Term","UTM_Content"]:
             for r in existing_session_data:
                 if r.get(field):
                     utm_params[field.lower()] = r[field]
                     break
 
+        # ---- Fallback: if no UTM source + no detected → direct ----
+        if not utm_params.get("utm_source"):
+            utm_params["utm_source"] = "direct"
+
         # ---- Determine customer info ----
         session_customer_info = {}
+
         if visitor_info.get("customer_id"):
             session_customer_info.update({
                 "Customer_ID": int(visitor_info.get("customer_id")),
