@@ -83,23 +83,23 @@ def detect_primary_source(referrer_url):
     params = urllib.parse.parse_qs(parsed.query or "")
     netloc = (parsed.netloc or "").lower()
 
-    # 1️⃣ UTM in referrer takes priority
+    # 1️ UTM in referrer takes priority
     if "utm_source" in params and params["utm_source"]:
         return params["utm_source"][0]
 
-    # 2️⃣ DOMAIN_MAPPING
+    # 2️ DOMAIN_MAPPING
     for domain, source in DOMAIN_MAPPING.items():
         if domain in netloc:
             return source
 
-    # 3️⃣ PARAM_MAPPING
+    # 3️ PARAM_MAPPING
     for key, source in PARAM_MAPPING.items():
         if key in params:
             return source
 
-    # 4️⃣ Internal referral
+    # 4️ Internal referral
     if OWN_DOMAIN in netloc:
         return "internal"
 
-    # 5️⃣ Fallback
+    # 5️ Fallback
     return "direct"

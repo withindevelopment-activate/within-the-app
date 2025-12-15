@@ -19,7 +19,7 @@ from dateutil import parser
 # Supabase & Supporting imports
 from Demo.supporting_files.supabase_functions import get_next_id_from_supabase_compatible_all, batch_insert_to_supabase, sync_customers, fetch_data_from_supabase_specific
 
-from Demo.supporting_files.supporting_functions import get_uae_current_date, detect_source_from_url_or_domain
+from Demo.supporting_files.supporting_functions import get_uae_current_date, detect_source_from_url_or_domain, detect_primary_source
 # Marketing Report functions
 from Demo.supporting_files.marketing_report import create_general_analysis, create_product_percentage_amount_spent, landing_performance_5_async, column_check
 # Webhook function imports
@@ -477,7 +477,7 @@ def match_orders_with_analytics(request):
 @require_POST
 def save_tracking(request):
     try:
-        # 1️⃣ Parse JSON payload
+        # 1️ Parse JSON payload
         try:
             data = json.loads(request.body)
         except Exception:
@@ -495,10 +495,10 @@ def save_tracking(request):
         utm_params = data.get('utm_params', {}) or {}
         traffic_source = data.get('traffic_source', {}) or {}
 
-        # 2️⃣ Generate unique ID
+        # 2️ Generate unique ID
         distinct_id = int(get_next_id_from_supabase_compatible_all(name='Tracking_Visitors', column='Distinct_ID'))
 
-        # 3️⃣ Fetch existing session data to propagate UTM and customer info
+        # 3️ Fetch existing session data to propagate UTM and customer info
         existing_session_data = []
         try:
             existing_session = (
@@ -542,7 +542,7 @@ def save_tracking(request):
                 "Customer_Mobile": int(visitor_info.get("mobile")) if visitor_info.get("mobile") else None
             })
 
-        # 4️⃣ Prepare tracking entry
+        # 4️ Prepare tracking entry
         tracking_entry = {
             'Distinct_ID': distinct_id,
             'Visitor_ID': data.get('visitor_id'),
@@ -583,7 +583,7 @@ def save_tracking(request):
             'Device_Memory': int(client_info.get('device_memory')) if client_info.get('device_memory') else None,
         }
 
-        # 5️⃣ Convert to DataFrame and batch insert
+        # 5️ Convert to DataFrame and batch insert
         tracking_entry_df = pd.DataFrame([tracking_entry])
 
         # Fix bigint columns
@@ -1334,7 +1334,7 @@ def view_tracking(request):
             df["updated_at"] = df["updated_at"].dt.tz_convert(dubai_tz)
             
 
-        # 🧾 Ensure visitor_ids is always a list
+        # Ensure visitor_ids is always a list
         def normalize_visitors(v):
             if isinstance(v, list):
                 return v
@@ -1347,7 +1347,7 @@ def view_tracking(request):
             return []
         df["visitor_ids"] = df.get("visitor_ids", [[]]).apply(normalize_visitors)
 
-        # 🧠 Parse JSON fields if still strings
+        # Parse JSON fields if still strings
         json_cols = ["customer_info", "campaigns", "campaign_source"]
         for col in json_cols:
             if col in df.columns:
@@ -1357,11 +1357,11 @@ def view_tracking(request):
                     else x
                 )
 
-        # 🧮 Calculate Totals
+        # Calculate Totals
         total_customers = len(df)
         total_purchases = df["purchases"].sum() if "purchases" in df else 0
 
-        # 📊 Campaign & Source summaries
+        # Campaign & Source summaries
         campaign_counts, source_counts = {}, {}
 
         if "campaigns" in df.columns:
@@ -1383,7 +1383,7 @@ def view_tracking(request):
         source_labels = list(source_counts.keys())
         source_purchases = list(source_counts.values())
 
-        # 🧰 Apply filters (optional)
+        # Apply filters (optional)
         campaign_filter = request.GET.get("campaign")
         date_from = request.GET.get("from")
         date_to = request.GET.get("to")
@@ -1395,12 +1395,12 @@ def view_tracking(request):
         if date_to:
             df = df[df["updated_at"] <= pd.to_datetime(date_to) + pd.Timedelta(days=1)]
 
-        # 🧾 Convert timestamps to readable strings for display
+        # Convert timestamps to readable strings for display
         for col in ["updated_at", "last_visit"]:
             if col in df.columns:
                 df[col] = df[col].dt.strftime("%Y-%m-%d %H:%M")
 
-        # 🧩 Build Context
+        # Build Context
         context = {
             "track_id": store_id,
             "rows": df.to_dict("records"),
