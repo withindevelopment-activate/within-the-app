@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 import pytz
 import urllib.parse
-
+from django.contrib import messages
 
 def get_uae_current_date():
     # Define the UAE timezone
@@ -115,6 +115,7 @@ def detect_source_from_url_or_domain(url):
 
 def normalize_url(url):
     if not isinstance(url, str):
+        messages.error(f"Invalid URL format. {url}")
         return url
 
     first = url.find("http")
@@ -126,6 +127,7 @@ def normalize_url(url):
     return url
 
 def detect_primary_source(url):
+    url = normalize_url(url)
     if not isinstance(url, str) or not url.strip():
         return "direct"
 
@@ -147,5 +149,5 @@ def detect_primary_source(url):
     for domain, source in DOMAIN_MAPPING.items():
         if domain in netloc:
             return source
-        
-    return "direct"
+    else:
+        return "direct"
