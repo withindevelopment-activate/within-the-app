@@ -126,7 +126,6 @@ def normalize_url(url):
     return url
 
 def detect_primary_source(url):
-    url = normalize_url(url)
     if not isinstance(url, str) or not url.strip():
         return "direct"
 
