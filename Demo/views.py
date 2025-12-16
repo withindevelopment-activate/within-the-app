@@ -2550,7 +2550,7 @@ def events_table_view(request):
     date_after = request.GET.get("date_after")
     session_search = request.GET.get("session_id")
     visitor_search = request.GET.get("visitor_id")
-    sort_field = request.GET.get("sort_field") 
+    sort_field = request.GET.get("sort_by") 
     action = request.GET.get("action", "filter")
     date_end = request.GET.get("date_end")
 
