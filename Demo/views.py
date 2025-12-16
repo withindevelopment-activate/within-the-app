@@ -2557,13 +2557,20 @@ def events_table_view(request):
     filters = {}
     if event_type:
         filters["Event_Type"] = ("eq", str(event_type))
+    
+    # if date_after and date_end:
+    #     if len(date_after) == 10:
+    #         date_after += "T00:00:00"
+    #     if len(date_end) == 10:
+    #         date_end += "T00:00:00"
+    #     filters["Visited_at"] = ("between", [date_after, date_end])
     if date_after:
         if len(date_after) == 10:
             date_after += "T00:00:00"
         filters["Visited_at"] = ("gt", date_after)
     if date_end:
         if len(date_end) == 10:
-            date_end += "T23:59:59"
+            date_end += "T00:00:00"
         filters["Visited_at"] = ("lt", date_end)
     if session_search and session_search != "None":
         filters["Session_ID"] = ("eq", str(session_search))

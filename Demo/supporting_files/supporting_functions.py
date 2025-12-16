@@ -113,7 +113,13 @@ def detect_source_from_url_or_domain(url):
 #     # 5) Direct
 #     return "direct"
 
+def normalize_url(url):
+    if "http" in url[8:]:
+        url = url[url.find("http", 8):]
+    return url
+
 def detect_primary_source(url):
+    url = normalize_url(url)
     if not isinstance(url, str) or not url.strip():
         return "direct"
 
