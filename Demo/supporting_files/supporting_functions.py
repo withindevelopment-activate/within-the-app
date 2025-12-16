@@ -113,41 +113,44 @@ def detect_source_from_url_or_domain(url):
 #     # 5) Direct
 #     return "direct"
 
-def normalize_url(url):
+import urllib.parse
+
+def extract_params_from_raw_url(url):
     if not isinstance(url, str):
-        messages.error(f"Invalid URL format. {url}")
-        return url
+        return {}
 
-    first = url.find("http")
-    second = url.find("http", first + 4)
+    if "?" not in url:
+        return {}
 
-    if second != -1:
-        return url[second:]
+    query = url.split("?", 1)[1]
+    return urllib.parse.parse_qs(query)
 
-    return url
-
-def detect_primary_source(url):
-    url = normalize_url(url)
+def detect_source_from_row(url):
     if not isinstance(url, str) or not url.strip():
         return "direct"
 
-    parsed = urllib.parse.urlparse(url.lower())
-    params = urllib.parse.parse_qs(parsed.query or "")
-    netloc = parsed.netloc or ""
+    raw = url.lower()
+    params = extract_params_from_raw_url(raw)
 
-    # 1️ UTM source ALWAYS wins
+    # 1️⃣ UTM source
     utm_source = params.get("utm_source", [None])[0]
     if utm_source:
         return utm_source.lower()
 
-    # 2️ Paid click identifiers (override internal)
+    # 2️⃣ Paid click IDs
     for key, source in PARAM_MAPPING.items():
         if key in params:
             return source
 
-    # 3️ External domain mapping
+    # 3️⃣ Domain mapping
+    try:
+        parsed = urllib.parse.urlparse(raw)
+        netloc = parsed.netloc or ""
+    except Exception:
+        netloc = ""
+
     for domain, source in DOMAIN_MAPPING.items():
         if domain in netloc:
             return source
-    else:
-        return "direct"
+
+    return "direct"

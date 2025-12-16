@@ -19,7 +19,7 @@ from dateutil import parser
 # Supabase & Supporting imports
 from Demo.supporting_files.supabase_functions import get_next_id_from_supabase_compatible_all, batch_insert_to_supabase, sync_customers, fetch_data_from_supabase_specific, update_database_after_filter
 
-from Demo.supporting_files.supporting_functions import get_uae_current_date, detect_source_from_url_or_domain, detect_primary_source
+from Demo.supporting_files.supporting_functions import get_uae_current_date, detect_source_from_url_or_domain, detect_source_from_row
 # Marketing Report functions
 from Demo.supporting_files.marketing_report import create_general_analysis, create_product_percentage_amount_spent, landing_performance_5_async, column_check
 # Webhook function imports
@@ -2610,13 +2610,26 @@ def events_table_view(request):
         without_order = df[df["_order_id_tmp"].isna()]
         df = pd.concat([with_order, without_order], ignore_index=True).drop(columns=["_order_id_tmp"])
 
-        # ---- Apply primary UTM propagation across session rows ----
+        # ---- Session-level attribution override ----
         for session_id in df["Session_ID"].unique():
-            session_rows = df[df["Session_ID"] == session_id]
-            primary_sources = session_rows["Referrer_Platform"].dropna().apply(detect_primary_source)
-            if not primary_sources.empty:
-                primary_source = primary_sources.iloc[0]
-                df.loc[df["Session_ID"] == session_id, "UTM_Source"] = primary_source
+            session_mask = df["Session_ID"] == session_id
+            session_rows = df.loc[session_mask]
+
+            detected_sources = (
+                session_rows["Referrer_Platform"]
+                .apply(detect_source_from_row)
+            )
+
+            # Ignore "direct" for override decisions
+            meaningful_sources = detected_sources[detected_sources != "direct"]
+
+            if not meaningful_sources.empty:
+                final_source = meaningful_sources.iloc[-1]
+                df.loc[session_mask, "UTM_Source"] = final_source
+            else:
+                # Fallback only if nothing meaningful exists
+                df.loc[session_mask, "UTM_Source"] = "direct"
+
 
         # ---- Sorting ----
         if sort_field in ["Session_ID", "Visitor_ID", "Distinct_ID"]:
