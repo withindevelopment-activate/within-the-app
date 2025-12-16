@@ -114,8 +114,15 @@ def detect_source_from_url_or_domain(url):
 #     return "direct"
 
 def normalize_url(url):
-    if "http" in url[8:]:
-        url = url[url.find("http", 8):]
+    if not isinstance(url, str):
+        return url
+
+    first = url.find("http")
+    second = url.find("http", first + 4)
+
+    if second != -1:
+        return url[second:]
+
     return url
 
 def detect_primary_source(url):
@@ -141,9 +148,5 @@ def detect_primary_source(url):
     for domain, source in DOMAIN_MAPPING.items():
         if domain in netloc:
             return source
-
-    # 4️ Internal referral (only if no paid signals exist)
-    if OWN_DOMAIN in netloc:
-        return "internal"
-
+        
     return "direct"
