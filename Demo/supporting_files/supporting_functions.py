@@ -74,41 +74,70 @@ def detect_source_from_url_or_domain(url):
 
     return None
 
+# def detect_primary_source(url):
+#     """
+#     Attribution priority:
+#     1) UTM parameters (primary)
+#     2) Referrer domain mapping
+#     3) Click / tracking parameters
+#     4) Internal
+#     5) Direct
+#     """
+#     if not isinstance(url, str) or not url.strip():
+#         return "direct"
+
+#     url_lower = url.lower()
+#     parsed = urllib.parse.urlparse(url_lower)
+#     params = urllib.parse.parse_qs(parsed.query or "")
+#     netloc = parsed.netloc or ""
+
+#     # 1) UTM-based primary source
+#     utm_source = params.get("utm_source", [None])[0]
+#     if utm_source:
+#         return utm_source.lower()
+
+#     # 2) Internal traffic
+#     if OWN_DOMAIN in netloc:
+#         return "internal"
+
+#     # 3) Domain-based detection
+#     for domain, source in DOMAIN_MAPPING.items():
+#         if domain in netloc:
+#             return source
+
+#     # 4) Parameter-based detection (click IDs, etc.)
+#     for key, source in PARAM_MAPPING.items():
+#         if key in params:
+#             return source
+
+#     # 5) Direct
+#     return "direct"
+
 def detect_primary_source(url):
-    """
-    Attribution priority:
-    1) UTM parameters (primary)
-    2) Referrer domain mapping
-    3) Click / tracking parameters
-    4) Internal
-    5) Direct
-    """
     if not isinstance(url, str) or not url.strip():
         return "direct"
 
-    url_lower = url.lower()
-    parsed = urllib.parse.urlparse(url_lower)
+    parsed = urllib.parse.urlparse(url.lower())
     params = urllib.parse.parse_qs(parsed.query or "")
     netloc = parsed.netloc or ""
 
-    # 1) UTM-based primary source
+    # 1️ UTM source ALWAYS wins
     utm_source = params.get("utm_source", [None])[0]
     if utm_source:
         return utm_source.lower()
 
-    # 2) Internal traffic
-    if OWN_DOMAIN in netloc:
-        return "internal"
-
-    # 3) Domain-based detection
-    for domain, source in DOMAIN_MAPPING.items():
-        if domain in netloc:
-            return source
-
-    # 4) Parameter-based detection (click IDs, etc.)
+    # 2️ Paid click identifiers (override internal)
     for key, source in PARAM_MAPPING.items():
         if key in params:
             return source
 
-    # 5) Direct
+    # 3️ External domain mapping
+    for domain, source in DOMAIN_MAPPING.items():
+        if domain in netloc:
+            return source
+
+    # 4️ Internal referral (only if no paid signals exist)
+    if OWN_DOMAIN in netloc:
+        return "internal"
+
     return "direct"

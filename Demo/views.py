@@ -2552,6 +2552,7 @@ def events_table_view(request):
     visitor_search = request.GET.get("visitor_id")
     sort_field = request.GET.get("sort_field") 
     action = request.GET.get("action", "filter")
+    date_end = request.GET.get("date_end")
 
     filters = {}
     if event_type:
@@ -2560,6 +2561,10 @@ def events_table_view(request):
         if len(date_after) == 10:
             date_after += "T00:00:00"
         filters["Visited_at"] = ("gt", date_after)
+    if date_end:
+        if len(date_end) == 10:
+            date_end += "T23:59:59"
+        filters["Visited_at"] = ("lt", date_end)
     if session_search and session_search != "None":
         filters["Session_ID"] = ("eq", str(session_search))
     if visitor_search and visitor_search != "None":
@@ -2661,6 +2666,7 @@ def events_table_view(request):
         "selected_event_type": event_type,
         "selected_limit": limit,
         "selected_date": date_after,
+        "selected_date_end": date_end,
         "session_search": session_search,
         "visitor_search": visitor_search,
         "utm_source_labels": json.dumps(list(source_pct.keys())),
