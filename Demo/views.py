@@ -19,7 +19,7 @@ from dateutil import parser
 # Supabase & Supporting imports
 from Demo.supporting_files.supabase_functions import get_next_id_from_supabase_compatible_all, batch_insert_to_supabase, sync_customers, fetch_data_from_supabase_specific, update_database_after_filter
 
-from Demo.supporting_files.supporting_functions import get_uae_current_date, detect_source_from_url_or_domain, detect_source_from_row
+from Demo.supporting_files.supporting_functions import get_uae_current_date, detect_source_from_url_or_domain, detect_source_from_row, detect_source_from_user_agent
 # Marketing Report functions
 from Demo.supporting_files.marketing_report import create_general_analysis, create_product_percentage_amount_spent, landing_performance_5_async, column_check
 # Webhook function imports
@@ -651,8 +651,13 @@ def save_tracking(request):
 
         if is_crawler:
             return JsonResponse({"status": "skipped", "message": "Crawler detected"})
- 
+        
+        ua_detected_source = detect_source_from_user_agent(agent)
 
+        # If UA source detected, override utm_source
+        if ua_detected_source and not utm_params.get("utm_source"):
+            utm_params["utm_source"] = ua_detected_source
+        
         # --------------- NEW: Detect source from referrer URL ------------------
         detected_source = detect_source_from_url_or_domain(referrer)
 

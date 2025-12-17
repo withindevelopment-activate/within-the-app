@@ -45,8 +45,25 @@ PARAM_MAPPING = {
     "srsltid": "google"
 }
 
+USER_AGENT_SOURCE_MAPPING = {
+    "musical_ly": "tiktok",
+    "instagram": "instagram",
+    "snapchat": "snapchat",
+}
+
 OWN_DOMAIN = "sleepy-cloud.ae"
 
+def detect_source_from_user_agent(user_agent: str) -> str | None:
+    if not user_agent:
+        return None
+
+    ua = user_agent.lower()
+
+    for keyword, source in USER_AGENT_SOURCE_MAPPING.items():
+        if keyword in ua:
+            return source
+
+    return None
 
 def detect_source_from_url_or_domain(url):
     """Detect source based on parameters and domain."""
