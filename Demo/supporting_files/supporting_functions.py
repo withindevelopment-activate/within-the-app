@@ -85,10 +85,6 @@ def detect_source_from_url_or_domain(url):
         if domain in netloc:
             return source
 
-    # 3) Internal referral
-    if OWN_DOMAIN in netloc:
-        return "internal"
-
     return None
 
 # def detect_primary_source(url):

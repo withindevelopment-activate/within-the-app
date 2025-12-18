@@ -664,17 +664,17 @@ def save_tracking(request):
         
         ua_detected_source = detect_source_from_user_agent(agent)
 
+        detected_source = detect_source_from_url_or_domain(referrer)
         # If UA source detected, override utm_source
-        if ua_detected_source and not utm_params.get("utm_source"):
-            utm_params["utm_source"] = ua_detected_source
         
         # --------------- NEW: Detect source from referrer URL ------------------
-        detected_source = detect_source_from_url_or_domain(referrer)
 
         # 2) If detected_source exists → override UTM_Source
         if detected_source:
             utm_params["utm_source"] = detected_source
 
+        if ua_detected_source:
+            utm_params["utm_source"] = ua_detected_source
         # -----------------------------------------------------------------------
 
         # ---- Fetch existing session rows for UTM merge ----
