@@ -13,6 +13,7 @@ from django.core.files.storage import FileSystemStorage
 from io import BytesIO
 from supabase import create_client, Client
 from dateutil import parser
+import threading
 
 
 ## Custom Imports ------------------
@@ -23,7 +24,9 @@ from Demo.supporting_files.supporting_functions import get_uae_current_date, det
 # Marketing Report functions
 from Demo.supporting_files.marketing_report import create_general_analysis, create_product_percentage_amount_spent, landing_performance_5_async, column_check
 # Webhook function imports
+from Demo.supporting_files.hook_tasks import track_price_changes, process_zid_order_logic, initial_fetch_products
 from Demo.supporting_files.hook_tasks import track_price_changes, process_zid_order_logic
+
 # Constructing the marketing files
 from Demo.supporting_files.constructing_marketing_files import create_tiktok_file, create_snapchat_file
 # ------------------------------------
@@ -125,6 +128,12 @@ def zid_callback(request):
         ## Subscribe to the order webhook
         print("creating the new order webhook")
         #subscribe_store_to_order_create(authorization_token, access_token)
+
+        ##### Initial fetch for the products and orders
+        threading.Thread(
+            target=initial_fetch_products,
+            args=(authorization_token, access_token, store_id)
+        ).start()
 
         return redirect('Demo:home')  # go to the home view
 
@@ -615,6 +624,7 @@ def save_tracking(request):
     except Exception as e:
         print("TRACKING FUNCTION ERROR:", e)
         traceback.print_exc()
+        
         return JsonResponse({"status": "error", "message": str(e)}, status=500)
 '''
 
