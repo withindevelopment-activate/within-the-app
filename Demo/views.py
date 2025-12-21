@@ -661,20 +661,13 @@ def save_tracking(request):
 
         if is_crawler:
             return JsonResponse({"status": "skipped", "message": "Crawler detected"})
-        
-        ua_detected_source = detect_source_from_user_agent(agent)
 
-        detected_source = detect_source_from_url_or_domain(referrer)
         # If UA source detected, override utm_source
         
         # --------------- NEW: Detect source from referrer URL ------------------
 
         # 2) If detected_source exists → override UTM_Source
-        if detected_source:
-            utm_params["utm_source"] = detected_source
-
-        if ua_detected_source:
-            utm_params["utm_source"] = ua_detected_source
+        
         # -----------------------------------------------------------------------
 
         # ---- Fetch existing session rows for UTM merge ----
@@ -695,6 +688,15 @@ def save_tracking(request):
             traceback.print_exc()
 
         # ---- Propagate UTM from existing session rows ----
+        ua_detected_source = detect_source_from_user_agent(agent)
+        referrer_detected_source = detect_source_from_url_or_domain(referrer)
+
+        if not utm_params.get("utm_source"):
+            if ua_detected_source:
+                utm_params["utm_source"] = ua_detected_source
+            elif referrer_detected_source:
+                utm_params["utm_source"] = referrer_detected_source
+
         for field in ["UTM_Source","UTM_Medium","UTM_Campaign","UTM_Term","UTM_Content"]:
             for r in existing_session_data:
                 if r.get(field):
