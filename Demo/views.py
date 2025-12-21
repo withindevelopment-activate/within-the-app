@@ -688,6 +688,13 @@ def save_tracking(request):
             traceback.print_exc()
 
         # ---- Propagate UTM from existing session rows ----
+
+        for field in ["UTM_Source","UTM_Medium","UTM_Campaign","UTM_Term","UTM_Content"]:
+            for r in existing_session_data:
+                if r.get(field):
+                    utm_params[field.lower()] = r[field]
+                    break
+
         ua_detected_source = detect_source_from_user_agent(agent)
         referrer_detected_source = detect_source_from_url_or_domain(referrer)
 
@@ -696,13 +703,7 @@ def save_tracking(request):
                 utm_params["utm_source"] = ua_detected_source
             elif referrer_detected_source:
                 utm_params["utm_source"] = referrer_detected_source
-
-        for field in ["UTM_Source","UTM_Medium","UTM_Campaign","UTM_Term","UTM_Content"]:
-            for r in existing_session_data:
-                if r.get(field):
-                    utm_params[field.lower()] = r[field]
-                    break
-
+                
         # ---- Fallback: if no UTM source + no detected → direct ----
         if not utm_params.get("utm_source"):
             utm_params["utm_source"] = "direct"
