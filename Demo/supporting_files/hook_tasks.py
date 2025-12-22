@@ -931,7 +931,12 @@ def increment_order_count_for_skus(order_items):
         import traceback
         traceback.print_exc()
 
-def send_wati_template_v3(phone, cart_id, customer_name, checkout_url):
+def send_wati_template_v3(phone=None, cart_id=None, customer_name=None, checkout_url=None):
+    if not all([phone, cart_id, customer_name, checkout_url]):
+        raise ValueError("Missing required WATI template parameters")
+
+    phone = phone.replace("+", "").strip()
+
     headers = {
         "Authorization": f"Bearer {settings.WATI_API_TOKEN}",
         "Content-Type": "application/json"
@@ -940,7 +945,7 @@ def send_wati_template_v3(phone, cart_id, customer_name, checkout_url):
     payload = {
         "channel": settings.WATI_CHANNEL_ID,
         "template_name": "abandon_carts_retargeting",
-        "broadcast_name": "abandon_carts_retargeting",
+        "broadcast_name": f"abandon_cart_{cart_id}",
         "recipients": [
             {
                 "phone_number": phone,
@@ -960,14 +965,18 @@ def send_wati_template_v3(phone, cart_id, customer_name, checkout_url):
             json=payload,
             timeout=10
         )
-        res.raise_for_status()
+
+        if res.status_code != 200:
+            print("[ERROR] WATI response:", res.status_code, res.text)
+            return None
+
         result = res.json()
-        print(f"[DEBUG] WATI message sent successfully: {result}")
+        print("[DEBUG] WATI message sent:", result)
         return result
-    except requests.exceptions.HTTPError as e:
-        print(f"[ERROR] WATI HTTP error: {e.response.text}")
-    except Exception as e:
-        print(f"[ERROR] WATI request failed: {e}")
+
+    except requests.exceptions.RequestException as e:
+        print("[ERROR] WATI request failed:", str(e))
+        return None
 
 # @app.post("/webhook/abandoned_cart")
 # async def abandoned_cart_webhook(req: Request):

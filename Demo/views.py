@@ -24,8 +24,7 @@ from Demo.supporting_files.supporting_functions import get_uae_current_date, det
 # Marketing Report functions
 from Demo.supporting_files.marketing_report import create_general_analysis, create_product_percentage_amount_spent, landing_performance_5_async, column_check
 # Webhook function imports
-from Demo.supporting_files.hook_tasks import track_price_changes, process_zid_order_logic, initial_fetch_products
-from Demo.supporting_files.hook_tasks import track_price_changes, process_zid_order_logic
+from Demo.supporting_files.hook_tasks import track_price_changes, process_zid_order_logic, initial_fetch_products, send_wati_template_v3
 
 # Constructing the marketing files
 from Demo.supporting_files.constructing_marketing_files import create_tiktok_file, create_snapchat_file
@@ -2693,7 +2692,7 @@ def events_table_view(request):
     source_pct = to_pct(Counter(utm_sources))
     campaign_pct = to_pct(Counter(utm_campaigns))
 
-    return render(request, "Demo/events_table.html", {
+    context = {
         "data": data,
         "selected_event_type": event_type,
         "selected_limit": limit,
@@ -2705,4 +2704,23 @@ def events_table_view(request):
         "utm_source_values": json.dumps(list(source_pct.values())),
         "utm_campaign_labels": json.dumps(list(campaign_pct.keys())),
         "utm_campaign_values": json.dumps(list(campaign_pct.values())),
-    })
+    }
+
+    if request.method == "POST":
+        phone = request.POST.get("phone")
+        cart_id = request.POST.get("cart_id")
+        customer_name = request.POST.get("customer_name")
+        checkout_url = request.POST.get("checkout_url")
+
+        try:
+            result = send_wati_template_v3(
+                phone=phone,
+                cart_id=cart_id,
+                customer_name=customer_name,
+                checkout_url=checkout_url
+            )
+            context["result"] = result
+        except Exception as e:
+            context["error"] = str(e)
+
+    return render(request, "Demo/events_table.html", context)

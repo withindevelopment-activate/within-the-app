@@ -133,6 +133,51 @@
     </div>
 </div>
 
+<div class="container mt-4" style="max-width: 600px;">
+    <h4>WATI Template Manual Test</h4>
+
+    <form method="post" class="card p-3 mt-3">
+        {% csrf_token %}
+
+        <div class="mb-3">
+            <label class="form-label">Phone (E.164, no +)</label>
+            <input type="text" name="phone" class="form-control" placeholder="9715XXXXXXXX" required>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Cart ID</label>
+            <input type="text" name="cart_id" class="form-control" required>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Customer Name</label>
+            <input type="text" name="customer_name" class="form-control" required>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Checkout URL</label>
+            <input type="url" name="checkout_url" class="form-control" required>
+        </div>
+
+        <button type="submit" class="btn btn-primary w-100">
+            Send WATI Template
+        </button>
+    </form>
+
+    {% if result %}
+        <div class="alert alert-success mt-3">
+            <strong>Response:</strong>
+            <pre>{{ result|safe }}</pre>
+        </div>
+    {% endif %}
+
+    {% if error %}
+        <div class="alert alert-danger mt-3">
+            {{ error }}
+        </div>
+    {% endif %}
+</div>
+
 <script>
     const modernColors = [
     '#6366F1','#F59E0B','#10B981','#EF4444','#3B82F6',
