@@ -2708,16 +2708,14 @@ def events_table_view(request):
 
     if request.method == "POST":
         phone = request.POST.get("phone")
-        cart_id = request.POST.get("cart_id")
         customer_name = request.POST.get("customer_name")
         checkout_url = request.POST.get("checkout_url")
 
         try:
             result = send_wati_template_v3(
                 phone=phone,
-                cart_id=cart_id,
                 customer_name=customer_name,
-                checkout_url=checkout_url
+                link=checkout_url
             )
             context["result"] = result
         except Exception as e:

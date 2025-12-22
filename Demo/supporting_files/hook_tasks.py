@@ -931,53 +931,58 @@ def increment_order_count_for_skus(order_items):
         import traceback
         traceback.print_exc()
 
-def send_wati_template_v3(phone=None, cart_id=None, customer_name=None, checkout_url=None):
-    if not all([phone, cart_id, customer_name, checkout_url]):
+def send_wati_template_v1(phone=None, customer_name=None, link=None):
+    if not all([phone, customer_name, link]):
         raise ValueError("Missing required WATI template parameters")
 
     phone = phone.replace("+", "").strip()
 
+    url = "https://wati_api_endpoint/api/v1/sendTemplateMessage"
+
     headers = {
         "Authorization": f"Bearer {settings.WATI_API_TOKEN}",
+        "Accept": "application/json",
         "Content-Type": "application/json"
     }
 
     payload = {
-        "channel": settings.WATI_CHANNEL_ID,
         "template_name": "abandon_carts_retargeting",
-        "broadcast_name": f"abandon_cart_{cart_id}",
-        "recipients": [
+        "broadcast_name": "abandon_carts_retargeting",
+        "channel_number": str(settings.WATI_CHANNEL_ID),
+        "parameters": [
             {
-                "phone_number": phone,
-                "local_message_id": f"cart-{cart_id}",
-                "custom_params": [
-                    {"name": "name", "value": customer_name},
-                    {"name": "link", "value": checkout_url}
-                ]
+                "name": "name",
+                "value": customer_name
             }
         ]
     }
 
+    params = {
+        "whatsappNumber": phone,
+        "link": link
+    }
+
     try:
         res = requests.post(
-            "https://live-mt-server.wati.io/api/ext/v3/messageTemplates/send",
+            url,
             headers=headers,
+            params=params,
             json=payload,
             timeout=10
         )
 
         if res.status_code != 200:
-            print("[ERROR] WATI response:", res.status_code, res.text)
+            print("[ERROR] WATI v1 response:", res.status_code, res.text)
             return None
 
         result = res.json()
-        print("[DEBUG] WATI message sent:", result)
+        print("[DEBUG] WATI template sent (v1):", result)
         return result
 
     except requests.exceptions.RequestException as e:
         print("[ERROR] WATI request failed:", str(e))
         return None
-
+    
 # @app.post("/webhook/abandoned_cart")
 # async def abandoned_cart_webhook(req: Request):
 #     payload = await req.json()
