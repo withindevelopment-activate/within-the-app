@@ -939,8 +939,8 @@ def send_wati_template_v3(phone, cart_id, customer_name, cart_items_count, cart_
 
     payload = {
         "channel": settings.WATI_CHANNEL_ID,
-        "template_name": "abandoned_cart_reminder",
-        "broadcast_name": "Abandoned Cart Campaign",
+        "template_name": "abandon_carts_retargeting",
+        "broadcast_name": "abandon_carts_retargeting",
         "recipients": [
             {
                 "phone_number": phone,
