@@ -698,7 +698,7 @@ def save_tracking(request):
         ua_detected_source = detect_source_from_user_agent(agent)
         referrer_detected_source = detect_source_from_url_or_domain(referrer)
 
-        if not utm_params.get("utm_source"):
+        if not utm_params.get("utm_source") or utm_params.get("utm_source") == "direct":
             if ua_detected_source:
                 utm_params["utm_source"] = ua_detected_source
             elif referrer_detected_source:
