@@ -931,7 +931,7 @@ def increment_order_count_for_skus(order_items):
         import traceback
         traceback.print_exc()
 
-def send_wati_template_v3(phone, cart_id, customer_name, cart_items_count, cart_total, checkout_url):
+def send_wati_template_v3(phone, cart_id, customer_name, checkout_url):
     headers = {
         "Authorization": f"Bearer {settings.WATI_API_TOKEN}",
         "Content-Type": "application/json"
