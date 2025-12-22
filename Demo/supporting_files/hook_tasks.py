@@ -931,3 +931,76 @@ def increment_order_count_for_skus(order_items):
         import traceback
         traceback.print_exc()
 
+def send_wati_template_v3(phone, cart_id, customer_name, cart_items_count, cart_total, checkout_url):
+    headers = {
+        "Authorization": f"Bearer {settings.WATI_API_TOKEN}",
+        "Content-Type": "application/json"
+    }
+
+    payload = {
+        "channel": settings.WATI_CHANNEL_ID,
+        "template_name": "abandoned_cart_reminder",
+        "broadcast_name": "Abandoned Cart Campaign",
+        "recipients": [
+            {
+                "phone_number": phone,
+                "local_message_id": f"cart-{cart_id}",
+                "custom_params": [
+                    {"name": "name", "value": customer_name},
+                    {"name": "link", "value": checkout_url}
+                ]
+            }
+        ]
+    }
+
+    try:
+        res = requests.post(
+            "https://live-mt-server.wati.io/api/ext/v3/messageTemplates/send",
+            headers=headers,
+            json=payload,
+            timeout=10
+        )
+        res.raise_for_status()
+        result = res.json()
+        print(f"[DEBUG] WATI message sent successfully: {result}")
+        return result
+    except requests.exceptions.HTTPError as e:
+        print(f"[ERROR] WATI HTTP error: {e.response.text}")
+    except Exception as e:
+        print(f"[ERROR] WATI request failed: {e}")
+
+# @app.post("/webhook/abandoned_cart")
+# async def abandoned_cart_webhook(req: Request):
+#     payload = await req.json()
+    
+#     cart_id = payload.get("id")
+#     customer = payload.get("customer", {})
+#     phone = customer.get("phone")
+#     name = customer.get("name", "Customer")
+#     cart_items = payload.get("items", [])
+#     cart_total = payload.get("total_price", 0)
+#     checkout_url = payload.get("checkout_url", f"https://yourstore.com/cart/{cart_id}")
+
+#     if not phone:
+#         return {"status": "skipped", "reason": "No phone number"}
+
+#     send_wati_template_v3(
+#         phone=phone,
+#         cart_id=cart_id,
+#         customer_name=name,
+#         cart_items_count=len(cart_items),
+#         cart_total=cart_total,
+#         checkout_url=checkout_url
+#     )
+
+#     # Optional: store cart info in Supabase
+#     store_abandoned_cart({
+#         "Cart_ID": cart_id,
+#         "Email": customer.get("email"),
+#         "Phone": phone,
+#         "Cart_Items": cart_items,
+#         "Cart_Total": cart_total,
+#         "Checkout_URL": checkout_url
+#     })
+
+#     return {"status": "success"}
