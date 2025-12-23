@@ -939,7 +939,7 @@ def send_wati_template_v1(phone=None, customer_name=None, link=None):
 
     phone = phone.replace("+", "").strip()
 
-    url = "https://wati_api_endpoint/api/v1/sendTemplateMessage"
+    url = "https://wati_api_endpoint/api/v1/sendTemplateMessage?whatsappNumber=" + phone
 
     headers = {
         "Authorization": f"Bearer {settings.WATI_API_TOKEN}",
@@ -955,20 +955,19 @@ def send_wati_template_v1(phone=None, customer_name=None, link=None):
             {
                 "name": "name",
                 "value": customer_name
-            }
+            },
+            {
+                "name": "link",
+                "value": link
+            },
         ]
     }
 
-    params = {
-        "whatsappNumber": phone,
-        "link": link
-    }
 
     try:
         res = requests.post(
             url,
             headers=headers,
-            params=params,
             json=payload,
             timeout=10
         )
