@@ -933,61 +933,61 @@ def increment_order_count_for_skus(order_items):
         import traceback
         traceback.print_exc()
 
-def send_wati_template_v3(phone=None, customer_name=None, link=None):
-    if not all([phone, customer_name, link]):
-        raise ValueError("Missing required WATI template parameters")
+# def send_wati_template_v3(phone=None, customer_name=None, link=None):
+#     if not all([phone, customer_name, link]):
+#         raise ValueError("Missing required WATI template parameters")
 
-    phone = phone.replace("+", "").strip()
+#     phone = phone.replace("+", "").strip()
 
-    url = "https://live-mt-server.wati.io/api/ext/v3/messageTemplates/send"
+#     url = "https://live-mt-server.wati.io/api/ext/v3/messageTemplates/send"
 
-    headers = {
-    "Authorization": f"Bearer {settings.WATI_API_TOKEN}",
-    "Accept": "*/*",
-    "Content-Type": "application/json",
-}
+#     headers = {
+#     "Authorization": f"Bearer {settings.WATI_API_TOKEN}",
+#     "Accept": "*/*",
+#     "Content-Type": "application/json",
+# }
 
-    payload = {
-        "template_name": "abandon_carts_retargeting",
-        "broadcast_name": "abandon_carts_retargeting_test",
-        "recipients": [
-            {
-            "phone_number": phone,
-            "local_message_id": "python-test-001",
-            "custom_params": [
-                    {
-                    "name": "name",
-                    "value": customer_name
-                    },
-                    {
-                    "name": "link",
-                    "value": link
-                    }
-                ]
-            }
-        ]
-    }
+#     payload = {
+#         "template_name": "abandon_carts_retargeting",
+#         "broadcast_name": "abandon_carts_retargeting_test",
+#         "recipients": [
+#             {
+#             "phone_number": phone,
+#             "local_message_id": "python-test-001",
+#             "custom_params": [
+#                     {
+#                     "name": "name",
+#                     "value": customer_name
+#                     },
+#                     {
+#                     "name": "link",
+#                     "value": link
+#                     }
+#                 ]
+#             }
+#         ]
+#     }
 
 
-    try:
-        res = requests.post(
-            url,
-            headers=headers,
-            data=payload,
-            timeout=10
-        )
+#     try:
+#         res = requests.post(
+#             url,
+#             headers=headers,
+#             data=payload,
+#             timeout=10
+#         )
 
-        if res.status_code != 200:
-            print("[ERROR] WATI v1 response:", res.status_code, res.text)
-            return None
+#         if res.status_code != 200:
+#             print("[ERROR] WATI v1 response:", res.status_code, res.text)
+#             return None
 
-        result = res.json()
-        print("[DEBUG] WATI template sent (v1):", result)
-        return result
+#         result = res.json()
+#         print("[DEBUG] WATI template sent (v1):", result)
+#         return result
 
-    except requests.exceptions.RequestException as e:
-        print("[ERROR] WATI request failed:", str(e))
-        return None
+#     except requests.exceptions.RequestException as e:
+#         print("[ERROR] WATI request failed:", str(e))
+#         return None
     
 # @app.post("/webhook/abandoned_cart")
 # async def abandoned_cart_webhook(req: Request):
