@@ -943,8 +943,8 @@ def send_wati_template_v3(phone=None, customer_name=None, link=None):
 
     headers = {
     "Authorization": "Bearer YOUR_WATI_TOKEN",
-    "Accept": "application/json",
-    "Content-Type": "application/json"
+    "accept": "application/json",
+    "content-type": "application/*+json",
 }
 
     payload = "{\"recipients\":[{\"custom_params\":[{\"name\":\"name\",\"value\":\"" + customer_name + "\"},{\"name\":\"link\",\"value\":\"" + link + "\"}],\"phone_number\":\"" + phone + "\"}],\"channel\":\"1053182\",\"template_name\":\"abandon_carts_retargeting\",\"broadcast_name\":\"abandon_carts_retargeting\"}"
@@ -953,7 +953,7 @@ def send_wati_template_v3(phone=None, customer_name=None, link=None):
         res = requests.post(
             url,
             headers=headers,
-            json=payload,
+            data=payload,
             timeout=10
         )
 
