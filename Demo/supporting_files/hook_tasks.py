@@ -26,7 +26,7 @@ class settings:
     TARGET_URL_ORDER_HOOK = 'https://translation-sc.onrender.com/zid-webhook/order-update'
     ZID_WEBHOOK_ENDPOINT = "/v1/managers/webhooks"
     ZID_API_HOST = "api.zid.sa"
-    WATI_API_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6InJlbWF6QHNsZWVweS1jbG91ZC5hZSIsIm5hbWVpZCI6InJlbWF6QHNsZWVweS1jbG91ZC5hZSIsImVtYWlsIjoicmVtYXpAc2xlZXB5LWNsb3VkLmFlIiwiYXV0aF90aW1lIjoiMTIvMjMvMjAyNSAwNDoxMzo0NyIsInRlbmFudF9pZCI6IjEwNTMxODIiLCJkYl9uYW1lIjoibXQtcHJvZC1UZW5hbnRzIiwiaHR0cDovL3NjaGVtYXMubWljcm9zb2Z0LmNvbS93cy8yMDA4LzA2L2lkZW50aXR5L2NsYWltcy9yb2xlIjoiQURNSU5JU1RSQVRPUiIsImV4cCI6MjUzNDAyMzAwODAwLCJpc3MiOiJDbGFyZV9BSSIsImF1ZCI6IkNsYXJlX0FJIn0.IJIpBZk2jkICvF_7pKtJ1_Uyj6oEvh0tEN-aD7VyUMs"
+    WATI_API_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1bmlxdWVfbmFtZSI6InJlbWF6QHNsZWVweS1jbG91ZC5hZSIsIm5hbWVpZCI6InJlbWF6QHNsZWVweS1jbG91ZC5hZSIsImVtYWlsIjoicmVtYXpAc2xlZXB5LWNsb3VkLmFlIiwiYXV0aF90aW1lIjoiMTIvMjMvMjAyNSAwODo0NjozMiIsInRlbmFudF9pZCI6IjEwNTMxODIiLCJkYl9uYW1lIjoibXQtcHJvZC1UZW5hbnRzIiwiaHR0cDovL3NjaGVtYXMubWljcm9zb2Z0LmNvbS93cy8yMDA4LzA2L2lkZW50aXR5L2NsYWltcy9yb2xlIjoiQURNSU5JU1RSQVRPUiIsImV4cCI6MjUzNDAyMzAwODAwLCJpc3MiOiJDbGFyZV9BSSIsImF1ZCI6IkNsYXJlX0FJIn0.BVqXkslhB4UhPKMeqOgc93hpKk_rT9B6BY7YIyQqBCw"
     WATI_CHANNEL_ID = "1053182"
 
 ### Suppotring functions #######################################################################################
@@ -943,8 +943,8 @@ def send_wati_template_v3(phone=None, customer_name=None, link=None):
 
     headers = {
     "Authorization": f"Bearer {settings.WATI_API_TOKEN}",
-    "accept": "application/json",
-    "content-type": "application/*+json",
+    "Accept": "*/*",
+    "Content-Type": "application/json",
 }
 
     payload = {
@@ -953,7 +953,7 @@ def send_wati_template_v3(phone=None, customer_name=None, link=None):
         "recipients": [
             {
             "phone_number": phone,
-            "local_message_id": "postman-test-001",
+            "local_message_id": "python-test-001",
             "custom_params": [
                     {
                     "name": "name",
