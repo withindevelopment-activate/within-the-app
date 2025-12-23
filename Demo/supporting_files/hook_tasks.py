@@ -933,35 +933,42 @@ def increment_order_count_for_skus(order_items):
         import traceback
         traceback.print_exc()
 
-def send_wati_template_v1(phone=None, customer_name=None, link=None):
+def send_wati_template_v3(phone=None, customer_name=None, link=None):
     if not all([phone, customer_name, link]):
         raise ValueError("Missing required WATI template parameters")
 
     phone = phone.replace("+", "").strip()
 
-    url = "https://wati_api_endpoint/api/v1/sendTemplateMessage?whatsappNumber=" + phone
+    url = "https://live-mt-server.wati.io/api/ext/v3/messageTemplates/send"
 
     headers = {
-        "Authorization": f"Bearer {settings.WATI_API_TOKEN}",
-        "Accept": "application/json",
-        "Content-Type": "application/json"
-    }
+    "Authorization": "Bearer YOUR_WATI_TOKEN",
+    "Accept": "application/json",
+    "Content-Type": "application/json"
+}
 
     payload = {
+        "channel": "1053182",
         "template_name": "abandon_carts_retargeting",
         "broadcast_name": "abandon_carts_retargeting",
-        "channel_number": str(settings.WATI_CHANNEL_ID),
-        "parameters": [
+        "recipients": [
             {
-                "name": "name",
-                "value": customer_name
-            },
-            {
-                "name": "link",
-                "value": link
-            },
+                "phone_number": phone,
+                "local_message_id": "test-001",
+                "custom_params": [
+                    {
+                        "name": "name",
+                        "value": customer_name
+                    },
+                    {
+                        "name": "link",
+                        "value": link
+                    }
+                ]
+            }
         ]
     }
+
 
 
     try:
