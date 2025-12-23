@@ -942,7 +942,7 @@ def send_wati_template_v3(phone=None, customer_name=None, link=None):
     url = "https://live-mt-server.wati.io/api/ext/v3/messageTemplates/send"
 
     headers = {
-    "Authorization": "Bearer YOUR_WATI_TOKEN",
+    "Authorization": f"Bearer {settings.WATI_API_TOKEN}",
     "accept": "application/json",
     "content-type": "application/*+json",
 }
