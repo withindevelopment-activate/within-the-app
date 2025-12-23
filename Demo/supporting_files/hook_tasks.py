@@ -947,7 +947,7 @@ def send_wati_template_v3(phone=None, customer_name=None, link=None):
     "content-type": "application/*+json",
 }
 
-    payload = "{\"recipients\":[{\"custom_params\":[{\"name\":\"name\",\"value\":\"" + customer_name + "\"},{\"name\":\"link\",\"value\":\"" + link + "\"}],\"phone_number\":\"" + phone + "\"}],\"channel\":\"1053182\",\"template_name\":\"abandon_carts_retargeting\",\"broadcast_name\":\"abandon_carts_retargeting\"}"
+    payload = "{\"recipients\":[{\"custom_params\":[{\"name\":\"name\",\"value\":\"" + customer_name + "\"},{\"name\":\"link\",\"value\":\"" + link + "\"}],\"phone_number\":\"" + phone + "\"}],\"template_name\":\"abandon_carts_retargeting\",\"broadcast_name\":\"abandon_carts_retargeting_test\"}"
 
     try:
         res = requests.post(
