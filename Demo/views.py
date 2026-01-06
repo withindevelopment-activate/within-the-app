@@ -2569,6 +2569,7 @@ def events_table_view(request):
     session_search = request.GET.get("session_id")
     visitor_search = request.GET.get("visitor_id")
     sort_field = request.GET.get("sort_by", "Distinct_ID")
+    timezone_search = request.GET.get("timezone")
 
     # ---- Build filters ----
     filters = {}
@@ -2591,6 +2592,9 @@ def events_table_view(request):
 
     if visitor_search and visitor_search != "None":
         filters["Visitor_ID"] = ("eq", visitor_search)
+
+    if timezone_search and timezone_search != "None":
+        filters["Timezone"] = ("eq", timezone_search)
 
     # ---- Fetch data ----
     df = fetch_data_from_supabase_specific(
