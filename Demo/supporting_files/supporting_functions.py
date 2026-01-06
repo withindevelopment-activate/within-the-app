@@ -49,6 +49,9 @@ USER_AGENT_SOURCE_MAPPING = {
     "musical_ly": "tiktok",
     "instagram": "instagram",
     "snapchat": "snapchat",
+    "FB_IAB": "instagram",
+    "google": "google",
+    "tiktok": "tiktok"
 }
 
 OWN_DOMAIN = "sleepy-cloud.ae"
