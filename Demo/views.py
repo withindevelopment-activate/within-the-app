@@ -2570,6 +2570,7 @@ def events_table_view(request):
     visitor_search = request.GET.get("visitor_id")
     sort_field = request.GET.get("sort_by", "Distinct_ID")
     timezone_search = request.GET.get("timezone")
+    action = request.GET.get("action", "filter")
 
     # ---- Build filters ----
     filters = {}
@@ -2621,7 +2622,28 @@ def events_table_view(request):
     def to_pct(counter):
         total = sum(counter.values())
         return {k: round((v / total) * 100, 2) for k, v in counter.items()} if total else {}
+    
+    if action == "export_excel":
+        from openpyxl import Workbook
 
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Tracking Sheet"
+
+        headers = list(df.columns)
+        ws.append(headers)
+
+        for _, row in df.iterrows():
+            ws.append([str(row[col]) if row[col] is not None else "" for col in headers])
+
+        response = HttpResponse(
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        response["Content-Disposition"] = "attachment; filename=tracking_sheet.xlsx"
+        wb.save(response)
+
+        return response
+    
     source_pct = to_pct(Counter(utm_sources))
     campaign_pct = to_pct(Counter(utm_campaigns))
 
