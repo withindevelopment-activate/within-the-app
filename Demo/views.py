@@ -2774,6 +2774,17 @@ def events_table_view(request):
 
         data = df.to_dict(orient="records")
 
+    from collections import Counter
+    utm_sources = [r.get("UTM_Source") for r in data if r.get("UTM_Source")]
+    utm_campaigns = [r.get("UTM_Campaign") for r in data if r.get("UTM_Campaign")]
+
+    def to_pct(counter):
+        total = sum(counter.values())
+        return {k: round((v / total) * 100, 2) for k, v in counter.items()} if total else {}
+
+    source_pct = to_pct(Counter(utm_sources))
+    campaign_pct = to_pct(Counter(utm_campaigns))
+
     context = {
         "data": data,
         "selected_event_type": event_type,
@@ -2783,6 +2794,10 @@ def events_table_view(request):
         "session_search": session_search,
         "visitor_search": visitor_search,
         "sort_field": sort_field,
+        "utm_source_labels": json.dumps(list(source_pct.keys())),
+        "utm_source_values": json.dumps(list(source_pct.values())),
+        "utm_campaign_labels": json.dumps(list(campaign_pct.keys())),
+        "utm_campaign_values": json.dumps(list(campaign_pct.values())),
     }
 
     return render(request, "Demo/events_table.html", context)
