@@ -696,16 +696,18 @@ def save_tracking(request):
 
         ua_detected_source = detect_source_from_user_agent(agent)
         referrer_detected_source = detect_source_from_url_or_domain(referrer)
-
+        print("UA detected source:", ua_detected_source)
         if not utm_params.get("utm_source") or utm_params.get("utm_source") == "direct":
             if ua_detected_source:
                 utm_params["utm_source"] = ua_detected_source
             elif referrer_detected_source:
                 utm_params["utm_source"] = referrer_detected_source
                 
+        print("Final UTM Source:", utm_params.get("utm_source"))
         # ---- Fallback: if no UTM source + no detected → direct ----
         if not utm_params.get("utm_source"):
             utm_params["utm_source"] = "direct"
+        print("UTM source after fallback is:", utm_params.get("utm_source"))
 
         # ---- Determine customer info ----
         session_customer_info = {}

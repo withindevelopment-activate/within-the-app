@@ -58,9 +58,11 @@ def detect_source_from_user_agent(user_agent: str) -> str | None:
         return None
 
     ua = user_agent.lower()
+    print("user_agent:", ua)
 
     for keyword, source in USER_AGENT_SOURCE_MAPPING.items():
         if keyword in ua:
+            print("Detected source from user agent:", source)
             return source
 
     return None
