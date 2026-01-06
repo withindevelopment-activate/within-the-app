@@ -2563,7 +2563,7 @@ def data_deletion(request):
     return render(request, "Demo/data_deletion.html")
 
 #Database pageview - Remaz
-def events_table_view(request):
+def events_table_view_1(request):
     event_type = request.GET.get("event_type")
     limit = int(request.GET.get("limit", 100))
     date_after = request.GET.get("date_after")
@@ -2722,5 +2722,67 @@ def events_table_view(request):
     #         context["result"] = result
     #     except Exception as e:
     #         context["error"] = str(e)
+
+    return render(request, "Demo/events_table.html", context)
+
+def events_table_view(request):
+    event_type = request.GET.get("event_type")
+    limit = int(request.GET.get("limit", 100))
+    date_after = request.GET.get("date_after")
+    date_end = request.GET.get("date_end")
+    session_search = request.GET.get("session_id")
+    visitor_search = request.GET.get("visitor_id")
+    sort_field = request.GET.get("sort_by", "Distinct_ID")
+
+    # ---- Build filters ----
+    filters = {}
+
+    if event_type:
+        filters["Event_Type"] = ("eq", event_type)
+
+    if date_after:
+        if len(date_after) == 10:
+            date_after += "T00:00:00"
+        filters["Visited_at"] = ("gt", date_after)
+
+    if date_end:
+        if len(date_end) == 10:
+            date_end += "T23:59:59"
+        filters["Visited_at"] = ("lt", date_end)
+
+    if session_search and session_search != "None":
+        filters["Session_ID"] = ("eq", session_search)
+
+    if visitor_search and visitor_search != "None":
+        filters["Visitor_ID"] = ("eq", visitor_search)
+
+    # ---- Fetch data ----
+    df = fetch_data_from_supabase_specific(
+        table_name="Tracking_Visitors",
+        filters=filters,
+        limit=limit,
+    )
+
+    if df is None or df.empty:
+        data = []
+    else:
+        # ---- Sorting ----
+        if sort_field in df.columns:
+            df = df.sort_values(sort_field, ascending=False)
+        else:
+            df = df.sort_values("Distinct_ID", ascending=False)
+
+        data = df.to_dict(orient="records")
+
+    context = {
+        "data": data,
+        "selected_event_type": event_type,
+        "selected_limit": limit,
+        "selected_date": date_after,
+        "selected_date_end": date_end,
+        "session_search": session_search,
+        "visitor_search": visitor_search,
+        "sort_field": sort_field,
+    }
 
     return render(request, "Demo/events_table.html", context)
