@@ -696,18 +696,16 @@ def save_tracking(request):
 
         ua_detected_source = detect_source_from_user_agent(agent)
         referrer_detected_source = detect_source_from_url_or_domain(referrer)
-        print("UA detected source:", ua_detected_source)
+
         if not utm_params.get("utm_source") or utm_params.get("utm_source") == "direct":
             if ua_detected_source:
                 utm_params["utm_source"] = ua_detected_source
             elif referrer_detected_source:
                 utm_params["utm_source"] = referrer_detected_source
                 
-        print("Final UTM Source:", utm_params.get("utm_source"))
         # ---- Fallback: if no UTM source + no detected → direct ----
         if not utm_params.get("utm_source"):
             utm_params["utm_source"] = "direct"
-        print("UTM source after fallback is:", utm_params.get("utm_source"))
 
         # ---- Determine customer info ----
         session_customer_info = {}
@@ -2563,168 +2561,6 @@ def data_deletion(request):
     return render(request, "Demo/data_deletion.html")
 
 #Database pageview - Remaz
-def events_table_view_1(request):
-    event_type = request.GET.get("event_type")
-    limit = int(request.GET.get("limit", 100))
-    date_after = request.GET.get("date_after")
-    session_search = request.GET.get("session_id")
-    visitor_search = request.GET.get("visitor_id")
-    sort_field = request.GET.get("sort_by") 
-    action = request.GET.get("action", "filter")
-    date_end = request.GET.get("date_end")
-
-    filters = {}
-    if event_type:
-        filters["Event_Type"] = ("eq", str(event_type))
-    
-    if date_after:
-        if len(date_after) == 10:
-            date_after += "T00:00:00"
-        filters["Visited_at"] = ("gt", date_after)
-    if date_end:
-        if len(date_end) == 10:
-            date_end += "T00:00:00"
-        filters["Visited_at"] = ("lt", date_end)
-    if session_search and session_search != "None":
-        filters["Session_ID"] = ("eq", str(session_search))
-    if visitor_search and visitor_search != "None":
-        filters["Visitor_ID"] = ("eq", str(visitor_search))
-
-    df = fetch_data_from_supabase_specific(
-        table_name="Tracking_Visitors",
-        filters=filters,
-        limit=limit,
-    )
-
-    if df is None or df.empty:
-        data = []
-    else:
-        # ---- Remove bots ----
-        crawlers = ["crawler","bingbot","googlebot","googleother","applebot","adsbot","ahrefsbot"]
-        df = df[~df["User_Agent"].fillna("").str.lower().apply(lambda x: any(bot in x for bot in crawlers))]
-
-        # ---- Deduplicate order_id in Event_Details ----
-        import ast
-        def extract_order_id(val):
-            if not val:
-                return None
-            if isinstance(val, dict):
-                return val.get("order_id")
-            try:
-                parsed = ast.literal_eval(val)
-                if isinstance(parsed, dict):
-                    return parsed.get("order_id")
-            except Exception:
-                return None
-            return None
-
-        df["_order_id_tmp"] = df["Event_Details"].apply(extract_order_id)
-        with_order = df[df["_order_id_tmp"].notna()].drop_duplicates(subset=["_order_id_tmp"], keep="last")
-        without_order = df[df["_order_id_tmp"].isna()]
-        df = pd.concat([with_order, without_order], ignore_index=True).drop(columns=["_order_id_tmp"])
-
-        # ---- Session-level attribution override ----
-        for session_id in df["Session_ID"].unique():
-            session_mask = df["Session_ID"] == session_id
-            session_rows = df.loc[session_mask]
-
-            detected_sources = (
-                session_rows["Referrer_Platform"]
-                .apply(detect_source_from_row)
-            )
-
-            # Ignore "direct" for override decisions
-            meaningful_sources = detected_sources[detected_sources != "direct"]
-
-            if not meaningful_sources.empty:
-                final_source = meaningful_sources.iloc[-1]
-                df.loc[session_mask, "UTM_Source"] = final_source
-            else:
-                # Fallback only if nothing meaningful exists
-                df.loc[session_mask, "UTM_Source"] = "direct"
-
-
-        # ---- Sorting ----
-        if sort_field in ["Session_ID", "Visitor_ID", "Distinct_ID"]:
-            df = df.sort_values(sort_field, ascending=False)
-        else:
-            df = df.sort_values("Distinct_ID", ascending=False)
-
-        data = df.to_dict(orient="records")
-
-        if action == "export_excel":
-            from openpyxl import Workbook
-
-            wb = Workbook()
-            ws = wb.active
-            ws.title = "Tracking Sheet"
-
-            headers = list(df.columns)
-            ws.append(headers)
-
-            for _, row in df.iterrows():
-                ws.append([str(row[col]) if row[col] is not None else "" for col in headers])
-
-            response = HttpResponse(
-                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-            response["Content-Disposition"] = "attachment; filename=tracking_sheet.xlsx"
-            wb.save(response)
-
-            return response
-    
-        if action == "update_db" and filters:
-            # Example: update Referrer_Platform or UTM_Source in Supabase
-            update_database_after_filter(request, df)
-
-        if action == "update_db" and not filters:
-            messages.error(request, "You must apply at least one filter before updating.")
-            action = "filter"
-
-
-    # ---- UTM aggregation ----
-    from collections import Counter
-    utm_sources = [r.get("UTM_Source") for r in data if r.get("UTM_Source")]
-    utm_campaigns = [r.get("UTM_Campaign") for r in data if r.get("UTM_Campaign")]
-
-    def to_pct(counter):
-        total = sum(counter.values())
-        return {k: round((v / total) * 100, 2) for k, v in counter.items()} if total else {}
-
-    source_pct = to_pct(Counter(utm_sources))
-    campaign_pct = to_pct(Counter(utm_campaigns))
-
-    context = {
-        "data": data,
-        "selected_event_type": event_type,
-        "selected_limit": limit,
-        "selected_date": date_after,
-        "selected_date_end": date_end,
-        "session_search": session_search,
-        "visitor_search": visitor_search,
-        "utm_source_labels": json.dumps(list(source_pct.keys())),
-        "utm_source_values": json.dumps(list(source_pct.values())),
-        "utm_campaign_labels": json.dumps(list(campaign_pct.keys())),
-        "utm_campaign_values": json.dumps(list(campaign_pct.values())),
-    }
-
-    # if request.method == "POST":
-    #     phone = request.POST.get("phone")
-    #     customer_name = request.POST.get("customer_name")
-    #     checkout_url = request.POST.get("checkout_url")
-
-    #     try:
-    #         result = send_wati_template_v3(
-    #             phone=phone,
-    #             customer_name=customer_name,
-    #             link=checkout_url
-    #         )
-    #         context["result"] = result
-    #     except Exception as e:
-    #         context["error"] = str(e)
-
-    return render(request, "Demo/events_table.html", context)
-
 def events_table_view(request):
     event_type = request.GET.get("event_type")
     limit = int(request.GET.get("limit", 100))
