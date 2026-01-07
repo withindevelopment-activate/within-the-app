@@ -2615,7 +2615,7 @@ def events_table_view(request):
         if len(date_end) == 10:
             date_end += "T23:59:59"
         elif len(date_end) == 16:
-            date_end += ":59"
+            date_end += ":00"
 
         filters["Visited_at"] = ("between", date_after, date_end)
 
@@ -2665,6 +2665,7 @@ def events_table_view(request):
         "session_search": session_search,
         "visitor_search": visitor_search,
         "sort_field": sort_field,
+        "timezone_search": timezone_search,
         "utm_source_labels": json.dumps(list(to_pct(Counter(utm_sources)).keys())),
         "utm_source_values": json.dumps(list(to_pct(Counter(utm_sources)).values())),
         "utm_campaign_labels": json.dumps(list(to_pct(Counter(utm_campaigns)).keys())),
