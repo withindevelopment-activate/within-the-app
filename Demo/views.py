@@ -2571,9 +2571,11 @@ def events_table_view(request):
     event_type = request.GET.get("event_type")
     limit = int(request.GET.get("limit", 100))
     date_after = request.GET.get("date_after")
-    date_after = date_after.replace("T", " ")
+    if date_after:
+        date_after = date_after.replace("T", " ")
     date_end = request.GET.get("date_end")
-    date_end = date_end.replace("T", " ")
+    if date_end:
+        date_end = date_end.replace("T", " ")
     session_search = request.GET.get("session_id")
     visitor_search = request.GET.get("visitor_id")
     sort_field = request.GET.get("sort_by", "Distinct_ID")
