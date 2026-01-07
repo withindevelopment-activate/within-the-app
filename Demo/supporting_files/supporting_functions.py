@@ -74,7 +74,7 @@ def detect_source_from_url_or_domain(url):
         return None
 
     url_lower = url.lower()
-    parsed = urllib.parse.urlparse(url)
+    parsed = urllib.parse.urlparse(url_lower)
     params = urllib.parse.parse_qs(parsed.query or "")
 
     # 1) URL parameters
