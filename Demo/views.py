@@ -649,6 +649,7 @@ def save_tracking(request):
         utm_params = data.get('utm_params', {}) or {}
         traffic_source = data.get('traffic_source', {}) or {}
         referrer = data.get("referrer") or ""
+        page_url = data.get('page_url') or ""
         agent = client_info.get('user_agent') or ""
         crawlers = ["crawler","bingbot","Googlebot","GoogleOther","Applebot","AdsBot","AhrefsBot"]
 
@@ -695,7 +696,10 @@ def save_tracking(request):
                     break
 
         ua_detected_source = detect_source_from_user_agent(agent)
-        referrer_detected_source = detect_source_from_url_or_domain(referrer)
+        if referrer:
+            referrer_detected_source = detect_source_from_url_or_domain(referrer)
+        if not referrer:
+            referrer_detected_source = detect_source_from_url_or_domain(page_url)
 
         if not utm_params.get("utm_source") or utm_params.get("utm_source") == "direct":
             if ua_detected_source:
