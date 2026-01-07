@@ -2602,15 +2602,10 @@ def events_table_view(request):
 
     # ---- Proper date range handling ----
     if date_after and date_end:
-        if len(date_after) == 10:
-            date_after += "00:00:00"
-        if len(date_end) == 10:
-            date_end += "23:59:59"
+        start = f"{date_after} 00:00:00" if len(date_after) == 10 else date_after
+        end = f"{date_end} 23:59:59" if len(date_end) == 10 else date_end
 
-        filters["Visited_at"] = [
-            ("gte", date_after),
-            ("lte", date_end),
-        ]
+        filters["Visited_at"] = ("between", start, end)
 
     df = fetch_data_from_supabase_specific(
         table_name="Tracking_Visitors",

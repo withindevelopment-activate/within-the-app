@@ -142,7 +142,13 @@ def fetch_data_from_supabase_specific(table_name, columns=None, filters=None, or
     # Apply filters if specified
     if filters:
         for column, condition in filters.items():
-            if isinstance(condition, tuple) and len(condition) == 2:
+            # ---- BETWEEN ----
+            if isinstance(condition, tuple) and condition[0] == "between":
+                _, start, end = condition
+                query = query.gte(column, start).lte(column, end)
+
+            # ---- STANDARD OPS ----
+            elif isinstance(condition, tuple) and len(condition) == 2:
                 op, value = condition
                 if op == 'eq':
                     query = query.eq(column, value)
