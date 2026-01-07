@@ -2566,6 +2566,8 @@ def data_deletion(request):
 
 #Database pageview - Remaz
 def events_table_view(request):
+    from urllib.parse import unquote
+
     event_type = request.GET.get("event_type")
     limit = int(request.GET.get("limit", 100))
     date_after = request.GET.get("date_after")
@@ -2592,20 +2594,26 @@ def events_table_view(request):
 
     if date_after and not date_end:
         if len(date_after) == 10:
-            date_after += "00:00:00"
+            date_after += "T00:00:00"
         filters["Visited_at"] = ("gte", date_after)
 
     if date_end and not date_after:
         if len(date_end) == 10:
-            date_end += "23:59:59"
+            date_end += "T23:59:59"
         filters["Visited_at"] = ("lte", date_end)
 
     # ---- Proper date range handling ----
     if date_after and date_end:
-        start = f"{date_after} 00:00:00" if len(date_after) == 10 else date_after
-        end = f"{date_end} 23:59:59" if len(date_end) == 10 else date_end
+        if len(date_after) == 10:
+            date_after += "T00:00:00"
+        elif len(date_after) == 16:
+            date_after += ":00"
+        if len(date_end) == 10:
+            date_end += "T23:59:59"
+        elif len(date_end) == 16:
+            date_end += ":59"
 
-        filters["Visited_at"] = ("between", start, end)
+        filters["Visited_at"] = ("between", date_after, date_end)
 
     df = fetch_data_from_supabase_specific(
         table_name="Tracking_Visitors",
