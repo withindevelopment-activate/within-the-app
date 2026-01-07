@@ -2576,21 +2576,10 @@ def events_table_view(request):
     timezone_search = request.GET.get("timezone")
     action = request.GET.get("action", "filter")
 
-    # ---- Build filters ----
     filters = {}
 
     if event_type:
         filters["Event_Type"] = ("eq", event_type)
-
-    if date_after:
-        if len(date_after) == 10:
-            date_after += "T00:00:00"
-        filters["Visited_at"] = ("gt", date_after)
-
-    if date_end:
-        if len(date_end) == 10:
-            date_end += "T23:59:59"
-        filters["Visited_at"] = ("lt", date_end)
 
     if session_search and session_search != "None":
         filters["Session_ID"] = ("eq", session_search)
@@ -2601,35 +2590,48 @@ def events_table_view(request):
     if timezone_search and timezone_search != "None":
         filters["Timezone"] = ("eq", timezone_search)
 
-    # ---- Fetch data ----
+    if date_after and not date_end:
+        if len(date_after) == 10:
+            date_after += "00:00:00"
+        filters["Visited_at"] = ("gte", date_after)
+
+    if date_end and not date_after:
+        if len(date_end) == 10:
+            date_end += "23:59:59"
+        filters["Visited_at"] = ("lte", date_end)
+
+    # ---- Proper date range handling ----
+    if date_after and date_end:
+        if len(date_after) == 10:
+            date_after += "00:00:00"
+        if len(date_end) == 10:
+            date_end += "23:59:59"
+
+        filters["Visited_at"] = [
+            ("gte", date_after),
+            ("lte", date_end),
+        ]
+
     df = fetch_data_from_supabase_specific(
         table_name="Tracking_Visitors",
         filters=filters,
+        order_by=sort_field,
         limit=limit,
     )
 
-    if df is None or df.empty:
-        data = []
-    else:
-        # ---- Sorting ----
-        if sort_field in df.columns:
-            df = df.sort_values(sort_field, ascending=False)
-        else:
-            df = df.sort_values("Distinct_ID", ascending=False)
-
-        data = df.to_dict(orient="records")
+    data = [] if df is None or df.empty else df.to_dict(orient="records")
 
     from collections import Counter
-    utm_sources = [r.get("UTM_Source") for r in data if r.get("UTM_Source")]
-    utm_campaigns = [r.get("UTM_Campaign") for r in data if r.get("UTM_Campaign")]
+
+    utm_sources = [r["UTM_Source"] for r in data if r.get("UTM_Source")]
+    utm_campaigns = [r["UTM_Campaign"] for r in data if r.get("UTM_Campaign")]
 
     def to_pct(counter):
         total = sum(counter.values())
-        return {k: round((v / total) * 100, 2) for k, v in counter.items()} if total else {}
-    
+        return {k: round(v / total * 100, 2) for k, v in counter.items()} if total else {}
+
     if action == "export_excel":
         from openpyxl import Workbook
-
         wb = Workbook()
         ws = wb.active
         ws.title = "Tracking Sheet"
@@ -2638,18 +2640,14 @@ def events_table_view(request):
         ws.append(headers)
 
         for _, row in df.iterrows():
-            ws.append([str(row[col]) if row[col] is not None else "" for col in headers])
+            ws.append([str(row[h]) if row[h] is not None else "" for h in headers])
 
         response = HttpResponse(
             content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
         response["Content-Disposition"] = "attachment; filename=tracking_sheet.xlsx"
         wb.save(response)
-
         return response
-    
-    source_pct = to_pct(Counter(utm_sources))
-    campaign_pct = to_pct(Counter(utm_campaigns))
 
     context = {
         "data": data,
@@ -2660,10 +2658,10 @@ def events_table_view(request):
         "session_search": session_search,
         "visitor_search": visitor_search,
         "sort_field": sort_field,
-        "utm_source_labels": json.dumps(list(source_pct.keys())),
-        "utm_source_values": json.dumps(list(source_pct.values())),
-        "utm_campaign_labels": json.dumps(list(campaign_pct.keys())),
-        "utm_campaign_values": json.dumps(list(campaign_pct.values())),
+        "utm_source_labels": json.dumps(list(to_pct(Counter(utm_sources)).keys())),
+        "utm_source_values": json.dumps(list(to_pct(Counter(utm_sources)).values())),
+        "utm_campaign_labels": json.dumps(list(to_pct(Counter(utm_campaigns)).keys())),
+        "utm_campaign_values": json.dumps(list(to_pct(Counter(utm_campaigns)).values())),
     }
 
     return render(request, "Demo/events_table.html", context)
