@@ -735,6 +735,37 @@ def save_tracking(request):
         # ---- Build tracking row ----
         distinct_id = int(get_next_id_from_supabase_compatible_all(name='Tracking_Visitors', column='Distinct_ID'))
 
+        # ---- Prevent duplicate purchases ----
+        event_type = data.get("event_type")
+        event_details = data.get("event_details", {})
+
+        order_id = None
+
+        if event_type == "purchase" and isinstance(event_details, dict):
+            order_id = event_details.get("order_id")
+
+            if order_id:
+                try:
+                    existing_purchase = (
+                        supabase.table("Tracking_Visitors")
+                        .select("Distinct_ID")
+                        .eq("Event_Type", "purchase")
+                        .ilike("Event_Details", f"%{order_id}%")
+                        .limit(1)
+                        .execute()
+                    )
+
+                    if existing_purchase.data:
+                        print("DEBUG | DUPLICATE FOUND:", existing_purchase.data)
+                        return JsonResponse({
+                            "status": "skipped",
+                            "message": "Duplicate purchase detected",
+                            "order_id": order_id
+                        })
+                except Exception:
+                    traceback.print_exc()
+
+
         tracking_entry = {
             'Distinct_ID': distinct_id,
             'Visitor_ID': data.get('visitor_id'),
