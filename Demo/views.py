@@ -739,45 +739,21 @@ def save_tracking(request):
         event_type = data.get("event_type")
         event_details = data.get("event_details", {})
 
-        print("DEBUG | Event_Type:", event_type)
-        print("DEBUG | Raw Event_Details:", event_details)
-
-        order_id = None
-
-        if isinstance(event_details, dict):
-            order_id = event_details.get("order_id")
-
-        # FALLBACK || Try to extract order_id from string using regex
-        if not order_id and isinstance(event_details, str):
-            match = re.search(r"'order_id'\s*:\s*(\d+)", event_details)
-            if match:
-                order_id = int(match.group(1))
-
-        print("DEBUG | Extracted order_id:", order_id)
-
-        if event_type == "purchase" and order_id:
+        if event_type == "purchase":
             try:
-                print("DEBUG | Query filter:",
-                    f"Event_Type=purchase AND Event_Details ILIKE '%{order_id}%'")
-
-                existing_purchase = (
-                    supabase.table("Tracking_Visitors")
-                    .select("Distinct_ID, Event_Details")
-                    .eq("Event_Type", "purchase")
-                    .ilike("Event_Details", f"%{order_id}%")
-                    .limit(1)
-                    .execute()
+                df = fetch_data_from_supabase_specific(
+                    "Tracking_Visitors",
+                    filters={'Event_Details': ('eq', event_details)},
                 )
 
-                print("DEBUG | Supabase raw response:", existing_purchase)
+                print("DEBUG | Supabase raw response:", df)
 
-                if existing_purchase.data:
-                    print("DEBUG | DUPLICATE FOUND:", existing_purchase.data)
+                if not df.empty:
+                    print("DEBUG | DUPLICATE FOUND:", df)
 
                     return JsonResponse({
                         "status": "skipped",
                         "message": "Duplicate purchase detected",
-                        "order_id": order_id,
                         "debug": "purchase already exists"
                     })
 
