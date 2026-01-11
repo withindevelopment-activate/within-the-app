@@ -750,7 +750,7 @@ def save_tracking(request):
                     ],
                     filters={
                         "Visitor_ID": ("eq", visitor_id),
-                        "Event_Type": ("eq", event_type),
+                        "Event_Type": ("eq", ["purchase"]),
                         "Event_Details": ("eq", event_details),
                     },
                     limit=1
@@ -771,12 +771,13 @@ def save_tracking(request):
 
             except Exception as e:
                 print("DEBUG | Supabase query failed:", str(e))
+                messages.error(request, f"Supabase query error: {str(e)}")
                 traceback.print_exc()
 
 
         tracking_entry = {
             'Distinct_ID': distinct_id,
-            'Visitor_ID': visitor_id,
+            'Visitor_ID': data.get('visitor_id'),
             'Session_ID': session_id,
             'Store_URL': data.get('store_url'),
             'Event_Type': data.get('event_type'),
