@@ -738,6 +738,7 @@ def save_tracking(request):
         # ---- Prevent duplicate purchases ----
         event_type = data.get("event_type")
         event_details = data.get("event_details", {})
+        visitor_id = data.get('visitor_id'),
         if event_details and event_type == "purchase":
             order_id = event_details.get("order_id")
 
@@ -748,9 +749,11 @@ def save_tracking(request):
                         "Customer_ID", "Visitor_ID", "Event_Type", "Event_Details"
                     ],
                     filters={
-                        "Event_Type": ("eq", ["purchase"]),
-                        "Event_Details": ("ilike", f"%\'order_id\': {order_id}%"),
+                        "Visitor_ID": ("eq", visitor_id),
+                        "Event_Type": ("eq", event_type),
+                        "Event_Details": ("eq", event_details),
                     },
+                    limit=1
                 )
 
                 print("DEBUG | Supabase raw response:", df)
@@ -773,7 +776,7 @@ def save_tracking(request):
 
         tracking_entry = {
             'Distinct_ID': distinct_id,
-            'Visitor_ID': data.get('visitor_id'),
+            'Visitor_ID': visitor_id,
             'Session_ID': session_id,
             'Store_URL': data.get('store_url'),
             'Event_Type': data.get('event_type'),
