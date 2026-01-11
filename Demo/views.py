@@ -739,31 +739,53 @@ def save_tracking(request):
         event_type = data.get("event_type")
         event_details = data.get("event_details", {})
 
+        print("DEBUG | Event_Type:", event_type)
+        print("DEBUG | Raw Event_Details:", event_details)
+
         order_id = None
 
-        if event_type == "purchase" and isinstance(event_details, dict):
+        if isinstance(event_details, dict):
             order_id = event_details.get("order_id")
 
-            if order_id:
-                try:
-                    existing_purchase = (
-                        supabase.table("Tracking_Visitors")
-                        .select("Distinct_ID")
-                        .eq("Event_Type", "purchase")
-                        .ilike("Event_Details", f"%\'order_id\': {order_id}%")
-                        .limit(1)
-                        .execute()
-                    )
+        # FALLBACK || Try to extract order_id from string using regex
+        if not order_id and isinstance(event_details, str):
+            match = re.search(r"'order_id'\s*:\s*(\d+)", event_details)
+            if match:
+                order_id = int(match.group(1))
 
-                    if existing_purchase.data:
-                        print("DEBUG | DUPLICATE FOUND:", existing_purchase.data)
-                        return JsonResponse({
-                            "status": "skipped",
-                            "message": "Duplicate purchase detected",
-                            "order_id": order_id
-                        })
-                except Exception:
-                    traceback.print_exc()
+        print("DEBUG | Extracted order_id:", order_id)
+
+        if event_type == "purchase" and order_id:
+            try:
+                print("DEBUG | Query filter:",
+                    f"Event_Type=purchase AND Event_Details ILIKE '%{order_id}%'")
+
+                existing_purchase = (
+                    supabase.table("Tracking_Visitors")
+                    .select("Distinct_ID, Event_Details")
+                    .eq("Event_Type", "purchase")
+                    .ilike("Event_Details", f"%{order_id}%")
+                    .limit(1)
+                    .execute()
+                )
+
+                print("DEBUG | Supabase raw response:", existing_purchase)
+
+                if existing_purchase.data:
+                    print("DEBUG | DUPLICATE FOUND:", existing_purchase.data)
+
+                    return JsonResponse({
+                        "status": "skipped",
+                        "message": "Duplicate purchase detected",
+                        "order_id": order_id,
+                        "debug": "purchase already exists"
+                    })
+
+                print("DEBUG | No duplicate found, proceeding to insert")
+
+            except Exception as e:
+                print("DEBUG | Supabase query failed:", str(e))
+                traceback.print_exc()
 
 
         tracking_entry = {
