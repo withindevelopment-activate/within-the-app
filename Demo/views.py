@@ -750,7 +750,7 @@ def save_tracking(request):
                         supabase.table("Tracking_Visitors")
                         .select("Distinct_ID")
                         .eq("Event_Type", "purchase")
-                        .ilike("Event_Details", f"%{order_id}%")
+                        .ilike("Event_Details", f"%\'order_id\': {order_id}%")
                         .limit(1)
                         .execute()
                     )
