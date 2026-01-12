@@ -629,7 +629,7 @@ def save_tracking(request):
 
 @csrf_exempt
 @require_POST
-def save_tracking(request):
+def save_tracking_old(request):
     try:
         # ---- Parse JSON ----
         try:
@@ -829,6 +829,486 @@ def save_tracking(request):
         return JsonResponse({"status": "success"})
 
     except Exception as e:
+        traceback.print_exc()
+        return JsonResponse({"status": "error", "message": str(e)}, status=500)
+
+@csrf_exempt
+@require_POST
+def save_tracking_no_debug(request):
+    try:
+        # -------------------------
+        # Parse JSON
+        # -------------------------
+        try:
+            data = json.loads(request.body)
+        except Exception:
+            return JsonResponse({"status": "error", "message": "Invalid JSON payload"}, status=400)
+
+        if not data:
+            return JsonResponse({"status": "error", "message": "No JSON payload received"}, status=400)
+
+        session_id = data.get("session_id")
+        if not session_id:
+            return JsonResponse({"status": "error", "message": "session_id is required"}, status=400)
+
+        visitor_info = data.get("visitor_info", {}) or {}
+        client_info = data.get("client_info", {}) or {}
+        utm_params = data.get("utm_params", {}) or {}
+        traffic_source = data.get("traffic_source", {}) or {}
+        referrer = data.get("referrer") or ""
+        page_url = data.get('page_url') or ""
+        agent = client_info.get("user_agent") or ""
+
+        # -------------------------
+        # Block crawlers
+        crawlers = [
+            "crawler", "bingbot", "googlebot", "googleother",
+            "applebot", "adsbot", "ahrefsbot"
+        ]
+
+        if any(bot in agent.lower() for bot in crawlers):
+            return JsonResponse({"status": "skipped", "message": "Crawler detected"})
+
+        # -------------------------
+        # Fetch existing session rows
+        existing_session_data = []
+        try:
+            res = (
+                supabase.table("Tracking_Visitors")
+                .select(
+                    "UTM_Source,UTM_Medium,UTM_Campaign,UTM_Term,UTM_Content,"
+                    "Customer_ID,Customer_Name,Customer_Email,Customer_Mobile"
+                )
+                .eq("Session_ID", session_id)
+                .execute()
+            )
+            if res and res.data:
+                existing_session_data = res.data
+        except Exception:
+            traceback.print_exc()
+
+        # -------------------------
+        # Fill existing UTM values (session-level wise)
+        # -------------------------
+        for field in ["UTM_Source", "UTM_Medium", "UTM_Campaign", "UTM_Term", "UTM_Content"]:
+            for row in existing_session_data:
+                if row.get(field):
+                    utm_params[field.lower()] = row[field]
+                    break
+
+        # -------------------------
+        # Detecting source
+        ua_detected_source = detect_source_from_user_agent(agent)
+        if referrer:
+            referrer_detected_source = detect_source_from_url_or_domain(referrer)
+        if not referrer:
+            referrer_detected_source = detect_source_from_url_or_domain(page_url)
+
+        if not utm_params.get("utm_source") or utm_params.get("utm_source") == "direct":
+            if ua_detected_source:
+                utm_params["utm_source"] = ua_detected_source
+            elif referrer_detected_source:
+                utm_params["utm_source"] = referrer_detected_source
+
+        if not utm_params.get("utm_source"):
+            utm_params["utm_source"] = "direct"
+
+        # -------------------------
+        # Determine customer info
+        session_customer_info = {}
+
+        if visitor_info.get("customer_id"):
+            session_customer_info = {
+                "Customer_ID": int(visitor_info.get("customer_id")),
+                "Customer_Name": visitor_info.get("name"),
+                "Customer_Email": visitor_info.get("email"),
+                "Customer_Mobile": int(visitor_info.get("mobile"))
+                if visitor_info.get("mobile") else None
+            }
+        else:
+            for row in existing_session_data:
+                if row.get("Customer_ID"):
+                    session_customer_info = {
+                        "Customer_ID": row.get("Customer_ID"),
+                        "Customer_Name": row.get("Customer_Name"),
+                        "Customer_Email": row.get("Customer_Email"),
+                        "Customer_Mobile": row.get("Customer_Mobile"),
+                    }
+                    break
+
+        # -------------------------
+        # Prevent duplicate purchases
+        event_type = data.get("event_type")
+        event_details = data.get("event_details", {}) or {}
+        visitor_id = data.get("visitor_id")
+
+        if event_type == "purchase" and event_details:
+            order_id = event_details.get("order_id")
+
+            if order_id:
+                try:
+                    df = fetch_data_from_supabase_specific(
+                        "Tracking_Visitors",
+                        filters={
+                            "Event_Type": ("eq", "purchase"),
+                            "Event_Details": ("like", f"%{order_id}%"),
+                        },
+                        limit=1
+                    )
+
+                    if df is not None and not df.empty:
+                        return JsonResponse({
+                            "status": "skipped",
+                            "message": "Duplicate purchase detected",
+                            "order_id": order_id
+                        })
+                except Exception:
+                    traceback.print_exc()
+
+        # -------------------------
+        # Build tracking entry
+        distinct_id = int(
+            get_next_id_from_supabase_compatible_all(
+                name="Tracking_Visitors",
+                column="Distinct_ID"
+            )
+        )
+
+        tracking_entry = {
+            "Distinct_ID": distinct_id,
+            "Visitor_ID": visitor_id,
+            "Session_ID": session_id,
+            "Store_URL": data.get("store_url"),
+            "Event_Type": event_type,
+            "Event_Details": str(event_details),
+            "Page_URL": data.get("page_url"),
+            "Visited_at": get_uae_current_date(),
+
+            # UTM
+            "UTM_Source": utm_params.get("utm_source"),
+            "UTM_Medium": utm_params.get("utm_medium"),
+            "UTM_Campaign": utm_params.get("utm_campaign"),
+            "UTM_Term": utm_params.get("utm_term"),
+            "UTM_Content": utm_params.get("utm_content"),
+
+            # Referrer & traffic
+            "Referrer_Platform": referrer,
+            "Traffic_Source": traffic_source.get("source"),
+            "Traffic_Medium": traffic_source.get("medium"),
+            "Traffic_Campaign": traffic_source.get("campaign"),
+
+            # Customer
+            **session_customer_info,
+
+            # Client
+            "User_Agent": agent,
+            "Language": client_info.get("language"),
+            "Timezone": client_info.get("timezone"),
+            "Platform": client_info.get("platform"),
+            "Screen_Resolution": client_info.get("screen_resolution"),
+            "Device_Memory": int(client_info.get("device_memory"))
+            if client_info.get("device_memory") else None,
+        }
+
+        # -------------------------
+        # Insert to db
+        batch_insert_to_supabase(
+            pd.DataFrame([tracking_entry]),
+            "Tracking_Visitors"
+        )
+
+        # -------------------------
+        # Update customer info across session
+        if session_customer_info.get("Customer_ID"):
+            supabase.table("Tracking_Visitors").update(session_customer_info)\
+                .eq("Session_ID", session_id).execute()
+
+        return JsonResponse({"status": "success"})
+
+    except Exception as e:
+        traceback.print_exc()
+        return JsonResponse({"status": "error", "message": str(e)}, status=500)
+
+@csrf_exempt
+@require_POST
+def save_tracking(request):
+    import traceback
+    import json
+    import pandas as pd
+
+    def dprint(msg):
+        print(f"[SAVE_TRACKING DEBUG] {msg}")
+
+    dprint("===== START save_tracking =====")
+
+    try:
+        # -------------------------
+        # STEP 1: Parse JSON
+        # -------------------------
+        dprint("Parsing request.body")
+
+        try:
+            raw_body = request.body.decode("utf-8")
+            dprint(f"Raw body: {raw_body}")
+            data = json.loads(raw_body)
+        except Exception as e:
+            dprint(f"[ERROR] JSON parse failed: {e}")
+            return JsonResponse({"status": "error", "message": "Invalid JSON payload"}, status=400)
+
+        if not data:
+            dprint("[ERROR] Empty JSON payload")
+            return JsonResponse({"status": "error", "message": "No JSON payload received"}, status=400)
+
+        dprint(f"Parsed JSON keys: {list(data.keys())}")
+
+        # -------------------------
+        # STEP 2: Required fields
+        # -------------------------
+        session_id = data.get("session_id")
+        dprint(f"session_id = {session_id}")
+
+        if not session_id:
+            dprint("[ERROR] session_id missing")
+            return JsonResponse({"status": "error", "message": "session_id is required"}, status=400)
+
+        visitor_info   = data.get("visitor_info", {}) or {}
+        client_info    = data.get("client_info", {}) or {}
+        utm_params     = data.get("utm_params", {}) or {}
+        traffic_source = data.get("traffic_source", {}) or {}
+        referrer       = data.get("referrer") or ""
+        page_url       = data.get("page_url") or ""
+        agent          = client_info.get("user_agent") or ""
+
+        dprint(f"visitor_info: {visitor_info}")
+        dprint(f"client_info: {client_info}")
+        dprint(f"utm_params (initial): {utm_params}")
+        dprint(f"traffic_source: {traffic_source}")
+        dprint(f"referrer: {referrer}")
+        dprint(f"page_url: {page_url}")
+        dprint(f"user_agent: {agent}")
+
+        # -------------------------
+        # STEP 3: Block crawlers
+        # -------------------------
+        crawlers = [
+            "crawler", "bingbot", "googlebot", "googleother",
+            "applebot", "adsbot", "ahrefsbot"
+        ]
+
+        if any(bot in agent.lower() for bot in crawlers):
+            dprint("[SKIPPED] Crawler detected via user agent")
+            return JsonResponse({"status": "skipped", "message": "Crawler detected"})
+
+        # -------------------------
+        # STEP 4: Fetch existing session rows
+        # -------------------------
+        dprint("Fetching existing session data from Supabase")
+
+        existing_session_data = []
+
+        try:
+            res = (
+                supabase.table("Tracking_Visitors")
+                .select(
+                    "UTM_Source,UTM_Medium,UTM_Campaign,UTM_Term,UTM_Content,"
+                    "Customer_ID,Customer_Name,Customer_Email,Customer_Mobile"
+                )
+                .eq("Session_ID", session_id)
+                .execute()
+            )
+
+            if res and res.data:
+                existing_session_data = res.data
+                dprint(f"Existing rows found: {len(existing_session_data)}")
+            else:
+                dprint("No existing rows for session")
+
+        except Exception:
+            dprint("[ERROR] Failed fetching existing session data")
+            traceback.print_exc()
+
+        # -------------------------
+        # STEP 5: Backfill UTM values
+        # -------------------------
+        dprint("Backfilling UTM values from session history")
+
+        for field in ["UTM_Source", "UTM_Medium", "UTM_Campaign", "UTM_Term", "UTM_Content"]:
+            for row in existing_session_data:
+                if row.get(field):
+                    utm_params[field.lower()] = row[field]
+                    dprint(f"Backfilled {field} = {row[field]}")
+                    break
+
+        dprint(f"utm_params (after backfill): {utm_params}")
+
+        # -------------------------
+        # STEP 6: Detect traffic source
+        # -------------------------
+        dprint("Detecting traffic source")
+
+        ua_detected_source = detect_source_from_user_agent(agent)
+        dprint(f"UA detected source: {ua_detected_source}")
+
+        if referrer:
+            referrer_detected_source = detect_source_from_url_or_domain(referrer)
+            dprint(f"Referrer detected source: {referrer_detected_source}")
+        else:
+            referrer_detected_source = detect_source_from_url_or_domain(page_url)
+            dprint(f"Page URL detected source: {referrer_detected_source}")
+
+        if not utm_params.get("utm_source") or utm_params.get("utm_source") == "direct":
+            if ua_detected_source:
+                utm_params["utm_source"] = ua_detected_source
+                dprint(f"utm_source set from UA: {ua_detected_source}")
+            elif referrer_detected_source:
+                utm_params["utm_source"] = referrer_detected_source
+                dprint(f"utm_source set from referrer/page: {referrer_detected_source}")
+
+        if not utm_params.get("utm_source"):
+            utm_params["utm_source"] = "direct"
+            dprint("utm_source defaulted to direct")
+
+        # -------------------------
+        # STEP 7: Determine customer info
+        # -------------------------
+        dprint("Resolving customer info")
+
+        session_customer_info = {}
+
+        if visitor_info.get("customer_id"):
+            session_customer_info = {
+                "Customer_ID": int(visitor_info.get("customer_id")),
+                "Customer_Name": visitor_info.get("name"),
+                "Customer_Email": visitor_info.get("email"),
+                "Customer_Mobile": int(visitor_info.get("mobile"))
+                if visitor_info.get("mobile") else None
+            }
+            dprint(f"Customer info from visitor_info: {session_customer_info}")
+        else:
+            for row in existing_session_data:
+                if row.get("Customer_ID"):
+                    session_customer_info = {
+                        "Customer_ID": row.get("Customer_ID"),
+                        "Customer_Name": row.get("Customer_Name"),
+                        "Customer_Email": row.get("Customer_Email"),
+                        "Customer_Mobile": row.get("Customer_Mobile"),
+                    }
+                    dprint(f"Customer info inherited from session: {session_customer_info}")
+                    break
+
+        # -------------------------
+        # STEP 8: Prevent duplicate purchases
+        # -------------------------
+        event_type    = data.get("event_type")
+        event_details = data.get("event_details", {}) or {}
+        visitor_id    = data.get("visitor_id")
+
+        dprint(f"event_type: {event_type}")
+        dprint(f"event_details: {event_details}")
+
+        if event_type == "purchase" and event_details:
+            order_id = event_details.get("order_id")
+            dprint(f"Checking duplicate purchase for order_id: {order_id}")
+
+            if order_id:
+                try:
+                    df = fetch_data_from_supabase_specific(
+                        "Tracking_Visitors",
+                        filters={
+                            "Event_Type": ("eq", "purchase"),
+                            "Event_Details": ("like", f"%{order_id}%"),
+                        },
+                        limit=1
+                    )
+
+                    if df is not None and not df.empty:
+                        dprint("[SKIPPED] Duplicate purchase detected")
+                        return JsonResponse({
+                            "status": "skipped",
+                            "message": "Duplicate purchase detected",
+                            "order_id": order_id
+                        })
+
+                except Exception:
+                    dprint("[ERROR] Duplicate purchase check failed")
+                    traceback.print_exc()
+
+        # -------------------------
+        # STEP 9: Build tracking entry
+        # -------------------------
+        dprint("Building tracking entry")
+
+        distinct_id = int(
+            get_next_id_from_supabase_compatible_all(
+                name="Tracking_Visitors",
+                column="Distinct_ID"
+            )
+        )
+
+        dprint(f"Generated Distinct_ID: {distinct_id}")
+
+        tracking_entry = {
+            "Distinct_ID": distinct_id,
+            "Visitor_ID": visitor_id,
+            "Session_ID": session_id,
+            "Store_URL": data.get("store_url"),
+            "Event_Type": event_type,
+            "Event_Details": str(event_details),
+            "Page_URL": page_url,
+            "Visited_at": get_uae_current_date(),
+
+            "UTM_Source": utm_params.get("utm_source"),
+            "UTM_Medium": utm_params.get("utm_medium"),
+            "UTM_Campaign": utm_params.get("utm_campaign"),
+            "UTM_Term": utm_params.get("utm_term"),
+            "UTM_Content": utm_params.get("utm_content"),
+
+            "Referrer_Platform": referrer,
+            "Traffic_Source": traffic_source.get("source"),
+            "Traffic_Medium": traffic_source.get("medium"),
+            "Traffic_Campaign": traffic_source.get("campaign"),
+
+            **session_customer_info,
+
+            "User_Agent": agent,
+            "Language": client_info.get("language"),
+            "Timezone": client_info.get("timezone"),
+            "Platform": client_info.get("platform"),
+            "Screen_Resolution": client_info.get("screen_resolution"),
+            "Device_Memory": int(client_info.get("device_memory"))
+            if client_info.get("device_memory") else None,
+        }
+
+        dprint(f"Final tracking entry:\n{tracking_entry}")
+
+        # -------------------------
+        # STEP 10: Insert into DB
+        # -------------------------
+        dprint("Inserting tracking entry into Supabase")
+
+        batch_insert_to_supabase(
+            pd.DataFrame([tracking_entry]),
+            "Tracking_Visitors"
+        )
+
+        dprint("Insert successful")
+
+        # -------------------------
+        # STEP 11: Update customer info across session
+        # -------------------------
+        if session_customer_info.get("Customer_ID"):
+            dprint("Updating customer info across session rows")
+
+            supabase.table("Tracking_Visitors") \
+                .update(session_customer_info) \
+                .eq("Session_ID", session_id) \
+                .execute()
+
+        dprint("===== END save_tracking (SUCCESS) =====")
+        return JsonResponse({"status": "success"})
+
+    except Exception as e:
+        dprint("[FATAL ERROR] save_tracking crashed")
         traceback.print_exc()
         return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
