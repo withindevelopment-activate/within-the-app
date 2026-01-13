@@ -167,10 +167,10 @@ def fetch_data_from_supabase_specific(table_name, columns=None, filters=None, or
                     query = query.gte(column, value)
                 elif op == 'in':
                     query = query.in_(column, value)
-                elif op == "ilike":
+                elif op == "like":
                     if not isinstance(value, str):
                         raise ValueError("ilike value must be a string")
-                    query = query.ilike(column, value)
+                    query = query.like(column, value)
 
             else:
                 query = query.eq(column, condition)

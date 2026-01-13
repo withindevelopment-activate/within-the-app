@@ -1216,7 +1216,7 @@ def save_tracking(request):
                         "Tracking_Visitors",
                         filters={
                             "Event_Type": ("eq", "purchase"),
-                            "Event_Details": ("like", f"%{order_id}%"),
+                            "Event_Details": ("ilike", f"%{order_id}%"),
                         },
                         limit=1
                     )
