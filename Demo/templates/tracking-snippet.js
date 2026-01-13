@@ -119,39 +119,49 @@
     };
 
     // ------------------- Purchase Tracking -------------------
-    (function () {
-        if (typeof window.sendPurchaseEvent !== "function") return;
+    (function hookPurchaseEvent() {
+        const MAX_RETRIES = 50;
+        let attempts = 0;
 
-        const originalSendPurchaseEvent = window.sendPurchaseEvent;
+        const interval = setInterval(() => {
+            if (typeof window.sendPurchaseEvent === "function") {
+                clearInterval(interval);
 
-        window.sendPurchaseEvent = function (payload) {
-            try {
-            const { order } = payload || {};
+                const originalSendPurchaseEvent = window.sendPurchaseEvent;
 
-            if (order && order.id) {
-                const orderInfo = {
-                order_id: order.id,
-                customer_id: order.customer?.id || "Unknown",
-                order_total: order.order_total,
-                order_total_string: order.order_total_string,
-                currency: order.currency_code || "SAR",
-                issue_date: order.issue_date,
-                payment_method_name: order.payment?.method?.name,
-                products_name: order.products?.map(p => p.name).join(", "),
-                products_count: order.products?.length || 0
+                window.sendPurchaseEvent = function (payload) {
+                    try {
+                        const { order } = payload || {};
+
+                        if (order && order.id) {
+                            const orderInfo = {
+                                order_id: order.id,
+                                customer_id: order.customer?.id || "Unknown",
+                                order_total: Number(order.order_total),
+                                order_total_string: order.order_total_string,
+                                currency: order.currency_code || "SAR",
+                                issue_date: order.issue_date,
+                                payment_method_name: order.payment?.method?.name || null,
+                                products_name: order.products?.map(p => p.name).join(", "),
+                                products_count: order.products?.length || 0
+                            };
+
+                            console.log("✅ Purchase detected:", orderInfo);
+                            sendTrackingEvent("purchase", orderInfo);
+                        }
+                    } catch (err) {
+                        console.warn("Purchase hook failed:", err);
+                    }
+
+                    return originalSendPurchaseEvent.apply(this, arguments);
                 };
-
-                console.log("✅ Purchase detected (hooked):", orderInfo);
-                sendTrackingEvent("purchase", orderInfo);
-            }
-            } catch (err) {
-            console.warn("Purchase hook failed:", err);
             }
 
-            return originalSendPurchaseEvent.apply(this, arguments);
-        };
+            if (++attempts >= MAX_RETRIES) {
+                clearInterval(interval);
+                console.warn("sendPurchaseEvent not found after retries");
+            }
+        }, 200);
     })();
 
-    // Run once after page load
-    window.addEventListener('load', sendPurchaseIfExists);
 })();
