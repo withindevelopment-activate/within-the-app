@@ -1203,35 +1203,35 @@ def save_tracking(request):
         event_details = data.get("event_details", {}) or {}
         visitor_id    = data.get("visitor_id")
 
-        dprint(f"event_type: {event_type}")
-        dprint(f"event_details: {event_details}")
+        # dprint(f"event_type: {event_type}")
+        # dprint(f"event_details: {event_details}")
 
-        if event_type == "purchase" and event_details:
-            order_id = event_details.get("order_id")
-            dprint(f"Checking duplicate purchase for order_id: {order_id}")
+        # if event_type == "purchase" and event_details:
+        #     order_id = event_details.get("order_id")
+        #     dprint(f"Checking duplicate purchase for order_id: {order_id}")
 
-            if order_id:
-                try:
-                    df = fetch_data_from_supabase_specific(
-                        "Tracking_Visitors",
-                        filters={
-                            "Event_Type": ("eq", "purchase"),
-                            "Event_Details": ("ilike", f"%{order_id}%"),
-                        },
-                        limit=1
-                    )
+        #     if order_id:
+        #         try:
+        #             df = fetch_data_from_supabase_specific(
+        #                 "Tracking_Visitors",
+        #                 filters={
+        #                     "Event_Type": ("eq", "purchase"),
+        #                     "Event_Details": ("ilike", f"%{order_id}%"),
+        #                 },
+        #                 limit=1
+        #             )
 
-                    if df is not None and not df.empty:
-                        dprint("[SKIPPED] Duplicate purchase detected")
-                        return JsonResponse({
-                            "status": "skipped",
-                            "message": "Duplicate purchase detected",
-                            "order_id": order_id
-                        })
+        #             if df is not None and not df.empty:
+        #                 dprint("[SKIPPED] Duplicate purchase detected")
+        #                 return JsonResponse({
+        #                     "status": "skipped",
+        #                     "message": "Duplicate purchase detected",
+        #                     "order_id": order_id
+        #                 })
 
-                except Exception:
-                    dprint("[ERROR] Duplicate purchase check failed")
-                    traceback.print_exc()
+        #         except Exception:
+        #             dprint("[ERROR] Duplicate purchase check failed")
+        #             traceback.print_exc()
 
         # -------------------------
         # STEP 9: Build tracking entry
