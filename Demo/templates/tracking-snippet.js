@@ -129,9 +129,9 @@
 
         try {
 
-            console.log("RAW ORDER OBJECT:", order);
-
+            
             const order = payload?.order;
+            console.log("RAW ORDER OBJECT:", order);
 
             if (!order || !order.id) return originalSendPurchaseEvent.apply(this, arguments);
  
@@ -165,7 +165,7 @@
  
             console.log("Purchase detected:", orderInfo); 
 
-            sendPageview("purchase", orderInfo);
+            sendTrackingEvent("purchase", orderInfo);
  
         } catch (err) {
 
