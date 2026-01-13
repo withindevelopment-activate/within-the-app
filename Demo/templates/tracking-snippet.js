@@ -70,7 +70,7 @@
     // ------------------- Tracking -------------------
     const BACKEND_URL = "https://testing-within.onrender.com";
 
-    function sendPageview(eventType, eventDetails = {}) {
+    function sendTrackingEvent(eventType, eventDetails = {}) {
         const storeUrl = window.location.origin;
         if (!storeUrl) {
             console.warn('tracking.js: store_url not found');
@@ -105,37 +105,52 @@
 
     // ------------------- Event Listener -------------------
     window.addEventListener('load', function() {
-        sendPageview("pageview");
+        sendTrackingEvent("pageview");
     });
 
     window.addToCartEvent = function(productInfo) {
         console.log("🛒 Add to Cart detected:", productInfo);
-        sendPageview("add_to_cart", productInfo);
+        sendTrackingEvent("add_to_cart", productInfo);
     };
 
     window.addToWishlist = function(productId) {
         console.log("🛒 Add to Wishlist detected:", productId);
-        sendPageview("add_to_wishlist", productId);
+        sendTrackingEvent("add_to_wishlist", productId);
     };
 
     // ------------------- Purchase Tracking -------------------
-    function sendPurchaseIfExists() {
-        if (window.sendPurchaseTrackingEventObj && window.sendPurchaseTrackingEventObj.order) {
-            const o = window.sendPurchaseTrackingEventObj.order;
-            const orderInfo = {
-                order_id: o.id,
-                customer_id: o.customer?.id || "Unknown",
-                order_total_string: o.order_total_string,
-                issue_date: o.issue_date,
-                payment_method_name: o.payment?.method?.name,
-                products_name: o.products?.map(p => p.name).join(", "),
-                products_count: o.products_count
-            };
+    (function () {
+        if (typeof window.sendPurchaseEvent !== "function") return;
 
-            console.log("✅ Purchase detected:", orderInfo);
-            sendPageview("purchase", orderInfo);
-        }
-    }
+        const originalSendPurchaseEvent = window.sendPurchaseEvent;
+
+        window.sendPurchaseEvent = function (payload) {
+            try {
+            const { order } = payload || {};
+
+            if (order && order.id) {
+                const orderInfo = {
+                order_id: order.id,
+                customer_id: order.customer?.id || "Unknown",
+                order_total: order.order_total,
+                order_total_string: order.order_total_string,
+                currency: order.currency_code || "SAR",
+                issue_date: order.issue_date,
+                payment_method_name: order.payment?.method?.name,
+                products_name: order.products?.map(p => p.name).join(", "),
+                products_count: order.products?.length || 0
+                };
+
+                console.log("✅ Purchase detected (hooked):", orderInfo);
+                sendTrackingEvent("purchase", orderInfo);
+            }
+            } catch (err) {
+            console.warn("Purchase hook failed:", err);
+            }
+
+            return originalSendPurchaseEvent.apply(this, arguments);
+        };
+    })();
 
     // Run once after page load
     window.addEventListener('load', sendPurchaseIfExists);
