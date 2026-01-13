@@ -119,49 +119,65 @@
     };
 
     // ------------------- Purchase Tracking -------------------
-    (function hookPurchaseEvent() {
-        const MAX_RETRIES = 50;
-        let attempts = 0;
+    (function interceptPurchaseEvent() {
 
-        const interval = setInterval(() => {
-            if (typeof window.sendPurchaseEvent === "function") {
-                clearInterval(interval);
+    if (typeof window.sendPurchaseEvent !== "function") return;
+ 
+    const originalSendPurchaseEvent = window.sendPurchaseEvent;
+ 
+    window.sendPurchaseEvent = function (payload) {
 
-                const originalSendPurchaseEvent = window.sendPurchaseEvent;
+        try {
 
-                window.sendPurchaseEvent = function (payload) {
-                    try {
-                        const { order } = payload || {};
+            console.log("RAW ORDER OBJECT:", order);
 
-                        if (order && order.id) {
-                            const orderInfo = {
-                                order_id: order.id,
-                                customer_id: order.customer?.id || "Unknown",
-                                order_total: Number(order.order_total),
-                                order_total_string: order.order_total_string,
-                                currency: order.currency_code || "SAR",
-                                issue_date: order.issue_date,
-                                payment_method_name: order.payment?.method?.name || null,
-                                products_name: order.products?.map(p => p.name).join(", "),
-                                products_count: order.products?.length || 0
-                            };
+            const order = payload?.order;
 
-                            console.log("✅ Purchase detected:", orderInfo);
-                            sendTrackingEvent("purchase", orderInfo);
-                        }
-                    } catch (err) {
-                        console.warn("Purchase hook failed:", err);
-                    }
+            if (!order || !order.id) return originalSendPurchaseEvent.apply(this, arguments);
+ 
+            const orderInfo = {
 
-                    return originalSendPurchaseEvent.apply(this, arguments);
-                };
-            }
+                order_id: order.id,
 
-            if (++attempts >= MAX_RETRIES) {
-                clearInterval(interval);
-                console.warn("sendPurchaseEvent not found after retries");
-            }
-        }, 200);
-    })();
+                customer_id: order.customer?.id || "Unknown",
 
+                order_total: Number(order.order_total) || null,
+
+                order_total_string: order.order_total_string || null,
+
+                currency: order.currency_code || "SAR",
+
+                issue_date: order.issue_date || null,
+
+                payment_method_name: order.payment?.method?.name || null,
+
+                products_name: Array.isArray(order.products)
+
+                    ? order.products.map(p => p.name).join(", ")
+
+                    : null,
+
+                products_count: order.products_count
+
+                    || (order.products ? order.products.length : 0)
+
+            };
+ 
+            console.log("Purchase detected:", orderInfo); 
+
+            sendPageview("purchase", orderInfo);
+ 
+        } catch (err) {
+
+            console.warn("Purchase capture failed:", err); 
+
+        }
+ 
+        return originalSendPurchaseEvent.apply(this, arguments);
+
+    };
+ 
+    console.log("sendPurchaseEvent successfully hooked");
+
+    })(); 
 })();
