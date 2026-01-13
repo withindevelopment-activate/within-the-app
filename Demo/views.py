@@ -1029,6 +1029,8 @@ def save_tracking_no_debug(request):
         traceback.print_exc()
         return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
+@csrf_exempt
+@require_POST
 def save_tracking(request):
     def dprint(msg):
         print(f"[SAVE_TRACKING DEBUG] {msg}")
