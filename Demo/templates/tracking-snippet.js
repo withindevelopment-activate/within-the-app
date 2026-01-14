@@ -71,113 +71,104 @@
     const BACKEND_URL = "https://testing-within.onrender.com";
 
     function sendTrackingEvent(eventType, eventDetails = {}) {
-        const storeUrl = window.location.origin;
-        if (!storeUrl) {
-            console.warn('tracking.js: store_url not found');
-            return;
+        try {
+            const storeUrl = window.location.origin;
+            if (!storeUrl) return;
+
+            const utmParams = getUTMParams();
+            const referrer = getReferrer();
+            const traffic = inferTrafficSource(utmParams, referrer);
+
+            const payload = {
+                visitor_id: getVisitorId(),
+                session_id: getOrCreateSessionId(),
+                store_url: storeUrl,
+                event_type: eventType,
+                event_details: eventDetails,
+                utm_params: utmParams,
+                referrer: referrer,
+                traffic_source: traffic,
+                client_info: getClientInfo(),
+                visitor_info: getVisitorInfo(),
+                page_url: window.location.href,
+                timestamp: new Date().toISOString()
+            };
+
+            fetch(`${BACKEND_URL}/save_tracking/`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            }).catch(() => {});
+        } catch (e) {
+            console.warn("Tracking error:", e);
         }
-        const utmParams = getUTMParams();
-        const referrer = getReferrer();
-        const traffic = inferTrafficSource(utmParams, referrer);
-
-        const trackingData = {
-            // store_id: STORE_ID,
-            visitor_id: getVisitorId(),
-            session_id: getOrCreateSessionId(),
-            store_url: storeUrl,
-            event_type: eventType,
-            event_details: eventDetails,
-            utm_params: utmParams,
-            referrer: referrer,
-            traffic_source: traffic,
-            client_info: getClientInfo(),
-            visitor_info: getVisitorInfo(),
-            page_url: window.location.href,
-            timestamp: new Date().toISOString()
-        };
-
-        fetch(`${BACKEND_URL}/save_tracking/`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(trackingData)
-        }).catch(err => console.error('Tracking failed:', err));
     }
 
-    // ------------------- Event Listener -------------------
-    window.addEventListener('load', function() {
+    // ------------------- Base Events -------------------
+    window.addEventListener("load", function () {
         sendTrackingEvent("pageview");
     });
 
-    window.addToCartEvent = function(productInfo) {
-        console.log("🛒 Add to Cart detected:", productInfo);
-        sendTrackingEvent("add_to_cart", productInfo);
+    window.addToCartEvent = function (productInfo) {
+        sendTrackingEvent("add_to_cart", productInfo || {});
     };
 
-    window.addToWishlist = function(productId) {
-        console.log("🛒 Add to Wishlist detected:", productId);
-        sendTrackingEvent("add_to_wishlist", productId);
+    window.addToWishlist = function (productId) {
+        sendTrackingEvent("add_to_wishlist", { product_id: productId });
     };
 
-    // ------------------- Purchase Tracking -------------------
+    // Keep this for compatibility ONLY — real capture happens via interceptor
+    window.purchaseEvent = function (data) {
+        sendTrackingEvent("purchase", data || {});
+    };
+
+    // ------------------- Purchase Interception -------------------
     (function interceptPurchaseEvent() {
 
-    if (typeof window.sendPurchaseEvent !== "function") return;
- 
-    const originalSendPurchaseEvent = window.sendPurchaseEvent;
- 
-    window.sendPurchaseEvent = function (payload) {
+        if (typeof window.sendPurchaseEvent !== "function") return;
 
-        try {
+        const originalSendPurchaseEvent = window.sendPurchaseEvent;
 
-            
-            const order = payload?.order;
-            console.log("RAW ORDER OBJECT:", order);
+        window.sendPurchaseEvent = function (payload) {
 
-            if (!order || !order.id) return originalSendPurchaseEvent.apply(this, arguments);
- 
-            const orderInfo = {
+            try {
+                // Normalize payload shape
+                const order =
+                    payload?.order ||
+                    (payload && payload.id ? payload : null);
 
-                order_id: order.id,
+                if (order && order.id) {
+                    const orderInfo = {
+                        order_id: order.id,
+                        customer_id: order.customer?.id || null,
+                        order_total: Number(order.order_total) || null,
+                        order_total_string: order.order_total_string || null,
+                        currency: order.currency_code || "SAR",
+                        issue_date: order.issue_date || null,
+                        payment_method_name: order.payment?.method?.name || null,
+                        products: Array.isArray(order.products)
+                            ? order.products.map(p => ({
+                                product_id: p.id || p.product_id || null,
+                                name: p.name || null,
+                                sku: p.sku || null,
+                                price: Number(p.sale_price ?? p.price) || null,
+                                quantity: Number(p.quantity) || 1
+                            }))
+                            : [],
+                        products_count:
+                            order.products_count ||
+                            (Array.isArray(order.products) ? order.products.length : 0)
+                    };
 
-                customer_id: order.customer?.id || "Unknown",
+                    sendTrackingEvent("purchase", orderInfo);
+                }
 
-                order_total: Number(order.order_total) || null,
+            } catch (err) {
+                console.warn("Purchase tracking failed:", err);
+            }
 
-                order_total_string: order.order_total_string || null,
+            return originalSendPurchaseEvent.apply(this, arguments);
+        };
 
-                currency: order.currency_code || "SAR",
-
-                issue_date: order.issue_date || null,
-
-                payment_method_name: order.payment?.method?.name || null,
-
-                products_name: Array.isArray(order.products)
-
-                    ? order.products.map(p => p.name).join(", ")
-
-                    : null,
-
-                products_count: order.products_count
-
-                    || (order.products ? order.products.length : 0)
-
-            };
- 
-            console.log("Purchase detected:", orderInfo); 
-
-            sendTrackingEvent("purchase", orderInfo);
- 
-        } catch (err) {
-
-            console.warn("Purchase capture failed:", err); 
-
-        }
- 
-        return originalSendPurchaseEvent.apply(this, arguments);
-
-    };
- 
-    console.log("sendPurchaseEvent successfully hooked");
-
-    })(); 
+    })();
 })();
