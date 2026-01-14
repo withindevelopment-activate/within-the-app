@@ -69,27 +69,11 @@
 
     // ------------------- Tracking -------------------
     const BACKEND_URL = "https://testing-within.onrender.com";
-    const TRACKING_DEBUG = true; // 🔁 set to false in production
-
-    function debugLog(...args) {
-        if (TRACKING_DEBUG && typeof console !== "undefined") {
-            console.log("[WithIn Tracking]", ...args);
-        }
-    }
-
-    function debugWarn(...args) {
-        if (TRACKING_DEBUG && typeof console !== "undefined") {
-            console.warn("[WithIn Tracking]", ...args);
-        }
-    }
 
     function sendTrackingEvent(eventType, eventDetails = {}) {
         try {
             const storeUrl = window.location.origin;
-            if (!storeUrl) {
-                debugWarn("store_url not found");
-                return;
-            }
+            if (!storeUrl) return;
 
             const utmParams = getUTMParams();
             const referrer = getReferrer();
@@ -110,71 +94,48 @@
                 timestamp: new Date().toISOString()
             };
 
-            debugLog("Sending event:", eventType, payload);
-
             fetch(`${BACKEND_URL}/save_tracking/`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
-            })
-            .then(res => debugLog("Backend response:", res.status))
-            .catch(err => debugWarn("Network error:", err));
+            }).catch(() => {});
 
         } catch (e) {
-            debugWarn("sendTrackingEvent failed:", e);
+            // silently fail
         }
     }
 
     // ------------------- Base Events -------------------
     window.addEventListener("load", function () {
-        debugLog("Pageview detected");
         sendTrackingEvent("pageview");
     });
 
     window.addToCartEvent = function (productInfo) {
-        debugLog("Add to cart detected:", productInfo);
         sendTrackingEvent("add_to_cart", productInfo || {});
     };
 
     window.addToWishlist = function (productId) {
-        debugLog("Add to wishlist detected:", productId);
         sendTrackingEvent("add_to_wishlist", { product_id: productId });
     };
 
     // Compatibility only — real capture via interceptor
     window.purchaseEvent = function (data) {
-        debugLog("Legacy purchaseEvent called:", data);
         sendTrackingEvent("purchase", data || {});
     };
 
     // ------------------- Purchase Interception -------------------
     (function interceptPurchaseEvent() {
-
-        if (typeof window.sendPurchaseEvent !== "function") {
-            debugWarn("sendPurchaseEvent not found — interception skipped");
-            return;
-        }
-
-        debugLog("Hooking sendPurchaseEvent");
+        if (typeof window.sendPurchaseEvent !== "function") return;
 
         const originalSendPurchaseEvent = window.sendPurchaseEvent;
 
         window.sendPurchaseEvent = function (payload) {
-
-            debugLog("sendPurchaseEvent called with payload:", payload);
-
             try {
                 const order =
                     payload?.order ||
                     (payload && payload.id ? payload : null);
 
-                if (!order) {
-                    debugWarn("No order object found in payload");
-                }
-
                 if (order && order.id) {
-                    debugLog("Order detected:", order);
-
                     const orderInfo = {
                         order_id: order.id,
                         customer_id: order.customer?.id || null,
@@ -197,20 +158,15 @@
                             (Array.isArray(order.products) ? order.products.length : 0)
                     };
 
-                    debugLog("Normalized order payload:", orderInfo);
-
                     sendTrackingEvent("purchase", orderInfo);
                 }
 
             } catch (err) {
-                debugWarn("Purchase tracking failed:", err);
+                // silently fail
             }
 
             return originalSendPurchaseEvent.apply(this, arguments);
         };
-
-        debugLog("sendPurchaseEvent successfully hooked");
-
     })();
 
 })();
