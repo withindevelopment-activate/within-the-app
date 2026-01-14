@@ -1214,13 +1214,9 @@ def save_tracking(request):
             if order_id:
                 try:
                     df = fetch_data_from_supabase_specific(
-                        "Tracking_Visitors",
-                        filters={
-                            "Event_Type": ("eq", "purchase"),
-                            "Event_Details": ("ilike", f"%{order_id}%"),
-                        },
-                        limit=1
-                    )
+                    "Tracking_Visitors",
+                    filters={'Event_Details': ('eq', str(event_details))},
+                )
 
                     if df is not None and not df.empty:
                         dprint("[SKIPPED] Duplicate purchase detected")

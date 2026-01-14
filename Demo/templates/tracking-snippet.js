@@ -119,8 +119,7 @@
     };
 
     // Compatibility only — real capture via interceptor
-    window.purchaseEventWithin = function (data) {
-        console.log("data detection Warning: 'purchaseEventWithin'", data);
+    window.purchaseEvent = function (data) {
         sendTrackingEvent("purchase", data || {});
     };
 
