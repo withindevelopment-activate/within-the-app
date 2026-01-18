@@ -1,4 +1,4 @@
-import os, json, ast, logging, pandas as pd, pytz, uuid, re
+import os, json, ast, logging, pandas as pd, pytz, uuid, re, traceback
 from supabase import create_client, Client
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
@@ -1624,3 +1624,38 @@ def update_database_after_filter(request, df):
         request,
         f"{updated_rows} records updated successfully."
     )
+
+def get_last_non_direct_utm(visitor_id, user_agent=None):
+    """
+    Returns dict with last non-direct UTM values for a visitor
+    or None if not found
+    """
+
+    filters = {
+        "Visitor_ID": ("eq", visitor_id),
+        "UTM_Source": ("neq", "direct"),
+    }
+
+    # Optional UA binding (recommended)
+    if user_agent:
+        filters["User_Agent"] = ("eq", user_agent)
+
+    df = fetch_data_from_supabase_specific(
+        table_name="Tracking_Visitors",
+        columns=[
+            "UTM_Source",
+            "UTM_Medium",
+            "UTM_Campaign",
+            "UTM_Term",
+            "UTM_Content",
+            "Visited_at",
+        ],
+        filters=filters,
+        order_by="Visited_at",
+        limit=1,
+    )
+
+    if df is not None and not df.empty:
+        return df.iloc[0].to_dict()
+
+    return None

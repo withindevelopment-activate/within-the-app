@@ -83,14 +83,16 @@
                 visitor_id: getVisitorId(),
                 session_id: getOrCreateSessionId(),
                 store_url: storeUrl,
+                page_url: window.location.href,
+                referrer: referrer || document.referrer || null,
+                
                 event_type: eventType,
                 event_details: eventDetails,
+                
                 utm_params: utmParams,
-                referrer: referrer,
                 traffic_source: traffic,
                 client_info: getClientInfo(),
                 visitor_info: getVisitorInfo(),
-                page_url: window.location.href,
                 timestamp: new Date().toISOString()
             };
 

@@ -18,7 +18,7 @@ import threading
 
 ## Custom Imports ------------------
 # Supabase & Supporting imports
-from Demo.supporting_files.supabase_functions import get_next_id_from_supabase_compatible_all, batch_insert_to_supabase, sync_customers, fetch_data_from_supabase_specific, update_database_after_filter
+from Demo.supporting_files.supabase_functions import get_next_id_from_supabase_compatible_all, batch_insert_to_supabase, sync_customers, fetch_data_from_supabase_specific, update_database_after_filter, get_last_non_direct_utm
 
 from Demo.supporting_files.supporting_functions import get_uae_current_date, detect_source_from_url_or_domain, detect_source_from_row, detect_source_from_user_agent
 # Marketing Report functions
@@ -1164,9 +1164,26 @@ def save_tracking(request):
                 utm_params["utm_source"] = referrer_detected_source
                 dprint(f"utm_source set from referrer/page: {referrer_detected_source}")
 
-        if not utm_params.get("utm_source"):
-            utm_params["utm_source"] = "direct"
-            dprint("utm_source defaulted to direct")
+        # ----------------------------------
+        # Attribution persistence (anti-direct overwrite)
+        # ----------------------------------
+        if not utm_params.get("utm_source") or utm_params.get("utm_source") == "direct":
+
+            last_utm = get_last_non_direct_utm(visitor_id, agent)
+
+            if last_utm:
+                dprint(f"Reusing last non-direct attribution: {last_utm}")
+
+                utm_params["utm_source"]   = last_utm.get("UTM_Source")
+                utm_params["utm_medium"]   = last_utm.get("UTM_Medium")
+                utm_params["utm_campaign"] = last_utm.get("UTM_Campaign")
+                utm_params["utm_term"]     = last_utm.get("UTM_Term")
+                utm_params["utm_content"]  = last_utm.get("UTM_Content")
+
+            else:
+                utm_params["utm_source"] = "direct"
+                dprint("No previous attribution found → direct")
+
 
         # -------------------------
         # STEP 7: Determine customer info
