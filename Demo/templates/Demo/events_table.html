@@ -96,18 +96,12 @@
     <div class="row mb-5">
         <div class="col-md-6">
             <h5 class="text-center">UTM Source Distribution (%)</h5>
-            <div class="chart-wrapper">
-                <canvas id="utmSourceChart"></canvas>
-            </div>
-            <div class="chartjs-legend-wrapper" id="utmSourceLegend"></div>
+            <canvas id="utmSourceChart"></canvas>
         </div>
 
         <div class="col-md-6">
             <h5 class="text-center">UTM Campaign Distribution (%)</h5>
-            <div class="chart-wrapper">
-                <canvas id="utmCampaignChart"></canvas>
-            </div>
-            <div class="chartjs-legend-wrapper" id="utmCampaignLegend"></div>
+            <canvas id="utmCampaignChart"></canvas>
         </div>
     </div>
 
@@ -185,69 +179,6 @@
 </div> -->
 
 <script>
-    const htmlLegendPlugin = {
-        id: 'htmlLegend',
-        afterUpdate(chart, args, options) {
-            const container = document.getElementById(options.containerID);
-            if (!container || !chart.data.labels) return; // safe check
-
-            // create or get <ul>
-            let ul = container.querySelector('ul');
-            if (!ul) {
-                ul = document.createElement('ul');
-                container.appendChild(ul);
-            }
-
-            ul.innerHTML = ''; // clear previous legend items
-
-            chart.data.labels.forEach((label, i) => {
-                const li = document.createElement('li');
-
-                const box = document.createElement('span');
-                box.style.background = chart.data.datasets[0].backgroundColor[i];
-                box.style.width = '12px';
-                box.style.height = '12px';
-                box.style.marginRight = '8px';
-                box.style.borderRadius = '3px';
-
-                li.appendChild(box);
-                li.appendChild(document.createTextNode(label));
-                ul.appendChild(li);
-
-                // Hover highlight
-                li.addEventListener('mouseenter', () => {
-                    chart.setActiveElements([{datasetIndex:0, index:i}]);
-                    chart.tooltip.setActiveElements([{datasetIndex:0, index:i}], {x:0,y:0});
-                    chart.update();
-                });
-                li.addEventListener('mouseleave', () => {
-                    chart.setActiveElements([]);
-                    chart.tooltip.setActiveElements([]);
-                    chart.update();
-                });
-
-                // Click toggle
-                li.addEventListener('click', () => {
-                    const meta = chart.getDatasetMeta(0);
-                    const slice = meta.data[i];
-
-                    const visibleCount = meta.data.filter(s => !s.hidden).length;
-                    if (slice.hidden || visibleCount > 1) {
-                        slice.hidden = !slice.hidden;
-                        li.style.opacity = slice.hidden ? 0.5 : 1;
-                        chart.update();
-                    }
-                });
-
-                // initial opacity
-                const meta = chart.getDatasetMeta(0);
-                const slice = meta.data[i];
-                li.style.opacity = slice?.hidden ? 0.5 : 1;
-            });
-        }
-    };
-
-
     const modernColors = [
     '#6366F1','#F59E0B','#10B981','#EF4444','#3B82F6',
     '#8B5CF6','#EC4899','#14B8A6','#F97316','#84CC16',
@@ -297,37 +228,26 @@
                 }
             },
             legend: {
-                display: false
+                position: 'bottom'
             }
         }
     };
-    
-    document.addEventListener('DOMContentLoaded', () => {
-        if (utmSourceData.labels.length) {
-            new Chart(document.getElementById('utmSourceChart'), {
-                type: 'pie',
-                data: utmSourceData,
-                options: pieOptions,
-                plugins: [{
-                    ...htmlLegendPlugin,
-                    containerID: 'utmSourceLegend'
-                }]
-            });
-        }
-        
-        if (utmCampaignData.labels.length) {
-            new Chart(document.getElementById('utmCampaignChart'), {
-                type: 'pie',
-                data: utmCampaignData,
-                options: pieOptions,
-                plugins: [{
-                    ...htmlLegendPlugin,
-                    containerID: 'utmCampaignLegend'
-                }]
-            });
-        }
-    });
 
+    if (utmSourceData.labels.length) {
+        new Chart(document.getElementById('utmSourceChart'), {
+            type: 'pie',
+            data: utmSourceData,
+            options: pieOptions
+        });
+    }
+
+    if (utmCampaignData.labels.length) {
+        new Chart(document.getElementById('utmCampaignChart'), {
+            type: 'pie',
+            data: utmCampaignData,
+            options: pieOptions
+        });
+    }
 </script>
 
 
