@@ -189,28 +189,19 @@
         id: 'htmlLegend',
         afterUpdate(chart, args, options) {
             const container = document.getElementById(options.containerID);
-            if (!container) return; // <--- prevent errors if container is missing
+            if (!container || !chart.data.labels) return; // safe check
 
+            // create or get <ul>
             let ul = container.querySelector('ul');
             if (!ul) {
                 ul = document.createElement('ul');
-                ul.style.listStyle = 'none';
-                ul.style.padding = 0;
-                ul.style.margin = 0;
                 container.appendChild(ul);
             }
 
-            // Clear old legend items
-            while (ul.firstChild) {
-                ul.firstChild.remove();
-            }
+            ul.innerHTML = ''; // clear previous legend items
 
             chart.data.labels.forEach((label, i) => {
                 const li = document.createElement('li');
-                li.style.display = 'flex';
-                li.style.alignItems = 'center';
-                li.style.cursor = 'pointer';
-                li.style.transition = 'opacity 0.2s';
 
                 const box = document.createElement('span');
                 box.style.background = chart.data.datasets[0].backgroundColor[i];
@@ -225,8 +216,8 @@
 
                 // Hover highlight
                 li.addEventListener('mouseenter', () => {
-                    chart.setActiveElements([{datasetIndex: 0, index: i}]);
-                    chart.tooltip.setActiveElements([{datasetIndex: 0, index: i}], {x:0,y:0});
+                    chart.setActiveElements([{datasetIndex:0, index:i}]);
+                    chart.tooltip.setActiveElements([{datasetIndex:0, index:i}], {x:0,y:0});
                     chart.update();
                 });
                 li.addEventListener('mouseleave', () => {
@@ -235,7 +226,7 @@
                     chart.update();
                 });
 
-                // Click toggle visibility
+                // Click toggle
                 li.addEventListener('click', () => {
                     const meta = chart.getDatasetMeta(0);
                     const slice = meta.data[i];
@@ -248,13 +239,14 @@
                     }
                 });
 
-                // Initial opacity
+                // initial opacity
                 const meta = chart.getDatasetMeta(0);
                 const slice = meta.data[i];
                 li.style.opacity = slice?.hidden ? 0.5 : 1;
             });
         }
     };
+
 
     const modernColors = [
     '#6366F1','#F59E0B','#10B981','#EF4444','#3B82F6',
@@ -309,30 +301,33 @@
             }
         }
     };
-
-    if (utmSourceData.labels.length) {
-        new Chart(document.getElementById('utmSourceChart'), {
-            type: 'pie',
-            data: utmSourceData,
-            options: pieOptions,
-            plugins: [{
-                ...htmlLegendPlugin,
-                containerID: 'utmSourceLegend'
-            }]
-        });
-    }
     
-    if (utmCampaignData.labels.length) {
-        new Chart(document.getElementById('utmCampaignChart'), {
-            type: 'pie',
-            data: utmCampaignData,
-            options: pieOptions,
-            plugins: [{
-                ...htmlLegendPlugin,
-                containerID: 'utmCampaignLegend'
-            }]
-        });
-    }
+    document.addEventListener('DOMContentLoaded', () => {
+        if (utmSourceData.labels.length) {
+            new Chart(document.getElementById('utmSourceChart'), {
+                type: 'pie',
+                data: utmSourceData,
+                options: pieOptions,
+                plugins: [{
+                    ...htmlLegendPlugin,
+                    containerID: 'utmSourceLegend'
+                }]
+            });
+        }
+        
+        if (utmCampaignData.labels.length) {
+            new Chart(document.getElementById('utmCampaignChart'), {
+                type: 'pie',
+                data: utmCampaignData,
+                options: pieOptions,
+                plugins: [{
+                    ...htmlLegendPlugin,
+                    containerID: 'utmCampaignLegend'
+                }]
+            });
+        }
+    });
+
 </script>
 
 
