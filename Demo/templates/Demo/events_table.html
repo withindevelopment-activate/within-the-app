@@ -189,8 +189,9 @@
         id: 'htmlLegend',
         afterUpdate(chart, args, options) {
             const container = document.getElementById(options.containerID);
-            let ul = container.querySelector('ul');
+            if (!container) return; // <--- prevent errors if container is missing
 
+            let ul = container.querySelector('ul');
             if (!ul) {
                 ul = document.createElement('ul');
                 ul.style.listStyle = 'none';
@@ -222,9 +223,7 @@
                 li.appendChild(document.createTextNode(label));
                 ul.appendChild(li);
 
-                // ---------------------------
-                // Hover: highlight slice
-                // ---------------------------
+                // Hover highlight
                 li.addEventListener('mouseenter', () => {
                     chart.setActiveElements([{datasetIndex: 0, index: i}]);
                     chart.tooltip.setActiveElements([{datasetIndex: 0, index: i}], {x:0,y:0});
@@ -236,18 +235,20 @@
                     chart.update();
                 });
 
-                // ---------------------------
-                // Click: toggle slice visibility
-                // ---------------------------
+                // Click toggle visibility
                 li.addEventListener('click', () => {
                     const meta = chart.getDatasetMeta(0);
                     const slice = meta.data[i];
-                    slice.hidden = !slice.hidden;
-                    li.style.opacity = slice.hidden ? 0.5 : 1; // dim hidden slices
-                    chart.update();
+
+                    const visibleCount = meta.data.filter(s => !s.hidden).length;
+                    if (slice.hidden || visibleCount > 1) {
+                        slice.hidden = !slice.hidden;
+                        li.style.opacity = slice.hidden ? 0.5 : 1;
+                        chart.update();
+                    }
                 });
 
-                // Set initial opacity if slice is hidden
+                // Initial opacity
                 const meta = chart.getDatasetMeta(0);
                 const slice = meta.data[i];
                 li.style.opacity = slice?.hidden ? 0.5 : 1;
