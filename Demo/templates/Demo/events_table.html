@@ -96,18 +96,12 @@
     <div class="row mb-5">
         <div class="col-md-6">
             <h5 class="text-center">UTM Source Distribution (%)</h5>
-            <div class="chart-wrapper">
-                <canvas id="utmSourceChart"></canvas>
-            </div>
-            <div class="chartjs-legend-wrapper" id="utmSourceLegend"></div>
+            <canvas id="utmSourceChart"></canvas>
         </div>
 
         <div class="col-md-6">
             <h5 class="text-center">UTM Campaign Distribution (%)</h5>
-            <div class="chart-wrapper">
-                <canvas id="utmCampaignChart"></canvas>
-            </div>
-            <div class="chartjs-legend-wrapper" id="utmCampaignLegend"></div>
+            <canvas id="utmCampaignChart"></canvas>
         </div>
     </div>
 
@@ -185,44 +179,6 @@
 </div> -->
 
 <script>
-    const htmlLegendPlugin = {
-        id: 'htmlLegend',
-        afterUpdate(chart, args, options) {
-            const container = document.getElementById(options.containerID);
-            let ul = container.querySelector('ul');
-
-            if (!ul) {
-                ul = document.createElement('ul');
-                ul.style.listStyle = 'none';
-                ul.style.padding = 0;
-                ul.style.margin = 0;
-                container.appendChild(ul);
-            }
-
-            while (ul.firstChild) {
-                ul.firstChild.remove();
-            }
-
-            chart.data.labels.forEach((label, i) => {
-                const li = document.createElement('li');
-                li.style.display = 'flex';
-                li.style.alignItems = 'center';
-                li.style.cursor = 'pointer';
-
-                const box = document.createElement('span');
-                box.style.background = chart.data.datasets[0].backgroundColor[i];
-                box.style.width = '12px';
-                box.style.height = '12px';
-                box.style.marginRight = '8px';
-                box.style.borderRadius = '3px';
-
-                li.appendChild(box);
-                li.appendChild(document.createTextNode(label));
-                ul.appendChild(li);
-            });
-        }
-    };
-
     const modernColors = [
     '#6366F1','#F59E0B','#10B981','#EF4444','#3B82F6',
     '#8B5CF6','#EC4899','#14B8A6','#F97316','#84CC16',
@@ -272,7 +228,7 @@
                 }
             },
             legend: {
-                display: false
+                position: 'bottom'
             }
         }
     };
@@ -281,23 +237,15 @@
         new Chart(document.getElementById('utmSourceChart'), {
             type: 'pie',
             data: utmSourceData,
-            options: pieOptions,
-            plugins: [{
-                ...htmlLegendPlugin,
-                containerID: 'utmSourceLegend'
-            }]
-        });    
+            options: pieOptions
+        });
     }
-    
+
     if (utmCampaignData.labels.length) {
         new Chart(document.getElementById('utmCampaignChart'), {
             type: 'pie',
             data: utmCampaignData,
-            options: pieOptions,
-            plugins: [{
-                ...htmlLegendPlugin,
-                containerID: 'utmCampaignLegend'
-            }]
+            options: pieOptions
         });
     }
 </script>
