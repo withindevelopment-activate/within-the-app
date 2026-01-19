@@ -1074,6 +1074,9 @@ def save_tracking(request):
         client_info    = clean_dict(data.get("client_info"))
         utm_params     = clean_dict(data.get("utm_params"))
         traffic_source = clean_dict(data.get("traffic_source"))
+        event_type    = (data.get("event_type") or "").strip()
+        visitor_id    = (data.get("visitor_id") or "").strip()
+        event_details = clean_dict(data.get("event_details"))
 
         referrer = (data.get("referrer") or "").strip()
         page_url = (data.get("page_url") or "").strip()
@@ -1216,10 +1219,7 @@ def save_tracking(request):
         # -------------------------
         # STEP 8: Prevent duplicate purchases
         # -------------------------
-        event_type    = (data.get("event_type") or "").strip()
-        visitor_id    = (data.get("visitor_id") or "").strip()
-
-        event_details = clean_dict(data.get("event_details"))
+        
 
         dprint(f"event_type: {event_type}")
         dprint(f"event_details: {event_details}")
