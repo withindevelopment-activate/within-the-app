@@ -3114,6 +3114,7 @@ def events_table_view(request):
     visitor_search = request.GET.get("visitor_id")
     sort_field = request.GET.get("sort_by", "Distinct_ID")
     timezone_search = request.GET.get("timezone")
+    number_search = request.GET.get("name_search")
     action = request.GET.get("action", "filter")
 
     filters = {}
@@ -3126,6 +3127,9 @@ def events_table_view(request):
 
     if visitor_search and visitor_search != "None":
         filters["Visitor_ID"] = ("eq", visitor_search)
+
+    if number_search and number_search != "None":
+        filters["Customer_Mobile"] = ("eq", number_search)
 
     if timezone_search and timezone_search != "None":
         filters["Timezone"] = ("eq", timezone_search)
@@ -3201,6 +3205,7 @@ def events_table_view(request):
         "selected_date_end": date_end,
         "session_search": session_search,
         "visitor_search": visitor_search,
+        "number_search": number_search,
         "sort_field": sort_field,
         "timezone_search": timezone_search,
         "utm_source_labels": json.dumps(list(to_pct(Counter(utm_sources)).keys())),
