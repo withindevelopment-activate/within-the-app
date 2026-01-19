@@ -3189,9 +3189,12 @@ def events_table_view(request):
         response["Content-Disposition"] = "attachment; filename=tracking_sheet.xlsx"
         wb.save(response)
         return response
+    
+    row_count = 0 if df is None else len(df)
 
     context = {
         "data": data,
+        "row_count": row_count,
         "selected_event_type": event_type,
         "selected_limit": limit,
         "selected_date": date_after,
