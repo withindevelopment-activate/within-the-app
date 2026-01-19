@@ -24,7 +24,7 @@ DOMAIN_MAPPING = {
     "twitter.com": "twitter",
     "x.com": "twitter",
     "linkedin.com": "linkedin",
-    "snapchat.com": "snapchat",
+    "snapchat.com": "Snapchat",
     "google.com": "google",
     "youtube.com": "youtube"
 }
@@ -39,15 +39,15 @@ PARAM_MAPPING = {
     "gclid": "google",
     "wbraid": "google",
     "gbraid": "google",
-    "sccid": "snapchat",
-    "sc_cid": "snapchat",
+    "sccid": "Snapchat",
+    "sc_cid": "Snapchat",
     "srsltid": "google"
 }
 
 USER_AGENT_SOURCE_MAPPING = {
     "musical_ly": "tiktok",
     "instagram": "instagram",
-    "snapchat": "snapchat",
+    "snapchat": "Snapchat",
     "FB_IAB": "instagram",
     "google": "google",
     "tiktok": "tiktok"
