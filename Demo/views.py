@@ -3114,7 +3114,7 @@ def events_table_view(request):
     visitor_search = request.GET.get("visitor_id")
     sort_field = request.GET.get("sort_by", "Distinct_ID")
     timezone_search = request.GET.get("timezone")
-    number_search = request.GET.get("name_search")
+    number_search = request.GET.get("number_search")
     action = request.GET.get("action", "filter")
 
     filters = {}
