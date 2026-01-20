@@ -3228,7 +3228,7 @@ def events_table_view(request):
         "number_search": number_search,
         "sort_field": sort_field,
         "timezone_search": timezone_search,
-        "last_30_unique_visitors": last_30_unique_visitors,
+        # "last_30_unique_visitors": last_30_unique_visitors,
         "utm_source_labels": json.dumps(list(to_pct(Counter(utm_sources)).keys())),
         "utm_source_values": json.dumps(list(to_pct(Counter(utm_sources)).values())),
         "utm_campaign_labels": json.dumps(list(to_pct(Counter(utm_campaigns)).keys())),
