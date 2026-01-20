@@ -18,39 +18,39 @@ def get_uae_current_date():
 # SOURCE DETECTION LOGIC (ported from Excel version)
 # -------------------------------------------
 DOMAIN_MAPPING = {
-    "facebook.com": "instagram",
-    "instagram.com": "instagram",
-    "tiktok.com": "tiktok",
-    "twitter.com": "twitter",
-    "x.com": "twitter",
-    "linkedin.com": "linkedin",
+    "facebook.com": "Instagram",
+    "instagram.com": "Instagram",
+    "tiktok.com": "Tiktok",
+    "twitter.com": "Twitter",
+    "x.com": "Twitter",
+    "linkedin.com": "Linkedin",
     "snapchat.com": "Snapchat",
-    "google.com": "google",
-    "youtube.com": "youtube"
+    "google.com": "Google",
+    "youtube.com": "Youtube"
 }
 
 PARAM_MAPPING = {
-    "fbclid": "instagram",
-    "fb_source": "instagram",
-    "fb_ref": "instagram",
-    "ttclid": "tiktok",
-    "twclid": "twitter",
-    "li_fat_id": "linkedin",
-    "gclid": "google",
-    "wbraid": "google",
-    "gbraid": "google",
+    "fbclid": "Instagram",
+    "fb_source": "Instagram",
+    "fb_ref": "Instagram",
+    "ttclid": "Tiktok",
+    "twclid": "Twitter",
+    "li_fat_id": "Linkedin",
+    "gclid": "Google",
+    "wbraid": "Google",
+    "gbraid": "Google",
     "sccid": "Snapchat",
     "sc_cid": "Snapchat",
-    "srsltid": "google"
+    "srsltid": "Google"
 }
 
 USER_AGENT_SOURCE_MAPPING = {
-    "musical_ly": "tiktok",
-    "instagram": "instagram",
+    "musical_ly": "Tiktok",
+    "instagram": "Instagram",
     "snapchat": "Snapchat",
-    "FB_IAB": "instagram",
-    "google": "google",
-    "tiktok": "tiktok"
+    "FB_IAB": "Instagram",
+    "google": "Google",
+    "tiktok": "Tiktok"
 }
 
 OWN_DOMAIN = "sleepy-cloud.ae"

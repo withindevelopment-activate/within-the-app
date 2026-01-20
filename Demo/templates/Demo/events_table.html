@@ -6,6 +6,20 @@
 <div class="container mt-4">
     <h3 class="mb-4">Tracking Events Viewer</h3>
 
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0">
+                <div class="card-body text-center">
+                    <i class="bi bi-people-fill fs-2 text-primary"></i><h6 class="text-muted mb-1">Unique Visitors</h6>
+                    <h3 class="fw-bold text-primary">
+                        {{ last_30_unique_visitors }}
+                    </h3>
+                    <small class="text-muted">Last 30 minutes</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Filters Form -->
     <form method="GET" class="row g-3 mb-4">
 
@@ -34,36 +48,36 @@
 
         <!-- Date After -->
         <div class="col-md-3">
-            <label class="form-label">Date After</label>
+            <label class="form-label">From Date</label>
             <input type="datetime-local" name="date_after" value="{{ selected_date }}" class="form-control">
         </div>
 
         <div class="col-md-3">
-            <label class="form-label">Date Before</label>
+            <label class="form-label">To Date</label>
             <input type="datetime-local" name="date_end" value="{{ selected_date_end }}" class="form-control">
         </div>
 
         <!-- Search Session ID -->
         <div class="col-md-2">
             <label class="form-label">Session ID</label>
-            <input type="text" name="session_id" value="{{ session_search }}" class="form-control">
+            <input type="text" name="session_id" value="{{ session_search }}" placeholder="Session ID..." class="form-control">
         </div>
 
         <!-- Search Visitor ID -->
         <div class="col-md-2">
             <label class="form-label">Visitor ID</label>
-            <input type="text" name="visitor_id" value="{{ visitor_search }}" class="form-control">
+            <input type="text" name="visitor_id" value="{{ visitor_search }}" placeholder="Visitor ID..." class="form-control">
         </div>
 
         <!-- Search Number -->
         <div class="col-md-2">
             <label class="form-label">Customer Mobile</label>
-            <input type="text" name="number_search" value="{{ number_search }}" class="form-control">
+            <input type="text" name="number_search" value="{{ number_search }}" placeholder="Customer Mobile..." class="form-control">
         </div>
 
         <div class="col-md-2">
             <label class="form-label">Timezone</label>
-            <input type="text" name="timezone" value="{{ timezone_search }}" class="form-control">
+            <input type="text" name="timezone" value="{{ timezone_search }}" placeholder="Timezone..." class="form-control">
         </div>
 
         <!-- Sorting -->
@@ -89,12 +103,12 @@
                 Export Excel
             </button>
 
-            <button type="submit"
+            {% comment %} <button type="submit"
                     class="btn btn-outline-warning"
                     onclick="return confirm('Update database using current filters?') &&
                             (document.getElementById('action-field').value='update_db')">
                 Update Database
-            </button>
+            </button> {% endcomment %}
         </div>
         <input type="hidden" name="action" id="action-field">
     </form>
@@ -238,7 +252,7 @@
                 fullSize: false,
                 labels: {
                     useBorderRadius: true,
-                    borderRadius: 10,
+                    borderRadius: 8,
                 }
             }
         }
