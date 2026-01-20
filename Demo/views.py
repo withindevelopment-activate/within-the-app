@@ -3157,24 +3157,24 @@ def events_table_view(request):
 
         filters["Visited_at"] = ("between", date_after, date_end)
     
-    # ---- Last 30 minutes unique visitors ----
-    last_30_min = (datetime.now() - timedelta(minutes=30)).strftime("%Y-%m-%dT%H:%M:%S")
+    # # ---- Last 30 minutes unique visitors ----
+    # last_30_min = (datetime.now() - timedelta(minutes=30)).strftime("%Y-%m-%dT%H:%M:%S")
 
-    last_30_filters = {
-        "Visited_at": ("gte", last_30_min)
-    }
+    # last_30_filters = {
+    #     "Visited_at": ("gte", last_30_min)
+    # }
 
-    df_last_30 = fetch_data_from_supabase_specific(
-        table_name="Tracking_Visitors",
-        columns=["Visitor_ID","Visited_at"],
-        filters=last_30_filters,
-        limit=5000,  # high enough to capture traffic
-    )
+    # df_last_30 = fetch_data_from_supabase_specific(
+    #     table_name="Tracking_Visitors",
+    #     columns=["Visitor_ID","Visited_at"],
+    #     filters=last_30_filters,
+    #     limit=5000,  # high enough to capture traffic
+    # )
 
-    if df_last_30 is None or df_last_30.empty:
-        last_30_unique_visitors = 0
-    else:
-        last_30_unique_visitors = df_last_30["Visitor_ID"].nunique()
+    # if df_last_30 is None or df_last_30.empty:
+    #     last_30_unique_visitors = 0
+    # else:
+    #     last_30_unique_visitors = df_last_30["Visitor_ID"].nunique()
 
 
     df = fetch_data_from_supabase_specific(
