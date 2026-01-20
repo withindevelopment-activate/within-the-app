@@ -3158,23 +3158,23 @@ def events_table_view(request):
         filters["Visited_at"] = ("between", date_after, date_end)
     
     # ---- Last 30 minutes unique visitors ----
-    last_30_min = (get_uae_current_date() - timedelta(minutes=30)).strftime("%Y-%m-%d %H:%M:%S")
+    # last_30_min = (get_uae_current_date() - timedelta(minutes=30)).strftime("%Y-%m-%d %H:%M:%S")
 
-    last_30_filters = {
-        "Visited_at": ("gte", last_30_min)
-    }
+    # last_30_filters = {
+    #     "Visited_at": ("gte", last_30_min)
+    # }
 
-    df_last_30 = fetch_data_from_supabase_specific(
-        table_name="Tracking_Visitors",
-        columns=["Visitor_ID","Visited_at"],
-        filters=last_30_filters,
-        limit=1000,  # high enough to capture traffic
-    )
+    # df_last_30 = fetch_data_from_supabase_specific(
+    #     table_name="Tracking_Visitors",
+    #     columns=["Visitor_ID","Visited_at"],
+    #     filters=last_30_filters,
+    #     limit=1000,  # high enough to capture traffic
+    # )
 
-    if df_last_30 is None or df_last_30.empty:
-        last_30_unique_visitors = 0
-    else:
-        last_30_unique_visitors = df_last_30["Visitor_ID"].nunique()
+    # if df_last_30 is None or df_last_30.empty:
+    #     last_30_unique_visitors = 0
+    # else:
+    #     last_30_unique_visitors = df_last_30["Visitor_ID"].nunique()
 
 
     df = fetch_data_from_supabase_specific(
@@ -3228,7 +3228,7 @@ def events_table_view(request):
         "number_search": number_search,
         "sort_field": sort_field,
         "timezone_search": timezone_search,
-        "last_30_unique_visitors": last_30_unique_visitors,
+        # "last_30_unique_visitors": last_30_unique_visitors,
         "utm_source_labels": json.dumps(list(to_pct(Counter(utm_sources)).keys())),
         "utm_source_values": json.dumps(list(to_pct(Counter(utm_sources)).values())),
         "utm_campaign_labels": json.dumps(list(to_pct(Counter(utm_campaigns)).keys())),
