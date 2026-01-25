@@ -1852,7 +1852,7 @@ def save_tracking(request):
 
         dprint(f"[INSERT PAYLOAD PREVIEW] {tracking_entry}")
 
-        batch_insert_to_supabase(pd.DataFrame([tracking_entry]), "Tracking_Visitors")
+        batch_insert_to_supabase(pd.DataFrame([tracking_entry]), "Tracking_Visitors_duplicate")
 
         # --------------------------------------------------
         # Backfill ONLY non-social sources across same mobile
