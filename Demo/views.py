@@ -1815,7 +1815,7 @@ def save_tracking(request):
         # --------------------------------------------------
         # Build tracking row
         tracking_entry = {
-            "Distinct_ID": int(get_next_id_from_supabase_compatible_all(name="Tracking_Visitors", column="Distinct_ID")),
+            "Distinct_ID": int(get_next_id_from_supabase_compatible_all(name="Tracking_Visitors_duplicate", column="Distinct_ID")),
             "Visitor_ID": visitor_id,
             "Session_ID": session_id,
             "Event_Type": event_type,
