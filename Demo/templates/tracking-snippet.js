@@ -1,68 +1,75 @@
-(function() {
-    // ------------------- Helper Functions -------------------
+(function () {
+    // ------------------- Helpers -------------------
     function getOrCreateCookie(name, days = 365) {
         const existing = document.cookie.split('; ').find(row => row.startsWith(name + '='));
         if (existing) return existing.split('=')[1];
-        const newId = crypto.randomUUID();
-        const expires = new Date(Date.now() + days * 864e5).toUTCString();
-        document.cookie = `${name}=${newId}; path=/; expires=${expires}`;
-        return newId;
+        const id = crypto.randomUUID();
+        document.cookie = `${name}=${id}; path=/; max-age=${days * 86400}`;
+        return id;
     }
 
     function getOrCreateSessionId() {
-        return sessionStorage.getItem('session_id') || (() => {
-            const id = crypto.randomUUID();
-            sessionStorage.setItem('session_id', id);
-            return id;
-        })();
+        let sid = sessionStorage.getItem("session_id");
+        if (!sid) {
+            sid = crypto.randomUUID();
+            sessionStorage.setItem("session_id", sid);
+        }
+        return sid;
     }
 
     function getUTMParams() {
-        const params = new URLSearchParams(window.location.search);
+        const p = new URLSearchParams(window.location.search);
         return {
-            utm_source: params.get("utm_source"),
-            utm_medium: params.get("utm_medium"),
-            utm_campaign: params.get("utm_campaign"),
-            utm_term: params.get("utm_term"),
-            utm_content: params.get("utm_content"),
+            utm_source: p.get("utm_source"),
+            utm_medium: p.get("utm_medium"),
+            utm_campaign: p.get("utm_campaign"),
+            utm_term: p.get("utm_term"),
+            utm_content: p.get("utm_content"),
         };
     }
 
-    function getReferrer() {
-        return document.referrer || null;
-    }
-
-    function getClientInfo() {
-        return {
-            user_agent: navigator.userAgent,
-            language: navigator.language,
-            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-            platform: navigator.platform,
-            screen_resolution: `${screen.width}x${screen.height}`,
-            device_memory: navigator.deviceMemory || null,
-        };
-    }
-
-    function inferTrafficSource(utmParams, referrer) {
-        if (utmParams.utm_source) return { source: utmParams.utm_source, medium: utmParams.utm_medium || 'unknown', campaign: utmParams.utm_campaign || 'unknown' };
-        if (referrer) {
-            const hostname = new URL(referrer).hostname.toLowerCase();
-            const socialDomains = ['facebook.com','instagram.com','twitter.com','linkedin.com','tiktok.com','pinterest.com'];
-            const searchDomains = ['google.com','bing.com','yahoo.com','duckduckgo.com'];
-            if (socialDomains.some(d => hostname.includes(d))) return { source: 'social', medium: 'referral', campaign: 'organic' };
-            if (searchDomains.some(d => hostname.includes(d))) return { source: 'search', medium: 'organic', campaign: 'n/a' };
-            return { source: 'referral', medium: 'referral', campaign: 'n/a' };
+    function inferSource(utm, referrer) {
+        if (utm.utm_source) {
+            return { source: utm.utm_source, medium: utm.utm_medium || "paid", campaign: utm.utm_campaign || "n/a", attribution_type: "explicit_utm" };
         }
-        return { source: 'direct', medium: 'none', campaign: 'n/a' };
+
+        if (referrer) {
+            const h = new URL(referrer).hostname.toLowerCase();
+            if (h.includes("instagram")) return { source: "instagram", medium: "social", campaign: "organic", attribution_type: "referrer" };
+            if (h.includes("facebook")) return { source: "facebook", medium: "social", campaign: "organic", attribution_type: "referrer" };
+            if (h.includes("tiktok")) return { source: "tiktok", medium: "social", campaign: "organic", attribution_type: "referrer" };
+            if (h.includes("snapchat")) return { source: "snapchat", medium: "social", campaign: "organic", attribution_type: "referrer" };
+            if (h.includes("google")) return { source: "google", medium: "organic", campaign: "n/a", attribution_type: "referrer" };
+        }
+
+        return { source: "unknown", medium: "unknown", campaign: "unknown", attribution_type: "unknown_first_touch" };
     }
 
-    function getVisitorId() {
-        return getOrCreateCookie('visitor_id');
+    function persistFirstTouch(source) {
+        if (!localStorage.getItem("first_touch_attribution")) {
+            localStorage.setItem("first_touch_attribution", JSON.stringify({
+                ...source,
+                ts: new Date().toISOString()
+            }));
+        }
+    }
+
+    function getPersistedFirstTouch() {
+        try {
+            return JSON.parse(localStorage.getItem("first_touch_attribution"));
+        } catch {
+            return null;
+        }
     }
 
     function getVisitorInfo() {
-        if (window.customer && window.customer.id) {
-            return { customer_id: window.customer.id, name: window.customer.name || null, email: window.customer.email || null, mobile: window.customer.mobile || null };
+        if (window.customer) {
+            return {
+                Customer_ID: window.customer.id,
+                Customer_Name: window.customer.name || null,
+                Customer_Email: window.customer.email || null,
+                Customer_Mobile: window.customer.mobile || null
+            };
         }
         return {};
     }
@@ -70,60 +77,53 @@
     // ------------------- Tracking -------------------
     const BACKEND_URL = "https://testing-within.onrender.com";
 
-    function sendTrackingEvent(eventType, eventDetails = {}) {
-        try {
-            const storeUrl = window.location.origin;
-            if (!storeUrl) return;
+    function sendTrackingEvent(type, details = {}) {
+        const utm = getUTMParams();
+        const referrer = document.referrer || null;
 
-            const utmParams = getUTMParams();
-            const referrer = getReferrer();
-            const traffic = inferTrafficSource(utmParams, referrer);
+        const inferred = inferSource(utm, referrer);
+        persistFirstTouch(inferred);
+        const firstTouch = getPersistedFirstTouch();
 
-            const payload = {
-                visitor_id: getVisitorId(),
-                session_id: getOrCreateSessionId(),
-                store_url: storeUrl,
-                page_url: window.location.href,
-                referrer: referrer || document.referrer || null,
-                
-                event_type: eventType,
-                event_details: eventDetails,
-                
-                utm_params: utmParams,
-                traffic_source: traffic,
-                client_info: getClientInfo(),
-                visitor_info: getVisitorInfo(),
-                timestamp: new Date().toISOString()
-            };
+        const payload = {
+            visitor_id: getOrCreateCookie("visitor_id"),
+            session_id: getOrCreateSessionId(),
+            store_url: location.origin,
+            page_url: location.href,
+            referrer,
 
-            fetch(`${BACKEND_URL}/save_tracking/`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            }).catch(() => {});
+            event_type: type,
+            event_details: details,
 
-        } catch (e) {
-            // silently fail
-        }
+            utm_params: utm,
+            traffic_source: inferred,
+            first_touch: firstTouch,
+
+            client_info: {
+                user_agent: navigator.userAgent,
+                language: navigator.language,
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                platform: navigator.platform,
+                screen_resolution: `${screen.width}x${screen.height}`,
+                device_memory: navigator.deviceMemory || null,
+            },
+
+            visitor_info: getVisitorInfo(),
+            timestamp: new Date().toISOString()
+        };
+
+        fetch(`${BACKEND_URL}/save_tracking/`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        }).catch(() => {});
     }
 
     // ------------------- Base Events -------------------
-    window.addEventListener("load", function () {
-        sendTrackingEvent("pageview");
-    });
-
-    window.addToCartEvent = function (productInfo) {
-        sendTrackingEvent("add_to_cart", productInfo || {});
-    };
-
-    window.addToWishlist = function (productId) {
-        sendTrackingEvent("add_to_wishlist", { product_id: productId });
-    };
-
-    // Compatibility only — real capture via interceptor
-    window.purchaseEvent = function (data) {
-        sendTrackingEvent("purchase", data || {});
-    };
+    window.addEventListener("load", () => sendTrackingEvent("pageview"));
+    window.addToCartEvent = p => sendTrackingEvent("add_to_cart", p || {});
+    window.addToWishlist = pid => sendTrackingEvent("add_to_wishlist", { product_id: pid });
+    window.purchaseEvent = p => sendTrackingEvent("purchase", p || {});
 
     // ------------------- Purchase Interception -------------------
     (function interceptPurchaseEvent() {
@@ -133,14 +133,15 @@
 
         window.sendPurchaseEvent = function (payload) {
             try {
-                const order =
-                    payload?.order ||
-                    (payload && payload.id ? payload : null);
+                const order = payload?.order || (payload && payload.id ? payload : null);
 
                 if (order && order.id) {
                     const orderInfo = {
                         order_id: order.id,
-                        customer_id: order.customer?.id || null,
+                        customer_id: window.customer?.id || null,
+                        customer_name: window.customer?.name || null,
+                        customer_email: window.customer?.email || null,
+                        customer_mobile: window.customer?.mobile || null,
                         order_total: Number(order.order_total) || null,
                         order_total_string: order.order_total_string || null,
                         currency: order.currency_code || "SAR",
@@ -148,12 +149,12 @@
                         payment_method_name: order.payment?.method?.name || null,
                         products: Array.isArray(order.products)
                             ? order.products.map(p => ({
-                                product_id: p.id || p.product_id || null,
-                                name: p.name || null,
-                                sku: p.sku || null,
-                                price: Number(p.sale_price ?? p.price) || null,
-                                quantity: Number(p.quantity) || 1
-                            }))
+                                  product_id: p.id || p.product_id || null,
+                                  name: p.name || null,
+                                  sku: p.sku || null,
+                                  price: Number(p.sale_price ?? p.price) || null,
+                                  quantity: Number(p.quantity) || 1
+                              }))
                             : [],
                         products_count:
                             order.products_count ||

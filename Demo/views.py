@@ -481,152 +481,6 @@ def match_orders_with_analytics(request):
 
 #############################################################################################################
 ################################## The Visitor Tracking Section #############################################
-'''@csrf_exempt
-@require_POST
-def save_tracking(request):
-    try:
-        # 1️ Parse JSON payload
-        try:
-            data = json.loads(request.body)
-        except Exception:
-            return JsonResponse({"status": "error", "message": "Invalid JSON payload"}, status=400)
-
-        if not data:
-            return JsonResponse({"status": "error", "message": "No JSON payload received"}, status=400)
-
-        session_id = data.get("session_id")
-        if not session_id:
-            return JsonResponse({"status": "error", "message": "session_id is required"}, status=400)
-
-        visitor_info = data.get('visitor_info', {}) or {}
-        client_info = data.get('client_info', {}) or {}
-        utm_params = data.get('utm_params', {}) or {}
-        traffic_source = data.get('traffic_source', {}) or {}
-
-        # 2️ Generate unique ID
-        distinct_id = int(get_next_id_from_supabase_compatible_all(name='Tracking_Visitors', column='Distinct_ID'))
-
-        # 3️ Fetch existing session data to propagate UTM and customer info
-        existing_session_data = []
-        try:
-            existing_session = (
-                supabase.table("Tracking_Visitors")
-                .select(
-                    "UTM_Source,UTM_Medium,UTM_Campaign,UTM_Term,UTM_Content,"
-                    "Customer_ID,Customer_Name,Customer_Email,Customer_Mobile"
-                )
-                .eq("Session_ID", session_id)
-                .execute()
-            )
-            if existing_session and existing_session.data:
-                existing_session_data = existing_session.data
-                print(existing_session_data)
-                
-        except Exception as e:
-            print("⚠️ Failed to fetch existing session:", e)
-            traceback.print_exc()
-
-        # Determine session-level UTM values (take first row with UTM info)
-        for field in ["UTM_Source","UTM_Medium","UTM_Campaign","UTM_Term","UTM_Content"]:
-            for r in existing_session_data:
-                if r.get(field):
-                    utm_params[field.lower()] = r[field]
-                    break
-
-        # Determine session-level customer info (if any row has Customer_ID)
-        customer_fields = ["Customer_ID","Customer_Name","Customer_Email","Customer_Mobile"]
-        session_customer_info = {}
-        for field in customer_fields:
-            for r in existing_session_data:
-                if r.get("Customer_ID"):
-                    session_customer_info[field.lower()] = r[field]
-                    break
-        # If current row has customer_id, override session_customer_info
-        if visitor_info.get("customer_id"):
-            session_customer_info.update({
-                "Customer_ID": int(visitor_info.get("customer_id")),
-                "Customer_Name": visitor_info.get("name"),
-                "Customer_Email": visitor_info.get("email"),
-                "Customer_Mobile": int(visitor_info.get("mobile")) if visitor_info.get("mobile") else None
-            })
-
-        # 4️ Prepare tracking entry
-        tracking_entry = {
-            'Distinct_ID': distinct_id,
-            'Visitor_ID': data.get('visitor_id'),
-            'Session_ID': session_id,
-            'Store_URL': data.get('store_url'),
-            'Event_Type': data.get('event_type'),
-            'Event_Details': str(data.get('event_details', {})),
-            'Page_URL': data.get('page_url'),
-            'Visited_at': get_uae_current_date(),
-
-            # UTM Parameters (propagated session-level)
-            'UTM_Source': utm_params.get('utm_source'),
-            'UTM_Medium': utm_params.get('utm_medium'),
-            'UTM_Campaign': utm_params.get('utm_campaign'),
-            'UTM_Term': utm_params.get('utm_term'),
-            'UTM_Content': utm_params.get('utm_content'),
-
-            # Referrer
-            'Referrer_Platform': data.get('referrer'),
-
-            # Traffic Source
-            'Traffic_Source': traffic_source.get('source'),
-            'Traffic_Medium': traffic_source.get('medium'),
-            'Traffic_Campaign': traffic_source.get('campaign'),
-
-            # Visitor Info (propagated session-level customer info)
-            'Customer_ID': session_customer_info.get('Customer_ID'),
-            'Customer_Name': session_customer_info.get('Customer_Name'),
-            'Customer_Email': session_customer_info.get('Customer_Email'),
-            'Customer_Mobile': session_customer_info.get('Customer_Mobile'),
-
-            # Client Info
-            'User_Agent': client_info.get('user_agent'),
-            'Language': client_info.get('language'),
-            'Timezone': client_info.get('timezone'),
-            'Platform': client_info.get('platform'),
-            'Screen_Resolution': client_info.get('screen_resolution'),
-            'Device_Memory': int(client_info.get('device_memory')) if client_info.get('device_memory') else None,
-        }
-
-        # 5️ Convert to DataFrame and batch insert
-        tracking_entry_df = pd.DataFrame([tracking_entry])
-
-        # Fix bigint columns
-        for col in ['Distinct_ID','Customer_Mobile','Device_Memory']:
-            if col in tracking_entry_df.columns:
-                tracking_entry_df[col] = tracking_entry_df[col].fillna(0).astype('int64')
-
-        # Fill NaNs for string columns
-        text_cols = [
-            'Visitor_ID','Session_ID','Store_URL','Event_Type','Event_Details','Page_URL',
-            'UTM_Source','UTM_Medium','UTM_Campaign','UTM_Term','UTM_Content',
-            'Referrer_Platform','Traffic_Source','Traffic_Medium','Traffic_Campaign',
-            'Customer_Name','Customer_Email','User_Agent','Language','Timezone',
-            'Platform','Screen_Resolution','Client_IP'
-        ]
-        for col in text_cols:
-            if col in tracking_entry_df.columns:
-                tracking_entry_df[col] = tracking_entry_df[col].fillna("")
-
-        # Format Visited_at
-        tracking_entry_df['Visited_at'] = pd.to_datetime(tracking_entry_df['Visited_at'], utc=True, errors='coerce')
-        tracking_entry_df['Visited_at'] = tracking_entry_df['Visited_at'].dt.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
-
-        # Batch insert to Supabase
-        batch_insert_to_supabase(tracking_entry_df, 'Tracking_Visitors')
-
-        return JsonResponse({"status": "success"})
-
-    except Exception as e:
-        print("TRACKING FUNCTION ERROR:", e)
-        traceback.print_exc()
-        
-        return JsonResponse({"status": "error", "message": str(e)}, status=500)
-'''
-
 @csrf_exempt
 @require_POST
 def save_tracking_old(request):
@@ -1029,7 +883,7 @@ def save_tracking_no_debug(request):
         traceback.print_exc()
         return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
-@csrf_exempt
+'''@csrf_exempt
 @require_POST
 def save_tracking(request):
     def dprint(msg):
@@ -1277,7 +1131,7 @@ def save_tracking(request):
             "UTM_Term": utm_params.get("utm_term"),
             "UTM_Content": utm_params.get("utm_content"),
 
-            "Referrer_Platform": referrer,
+            "Referrer_Platform": referrer, 
             "Traffic_Source": traffic_source.get("source"),
             "Traffic_Medium": traffic_source.get("medium"),
             "Traffic_Campaign": traffic_source.get("campaign"),
@@ -1324,7 +1178,699 @@ def save_tracking(request):
     except Exception as e:
         dprint("[FATAL ERROR] save_tracking crashed")
         traceback.print_exc()
-        return JsonResponse({"status": "error", "message": str(e)}, status=500)
+        return JsonResponse({"status": "error", "message": str(e)}, status=500)'''
+
+
+
+
+#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+##############################################################################################################################
+##############################################################################################################################
+##################### SAVE TRACKING UPDATE AS OF THE 25TH OF JAN - SARAH #############################################################
+def source_weight(source):
+    """
+    A function that gives each source weight to decide on what the actual source is for the said mobile_number or the visitor_id.
+
+    """
+    weights = {
+        "instagram": 100,
+        "facebook": 100,
+        "tiktok": 100,
+        "snapchat": 100,
+
+        "google": 70,
+        "bing": 60,
+
+        "referral": 50,
+        "email": 40,
+
+        "direct": 20,
+        "unknown": 10,
+    }
+    return weights.get((source or "").lower(), 10)
+
+def pick_stronger_source(incoming, existing):
+    """
+    Which source wins based on weight.
+    """
+    if not existing:
+        return incoming
+    if source_weight(incoming) > source_weight(existing):
+        return incoming
+    return existing
+
+def is_confirmed_direct(incoming_source, page_url, store_url, referrer):
+    """
+    Decide whether this hit deserves to be called 'direct'
+    or whether it's just 'unknown'.
+    it's direct only if the user explicity typed in our url in the search, otherwise, unknown.
+    """
+    if incoming_source != "direct":
+        return False
+
+    if referrer:
+        return False
+
+    if not page_url or not store_url:
+        return False
+
+    # Must be homepage or intentional entry
+    page = page_url.rstrip("/")
+    store = store_url.rstrip("/")
+
+    return page == store
+
+@csrf_exempt
+@require_POST
+def save_tracking_no_debug(request):
+    """
+    Now with:
+    - Attribution authority.
+    - Social preservation in history
+    - Session-aware social inheritance
+    - New social recorded for new events only
+    - Non-socials still backfilled across same mobile
+    - All dicts cleaned via clean_dict
+
+    A finalized save_tracking function that actually gives in correct sources to the incoming entries, if no source could be decided then it's unknown.
+    Handle unknowns afterwards.
+
+    Incoming sources are compared against existing sources in the db, then moving forward we compare against the replacement if any in later passes.
+
+    This function also keeps in mind if the current row is incoming and for example 2 previous socials are found for the said identifier (either mobile or visitor_id) then take the social source associated with the session id incoming for this row.
+    """
+
+    def dprint(msg):
+        print(f"[SAVE_TRACKING] {msg}")
+
+    dprint("========== START save_tracking ==========")
+
+    try:
+        # --------------------------------------------------
+        # Get the data incoming from the tracking-snippet.
+        try:
+            data = json.loads(request.body.decode("utf-8"))
+        except Exception as e:
+            dprint(f"[FATAL] JSON parse failed: {e}")
+            return JsonResponse({"status": "error"}, status=400)
+
+        # --------------------------------------------------
+        # Helper with cleaning the dicts
+        def clean_dict(d):
+            return {k: (v.strip() if isinstance(v, str) else v) for k, v in (d or {}).items()}
+
+        # --------------------------------------------------
+        # Extract raw inputs (NO LOGIC YET)
+        # Just sanitization + normalization
+        visitor_id = str(data.get("visitor_id") or "").strip()
+        session_id = str(data.get("session_id") or "").strip()
+        event_type = str(data.get("event_type") or "").strip()
+
+        event_details = clean_dict(data.get("event_details"))
+        utm_params = clean_dict(data.get("utm_params"))
+        traffic_source = clean_dict(data.get("traffic_source"))
+        visitor_info = clean_dict(data.get("visitor_info"))
+        client_info = clean_dict(data.get("client_info"))
+
+        # Extract extra customer 
+        session_customer_info = {}
+        for key in ["Customer_ID", "Customer_Name", "Customer_Email", "Customer_Mobile"]:
+            if visitor_info.get(key) is not None:
+                session_customer_info[key] = visitor_info[key]
+
+        # Page / context fields will leave as-is, evaluate later
+        page_url = data.get("page_url")
+        store_url = data.get("store_url")
+        referrer = data.get("referrer")
+        agent = (client_info.get("user_agent") or "").strip().lower()
+
+        # --------------------------------------------------
+        # Kill crawlers
+        crawlers = ["googlebot", "bingbot", "crawler", "adsbot", "ahrefs"]
+        if any(bot in agent for bot in crawlers):
+            dprint("[SKIPPED] Crawler detected")
+            return JsonResponse({"status": "skipped"})
+
+        # --------------------------------------------------
+        # Resolve INCOMING source -- subject to modifications
+        incoming_source = (utm_params.get("utm_source") or traffic_source.get("source") or "unknown").lower()
+        if incoming_source in ["", "(not set)", "(none)", None]:
+            incoming_source = "unknown"
+
+        final_source = incoming_source
+        attribution_type = "explicit_utm" if utm_params.get("utm_source") else "unknown_first_touch"
+        dprint(f"Incoming source (pre-resolution): {incoming_source}")
+
+        # --------------------------------------------------
+        # MOBILE NUMBER = ABSOLUTE AUTHORITY
+        mobile = str(visitor_info.get("mobile") or "").strip()
+
+        if mobile:
+            dprint(f"Mobile detected: {mobile}")
+
+            res = (
+                supabase.table("Tracking_Visitors")
+                .select("UTM_Source, Session_ID")
+                .eq("Customer_Mobile", mobile)
+                .execute()
+            )
+
+            strongest_source = incoming_source
+            existing_social_found = False
+            existing_social_value = None
+            session_social_map = {}
+
+            if res.data:
+                dprint(f"{len(res.data)} existing rows found for mobile")
+                for row in res.data:
+                    existing = (row.get("UTM_Source") or "").lower()
+                    sid = row.get("Session_ID")
+                    if source_weight(existing) >= 100:
+                        existing_social_found = True
+                        existing_social_value = existing
+                        session_social_map[sid] = existing
+                    strongest_source = pick_stronger_source(strongest_source, existing)
+
+            if session_id in session_social_map:
+                final_source = session_social_map[session_id]
+                dprint(f"Session-aware social inheritance applied: {final_source}")
+                attribution_type = "persisted_mobile_session"
+            elif existing_social_found:
+                if source_weight(incoming_source) >= 100:
+                    final_source = incoming_source
+                    dprint(f"New social recorded for new row: {final_source} (existing social in history preserved: {existing_social_value})")
+                else:
+                    final_source = existing_social_value
+                    dprint(f"Existing social preserved in history, new row non-social uses: {final_source}")
+                attribution_type = "persisted_mobile"
+            else:
+                final_source = strongest_source
+                if final_source != incoming_source:
+                    attribution_type = "persisted_mobile"
+                    dprint(f"Mobile override applied -- {final_source}")
+
+            session_customer_info["Customer_Mobile"] = mobile
+
+        # --------------------------------------------------
+        # VISITOR ID logic if mobile missing
+        if not mobile and visitor_id:
+            dprint("No mobile -- checking visitor_id history")
+
+            res = (
+                supabase.table("Tracking_Visitors")
+                .select("Customer_Mobile, UTM_Source, Session_ID")
+                .eq("Visitor_ID", visitor_id)
+                .execute()
+            )
+
+            strongest_source = incoming_source
+            discovered_mobiles = set()
+            existing_social_found = False
+            existing_social_value = None
+            session_social_map = {}
+
+            for row in res.data or []:
+                if row.get("Customer_Mobile"):
+                    discovered_mobiles.add(row["Customer_Mobile"])
+                existing = (row.get("UTM_Source") or "").lower()
+                sid = row.get("Session_ID")
+                if source_weight(existing) >= 100:
+                    existing_social_found = True
+                    existing_social_value = existing
+                    session_social_map[sid] = existing
+                strongest_source = pick_stronger_source(strongest_source, existing)
+
+            if session_id in session_social_map:
+                final_source = session_social_map[session_id]
+                dprint(f"Session-aware social inheritance applied (visitor_id): {final_source}")
+                attribution_type = "persisted_visitor_session"
+            elif existing_social_found:
+                if source_weight(incoming_source) >= 100:
+                    final_source = incoming_source
+                    dprint(f"New social recorded for new row (visitor_id linked), old social preserved: {existing_social_value}")
+                else:
+                    final_source = existing_social_value
+                    dprint(f"Existing social preserved in visitor history, new row non-social uses: {final_source}")
+                attribution_type = "persisted_visitor"
+            else:
+                final_source = strongest_source
+                if final_source != incoming_source:
+                    attribution_type = "persisted_visitor"
+                    dprint(f"Visitor override applied -- {final_source}")
+
+            if discovered_mobiles:
+                resolved_mobile = list(discovered_mobiles)[0]
+                session_customer_info["Customer_Mobile"] = resolved_mobile
+                dprint(f"Visitor linked to mobile: {resolved_mobile}")
+
+        # --------------------------------------------------
+        # Incoming social always wins for this row
+        if source_weight(incoming_source) >= 100:
+            final_source = incoming_source
+            dprint("Incoming source is social -- absolute priority for this event")
+
+        # --------------------------------------------------
+        # DIRECT CONFIRMATION (intentional direct visits)
+        if incoming_source == "direct":
+            is_homepage = page_url and store_url and page_url.rstrip("/") == store_url.rstrip("/")
+            if not referrer and is_homepage:
+                final_source = "direct"
+                attribution_type = "direct_confirmed"
+                dprint("Direct confirmed (intentional entry)")
+            else:
+                final_source = "unknown"
+                dprint("Direct downgraded → unknown (insufficient proof)")
+
+        dprint(f"FINAL SOURCE DECIDED: {final_source}")
+
+        # --------------------------------------------------
+        # FIRST / LAST / ASSISTED ATTRIBUTION
+
+        identity_column = None
+        identity_value = None
+
+        if session_customer_info.get("Customer_Mobile"):
+            identity_column = "Customer_Mobile"
+            identity_value = session_customer_info["Customer_Mobile"]
+        elif visitor_id:
+            identity_column = "Visitor_ID"
+            identity_value = visitor_id
+
+        first_touch_source = None
+        first_touch_medium = None
+        first_touch_timestamp = None
+        assisted_sources = []
+
+        if identity_column and identity_value:
+            history = (
+                supabase.table("Tracking_Visitors")
+                .select("UTM_Source, UTM_Medium, Visited_at")
+                .eq(identity_column, identity_value)
+                .order("Visited_at", desc=False)
+                .execute()
+            )
+
+            if history.data:
+                first_row = history.data[0]
+                first_touch_source = first_row.get("UTM_Source")
+                first_touch_medium = first_row.get("UTM_Medium")
+                first_touch_timestamp = first_row.get("Visited_at")
+
+                for row in history.data:
+                    src = row.get("UTM_Source")
+                    if src and src not in [first_touch_source, final_source]:
+                        assisted_sources.append(src)
+
+        assisted_sources = list(set(assisted_sources))
+
+        # --------------------------------------------------
+        # Build tracking row
+        tracking_entry = {
+            "Distinct_ID": int(get_next_id_from_supabase_compatible_all(name="Tracking_Visitors", column="Distinct_ID")),
+            "Visitor_ID": visitor_id,
+            "Session_ID": session_id,
+            "Event_Type": event_type,
+            "Event_Details": str(event_details),
+            "Page_URL": page_url,
+            "Referrer_Platform": referrer,
+            "Visited_at": get_uae_current_date(),
+
+            "UTM_Source": final_source,
+            "UTM_Medium": utm_params.get("utm_medium"),
+            "UTM_Campaign": utm_params.get("utm_campaign"),
+            "UTM_Term": utm_params.get("utm_term"),
+            "UTM_Content": utm_params.get("utm_content"),
+
+            "Attribution_Type": attribution_type, ## Add
+
+            "First_Touch_Source": first_touch_source or final_source, # Add
+            "First_Touch_Medium": first_touch_medium, # Add
+            "First_Touch_Timestamp": first_touch_timestamp, # Add
+
+            "Last_Touch_Source": final_source, # Add
+            "Assisted_Sources": assisted_sources, # Add
+
+            "User_Agent": agent,
+            "Language": client_info.get("language"),
+            "Timezone": client_info.get("timezone"),
+            "Platform": client_info.get("platform"),
+            "Screen_Resolution": client_info.get("screen_resolution"),
+            "Device_Memory": client_info.get("device_memory"),
+            "Last_Updated": get_uae_current_date(), # Add 
+
+            **session_customer_info,
+        }
+
+        # --------------------------------------------------
+        # Insert new event
+        batch_insert_to_supabase(pd.DataFrame([tracking_entry]), "Tracking_Visitors")
+
+        # --------------------------------------------------
+        # Backfill ONLY non-social sources across same mobile
+        if session_customer_info.get("Customer_Mobile") and source_weight(final_source) < 100:
+            supabase.table("Tracking_Visitors") \
+                .update({"UTM_Source": final_source}) \
+                .eq("Customer_Mobile", session_customer_info["Customer_Mobile"]) \
+                .execute()
+
+        dprint("========== END save_tracking (SUCCESS) ==========")
+        return JsonResponse({"status": "success"})
+
+    except Exception as e:
+        dprint(f"[CRASH] save_tracking failed: {e}")
+        traceback.print_exc()
+        return JsonResponse({"status": "error"}, status=500)
+
+
+@csrf_exempt
+@require_POST
+def save_tracking(request):
+    """
+    Same function.
+    Same logic.
+    Same outcomes.
+    Now with HEAVY DEBUGGING.
+    """
+
+    def dprint(msg):
+        print(f"[SAVE_TRACKING] {msg}")
+
+    dprint("========== START save_tracking ==========")
+
+    try:
+        # --------------------------------------------------
+        # Get the data incoming from the tracking-snippet.
+        try:
+            raw_body = request.body.decode("utf-8")
+            dprint(f"[RAW PAYLOAD] {raw_body[:600]}")
+            data = json.loads(raw_body)
+        except Exception as e:
+            dprint(f"[FATAL] JSON parse failed: {e}")
+            return JsonResponse({"status": "error"}, status=400)
+
+        # --------------------------------------------------
+        # Helper with cleaning the dicts
+        def clean_dict(d):
+            cleaned = {k: (v.strip() if isinstance(v, str) else v) for k, v in (d or {}).items()}
+            dprint(f"[CLEAN_DICT] input={d} → output={cleaned}")
+            return cleaned
+
+        # --------------------------------------------------
+        # Extract raw inputs (NO LOGIC YET)
+        visitor_id = str(data.get("visitor_id") or "").strip()
+        session_id = str(data.get("session_id") or "").strip()
+        event_type = str(data.get("event_type") or "").strip()
+
+        dprint(f"[IDS] visitor_id={visitor_id} | session_id={session_id} | event_type={event_type}")
+
+        event_details = clean_dict(data.get("event_details"))
+        utm_params = clean_dict(data.get("utm_params"))
+        traffic_source = clean_dict(data.get("traffic_source"))
+        visitor_info = clean_dict(data.get("visitor_info"))
+        client_info = clean_dict(data.get("client_info"))
+
+        # --------------------------------------------------
+        # Extract extra customer
+        session_customer_info = {}
+        for key in ["Customer_ID", "Customer_Name", "Customer_Email", "Customer_Mobile"]:
+            if visitor_info.get(key) is not None:
+                session_customer_info[key] = visitor_info[key]
+                dprint(f"[CUSTOMER FIELD] {key}={visitor_info.get(key)}")
+
+        page_url = data.get("page_url")
+        store_url = data.get("store_url")
+        referrer = data.get("referrer")
+        agent = (client_info.get("user_agent") or "").strip().lower()
+
+        dprint(f"[CONTEXT] page_url={page_url}")
+        dprint(f"[CONTEXT] referrer={referrer}")
+        dprint(f"[CONTEXT] user_agent={agent}")
+
+        # --------------------------------------------------
+        # Kill crawlers
+        crawlers = ["googlebot", "bingbot", "crawler", "adsbot", "ahrefs"]
+        if any(bot in agent for bot in crawlers):
+            dprint("[SKIPPED] crawler detected")
+            return JsonResponse({"status": "skipped"})
+
+        # --------------------------------------------------
+        # Resolve INCOMING source
+        incoming_source = (
+            utm_params.get("utm_source")
+            or traffic_source.get("source")
+            or "unknown"
+        ).lower()
+
+        if incoming_source in ["", "(not set)", "(none)", None]:
+            incoming_source = "unknown"
+
+        final_source = incoming_source
+        attribution_type = "explicit_utm" if utm_params.get("utm_source") else "unknown_first_touch"
+
+        dprint(f"[INCOMING SOURCE] {incoming_source}")
+        dprint(f"[ATTRIBUTION INIT] {attribution_type}")
+
+        # --------------------------------------------------
+        # MOBILE NUMBER = ABSOLUTE AUTHORITY
+        mobile = str(visitor_info.get("mobile") or "").strip()
+
+        if mobile:
+            dprint(f"[MOBILE DETECTED] {mobile}")
+
+            res = (
+                supabase.table("Tracking_Visitors")
+                .select("UTM_Source, Session_ID")
+                .eq("Customer_Mobile", mobile)
+                .execute()
+            )
+
+            strongest_source = incoming_source
+            existing_social_found = False
+            existing_social_value = None
+            session_social_map = {}
+
+            dprint(f"[MOBILE HISTORY COUNT] {len(res.data or [])}")
+
+            for row in res.data or []:
+                existing = (row.get("UTM_Source") or "").lower()
+                sid = row.get("Session_ID")
+
+                dprint(f"[MOBILE ROW] session={sid} source={existing}")
+
+                if source_weight(existing) >= 100:
+                    existing_social_found = True
+                    existing_social_value = existing
+                    session_social_map[sid] = existing
+                    dprint(f"[SOCIAL FOUND] {existing} (session {sid})")
+
+                strongest_source = pick_stronger_source(strongest_source, existing)
+                dprint(f"[STRONGEST UPDATE] now={strongest_source}")
+
+            if session_id in session_social_map:
+                final_source = session_social_map[session_id]
+                attribution_type = "persisted_mobile_session"
+                dprint(f"[SESSION SOCIAL INHERITED] {final_source}")
+
+            elif existing_social_found:
+                if source_weight(incoming_source) >= 100:
+                    final_source = incoming_source
+                    dprint(f"[NEW SOCIAL EVENT] keeping {final_source}")
+                else:
+                    final_source = existing_social_value
+                    dprint(f"[SOCIAL PRESERVED] using {final_source}")
+
+                attribution_type = "persisted_mobile"
+
+            else:
+                final_source = strongest_source
+                if final_source != incoming_source:
+                    attribution_type = "persisted_mobile"
+                    dprint(f"[MOBILE OVERRIDE] {incoming_source} → {final_source}")
+
+            session_customer_info["Customer_Mobile"] = mobile
+
+        # --------------------------------------------------
+        # VISITOR ID logic if mobile missing
+        if not mobile and visitor_id:
+            dprint("[VISITOR FALLBACK] no mobile, checking visitor_id")
+
+            res = (
+                supabase.table("Tracking_Visitors")
+                .select("Customer_Mobile, UTM_Source, Session_ID")
+                .eq("Visitor_ID", visitor_id)
+                .execute()
+            )
+
+            strongest_source = incoming_source
+            discovered_mobiles = set()
+            existing_social_value = None
+            session_social_map = {}
+
+            dprint(f"[VISITOR HISTORY COUNT] {len(res.data or [])}")
+
+            for row in res.data or []:
+                existing = (row.get("UTM_Source") or "").lower()
+                sid = row.get("Session_ID")
+
+                dprint(f"[VISITOR ROW] session={sid} source={existing}")
+
+                if row.get("Customer_Mobile"):
+                    discovered_mobiles.add(row["Customer_Mobile"])
+
+                if source_weight(existing) >= 100:
+                    existing_social_value = existing
+                    session_social_map[sid] = existing
+                    dprint(f"[SOCIAL FOUND VISITOR] {existing}")
+
+                strongest_source = pick_stronger_source(strongest_source, existing)
+
+            if session_id in session_social_map:
+                final_source = session_social_map[session_id]
+                attribution_type = "persisted_visitor_session"
+                dprint(f"[SESSION SOCIAL VISITOR] {final_source}")
+
+            elif existing_social_value:
+                if source_weight(incoming_source) < 100:
+                    final_source = existing_social_value
+                    dprint(f"[VISITOR SOCIAL PRESERVED] {final_source}")
+                attribution_type = "persisted_visitor"
+
+            else:
+                final_source = strongest_source
+
+            if discovered_mobiles:
+                resolved_mobile = list(discovered_mobiles)[0]
+                session_customer_info["Customer_Mobile"] = resolved_mobile
+                dprint(f"[VISITOR>>MOBILE LINK] {resolved_mobile}")
+
+        # --------------------------------------------------
+        # Incoming social always wins for this row
+        if source_weight(incoming_source) >= 100:
+            final_source = incoming_source
+            dprint("[ABSOLUTE SOCIAL PRIORITY APPLIED]")
+
+        # --------------------------------------------------
+        # DIRECT CONFIRMATION
+        if incoming_source == "direct":
+            is_homepage = page_url and store_url and page_url.rstrip("/") == store_url.rstrip("/")
+            dprint(f"[DIRECT CHECK] homepage={is_homepage} referrer={referrer}")
+
+            if not referrer and is_homepage:
+                final_source = "direct"
+                attribution_type = "direct_confirmed"
+                dprint("[DIRECT CONFIRMED]")
+            else:
+                final_source = "unknown"
+                dprint("[DIRECT DOWNGRADED >> UNKNOWN]")
+
+        dprint(f"[FINAL SOURCE] {final_source}")
+        dprint(f"[ATTRIBUTION TYPE] {attribution_type}")
+
+        # --------------------------------------------------
+        # FIRST / LAST / ASSISTED ATTRIBUTION
+        identity_column = None
+        identity_value = None
+
+        if session_customer_info.get("Customer_Mobile"):
+            identity_column = "Customer_Mobile"
+            identity_value = session_customer_info["Customer_Mobile"]
+        elif visitor_id:
+            identity_column = "Visitor_ID"
+            identity_value = visitor_id
+
+        dprint(f"[ATTRIBUTION IDENTITY] {identity_column}={identity_value}")
+
+        first_touch_source = None
+        first_touch_medium = None
+        first_touch_timestamp = None
+        assisted_sources = []
+
+        if identity_column and identity_value:
+            history = (
+                supabase.table("Tracking_Visitors")
+                .select("UTM_Source, UTM_Medium, Visited_at")
+                .eq(identity_column, identity_value)
+                .order("Visited_at", desc=False)
+                .execute()
+            )
+
+            dprint(f"[HISTORY ROWS] {len(history.data or [])}")
+
+            if history.data:
+                first_row = history.data[0]
+                first_touch_source = first_row.get("UTM_Source")
+                first_touch_medium = first_row.get("UTM_Medium")
+                first_touch_timestamp = first_row.get("Visited_at")
+
+                dprint(f"[FIRST TOUCH] source={first_touch_source} medium={first_touch_medium}")
+
+                for row in history.data:
+                    src = row.get("UTM_Source")
+                    if src and src not in [first_touch_source, final_source]:
+                        assisted_sources.append(src)
+
+        assisted_sources = list(set(assisted_sources))
+        dprint(f"[ASSISTED SOURCES] {assisted_sources}")
+
+        # --------------------------------------------------
+        # Build tracking row
+        tracking_entry = {
+            "Distinct_ID": int(get_next_id_from_supabase_compatible_all(name="Tracking_Visitors", column="Distinct_ID")),
+            "Visitor_ID": visitor_id,
+            "Session_ID": session_id,
+            "Event_Type": event_type,
+            "Event_Details": str(event_details),
+            "Page_URL": page_url,
+            "Referrer_Platform": referrer,
+            "Visited_at": get_uae_current_date(),
+
+            "UTM_Source": final_source,
+            "UTM_Medium": utm_params.get("utm_medium"),
+            "UTM_Campaign": utm_params.get("utm_campaign"),
+            "UTM_Term": utm_params.get("utm_term"),
+            "UTM_Content": utm_params.get("utm_content"),
+
+            "Attribution_Type": attribution_type,
+
+            "First_Touch_Source": first_touch_source or final_source,
+            "First_Touch_Medium": first_touch_medium,
+            "First_Touch_Timestamp": first_touch_timestamp,
+
+            "Last_Touch_Source": final_source,
+            "Assisted_Sources": assisted_sources,
+
+            "User_Agent": agent,
+            "Language": client_info.get("language"),
+            "Timezone": client_info.get("timezone"),
+            "Platform": client_info.get("platform"),
+            "Screen_Resolution": client_info.get("screen_resolution"),
+            "Device_Memory": client_info.get("device_memory"),
+            "Last_Updated": get_uae_current_date(),
+
+            **session_customer_info,
+        }
+
+        dprint(f"[INSERT PAYLOAD PREVIEW] {tracking_entry}")
+
+        batch_insert_to_supabase(pd.DataFrame([tracking_entry]), "Tracking_Visitors")
+
+        # --------------------------------------------------
+        # Backfill ONLY non-social sources across same mobile
+        if session_customer_info.get("Customer_Mobile") and source_weight(final_source) < 100:
+            dprint(f"[BACKFILL] non-social → {final_source}")
+            supabase.table("Tracking_Visitors") \
+                .update({"UTM_Source": final_source}) \
+                .eq("Customer_Mobile", session_customer_info["Customer_Mobile"]) \
+                .execute()
+
+        dprint("========== END save_tracking (SUCCESS) ==========")
+        return JsonResponse({"status": "success"})
+
+    except Exception as e:
+        dprint(f"[CRASH] save_tracking failed: {e}")
+        traceback.print_exc()
+        return JsonResponse({"status": "error"}, status=500)
+
 
 
 # The route to render the tracking javascript -- 
