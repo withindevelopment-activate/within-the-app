@@ -3724,7 +3724,7 @@ def events_table_view(request):
 
 
     df = fetch_data_from_supabase_specific(
-        table_name="Tracking_Visitors",
+        table_name="Tracking_Visitors_duplicate",
         filters=filters,
         order_by=sort_field,
         limit=limit,

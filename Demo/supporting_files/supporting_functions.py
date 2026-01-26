@@ -169,3 +169,21 @@ def detect_source_from_row(url):
             return source
 
     return "direct"
+
+NON_OVERRIDE_SOURCES = ("direct", "google")
+
+def resolve_non_direct_from_df(df):
+    """
+    Returns most recent row with non-direct/non-google source
+    """
+    if df is None or df.empty or not df:
+        return None
+
+    df = df.sort_values("Visited_at", ascending=False)
+
+    for _, row in df.iterrows():
+        src = str(row.get("UTM_Source") or "").lower()
+        if src and src not in NON_OVERRIDE_SOURCES:
+            return row
+
+    return None
