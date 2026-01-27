@@ -55,39 +55,44 @@ USER_AGENT_SOURCE_MAPPING = {
 
 OWN_DOMAIN = "sleepy-cloud.ae"
 
-def detect_source_from_user_agent(user_agent: str) -> str | None:
-    if not user_agent:
+def detect_source_from_user_agent(user_agent):
+    if not user_agent or not isinstance(user_agent, str):
         return None
 
-    ua = user_agent.lower()
+    ua_clean = user_agent.strip().lower()
 
     for keyword, source in USER_AGENT_SOURCE_MAPPING.items():
-        if keyword in ua:
-            return source
+        keyword_clean = keyword.strip().lower()
+        if keyword_clean in ua_clean:
+            return source.strip().lower() if isinstance(source, str) else source
 
     return None
+
 
 def detect_source_from_url_or_domain(url):
     """Detect source based on parameters and domain."""
     if not isinstance(url, str) or url.strip() == "":
         return None
 
-    url_lower = url.lower()
-    parsed = urllib.parse.urlparse(url_lower)
+    url_clean = url.strip().lower()
+    parsed = urllib.parse.urlparse(url_clean)
     params = urllib.parse.parse_qs(parsed.query or "")
 
     # 1) URL parameters
     for key, source in PARAM_MAPPING.items():
-        if key in params:
-            return source
+        key_clean = key.strip().lower()
+        if key_clean in params:
+            return source.strip().lower() if isinstance(source, str) else source
 
     # 2) Domain detection
-    netloc = parsed.netloc or ""
+    netloc = (parsed.netloc or "").strip().lower()
     for domain, source in DOMAIN_MAPPING.items():
-        if domain in netloc:
-            return source
+        domain_clean = domain.strip().lower()
+        if domain_clean in netloc:
+            return source.strip().lower() if isinstance(source, str) else source
 
     return None
+
 
 # def detect_primary_source(url):
 #     """

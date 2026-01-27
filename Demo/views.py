@@ -2177,17 +2177,18 @@ def save_tracking(request):
         client_info = clean_dict(data.get("client_info"))
 
         # --------------------------------------------------
-        # Extract extra customer
+        # Extract extra customer data
         session_customer_info = {}
         for key in ["Customer_ID", "Customer_Name", "Customer_Email", "Customer_Mobile"]:
             if visitor_info.get(key) is not None:
                 session_customer_info[key] = visitor_info[key]
                 dprint(f"[CUSTOMER FIELD] {key}={visitor_info.get(key)}")
 
-        page_url = data.get("page_url")
-        store_url = data.get("store_url")
-        referrer = data.get("referrer")
-        agent = (client_info.get("user_agent") or "").strip().lower()
+        page_url = str(data.get("page_url") or "").strip()
+        store_url = str(data.get("store_url") or "").strip()
+        referrer = str(data.get("referrer") or "").strip()
+        agent = str(client_info.get("user_agent") or "").strip().lower()
+
 
         dprint(f"[CONTEXT] page_url={page_url}")
         dprint(f"[CONTEXT] referrer={referrer}")
@@ -2212,18 +2213,22 @@ def save_tracking(request):
         if raw_utm_source:
             candidates.append({"source": raw_utm_source, "type": "explicit_utm"})
 
-        # Referrer inference (outweighs UA)
-        ref_source = detect_source_from_url_or_domain(referrer) or detect_source_from_url_or_domain(page_url)
+        # Referrer inference (outweighs UA) -- with existential checks to prevent errors
+        ref_source = None
+        if referrer or page_url:
+            ref_source = detect_source_from_url_or_domain(referrer) or detect_source_from_url_or_domain(page_url)
         if ref_source:
             candidates.append({"source": ref_source.lower(), "type": "inferred_referrer"})
 
-        # User agent inference
-        ua_source = detect_source_from_user_agent(agent)
+        # User agent inference -- with existential checks to prevent errors
+        ua_source = None
+        if agent:
+            ua_source = detect_source_from_user_agent(agent)
         if ua_source:
             candidates.append({"source": ua_source.lower(), "type": "inferred_user_agent"})
 
         # Traffic source fallback (weakest)
-        traffic_fallback = (traffic_source.get("source") or "").strip().lower()
+        traffic_fallback = str((traffic_source.get("source") or "")).strip().lower()
         if traffic_fallback:
             candidates.append({"source": traffic_fallback, "type": "traffic_source"})
 
@@ -2302,7 +2307,7 @@ def save_tracking(request):
             discovered_mobile = None
 
             for row in res.data or []:
-                existing = (str((row.get("UTM_Source") or "")).strip().lower() or "unknown")
+                existing = (row.get("UTM_Source") or "").strip().lower() or "unknown"
                 strongest_source = pick_stronger_source(strongest_source, existing)
 
                 if row.get("Customer_Mobile"):
@@ -2338,7 +2343,7 @@ def save_tracking(request):
             strongest_source = incoming_source
 
             for row in res.data or []:
-                existing = (str((row.get("UTM_Source") or "")).strip().lower() or "unknown")
+                existing = (row.get("UTM_Source") or "").strip().lower() or "unknown"
                 strongest_source = pick_stronger_source(strongest_source, existing)
 
             if strongest_source != "unknown":
@@ -2381,7 +2386,7 @@ def save_tracking(request):
             "Device_Memory": client_info.get("device_memory"),
             "Last_Updated": get_uae_current_date(),
             "RAW_UTM_SOURCE": raw_utm_source,
-            "Which_Update": "270126 1155",
+            "Which_Update": "270126 1218",
 
             **session_customer_info,
         }
