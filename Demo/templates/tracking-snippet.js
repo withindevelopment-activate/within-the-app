@@ -34,13 +34,18 @@
         }
 
         if (referrer) {
-            const h = new URL(referrer).hostname.toLowerCase();
-            if (h.includes("instagram")) return { source: "instagram", medium: "social", campaign: "organic", attribution_type: "referrer" };
-            if (h.includes("facebook")) return { source: "facebook", medium: "social", campaign: "organic", attribution_type: "referrer" };
-            if (h.includes("tiktok")) return { source: "tiktok", medium: "social", campaign: "organic", attribution_type: "referrer" };
-            if (h.includes("snapchat")) return { source: "snapchat", medium: "social", campaign: "organic", attribution_type: "referrer" };
-            if (h.includes("google")) return { source: "google", medium: "organic", campaign: "n/a", attribution_type: "referrer" };
-        }
+            try {
+                const h = new URL(referrer).hostname.toLowerCase();
+                if (h.includes("instagram")) return { source: "instagram", medium: "social", campaign: "organic", attribution_type: "referrer" };
+                if (h.includes("facebook")) return { source: "facebook", medium: "social", campaign: "organic", attribution_type: "referrer" };
+                if (h.includes("tiktok")) return { source: "tiktok", medium: "social", campaign: "organic", attribution_type: "referrer" };
+                if (h.includes("snapchat")) return { source: "snapchat", medium: "social", campaign: "organic", attribution_type: "referrer" };
+                if (h.includes("google")) return { source: "google", medium: "organic", campaign: "n/a", attribution_type: "referrer" };
+            } catch (e) {
+            // malformed referrer (android-app://, ios-app://, etc)
+            // Without try/catch, the whole function throws and you lose the event.
+            }
+        } 
 
         return { source: "unknown", medium: "unknown", campaign: "unknown", attribution_type: "unknown_first_touch" };
     }
