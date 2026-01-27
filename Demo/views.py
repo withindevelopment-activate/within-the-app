@@ -1207,7 +1207,7 @@ def source_weight(source):
         "direct": 20,
         "unknown": 10,
     }
-    return weights.get((source or "").lower(), 10)
+    return weights.get((source or "").lower(), 10) ## Any source not listed gets a 10
 
 def pick_stronger_source(incoming, existing):
     """
@@ -1704,8 +1704,8 @@ def save_tracking(request):
 
         # --------------------------------------------------
         # Get INCOMING source
-        incoming_source = (
-            (utm_params.get("utm_source") or traffic_source.get("source") or "")
+        '''incoming_source = (
+            (utm_params.get("utm_source"))
             .strip()
             .lower()
             or "unknown"
@@ -1715,15 +1715,15 @@ def save_tracking(request):
             incoming_source = "unknown"
 
         final_source = incoming_source
-        attribution_type = "explicit_utm" if utm_params.get("utm_source") else "unknown_first_touch"
+        attribution_type = "explicit_utm" if str(utm_params.get("utm_source")).strip() else "unknown_first_touch"
 
         dprint(f"[INCOMING SOURCE] {incoming_source}")
-        dprint(f"[ATTRIBUTION INIT] {attribution_type}")
+        dprint(f"[ATTRIBUTION INIT] {attribution_type}")'''
 
         # --------------------------------------------------
         # If the incoming source == unknown, check if we can get the source from either the user agent or the referrer url
         ## Prior source cleaning to handle later on based on identifier_type
-        if incoming_source == "unknown":
+        '''if incoming_source == "unknown":
             dprint("[INFER SOURCE] incoming_source is unknown → attempting inference")
 
             inferred_source = None
@@ -1752,8 +1752,69 @@ def save_tracking(request):
                 dprint(f"[INCOMING SOURCE SET] {incoming_source}")
             else:
                 incoming_source = "unknown"
-                dprint("[INFER RESULT] still unknown — no inference applied")
+                dprint("[INFER RESULT] still unknown — no inference applied")'''
+         ## This section was commented and replaced with a block where we always infer the source from any referrer, user agent, or traffic source.
 
+        ### LOG THE RAW UTM 
+        raw_utm_source = str(utm_params.get("utm_source") or "").strip().lower()
+        dprint(f"[RAW UTM SOURCE] {raw_utm_source or 'none'}")
+
+        # Intialize a list to store possible candidates to act as the incoming source (NO DECISIONS YET)
+        candidates = []
+
+        # Explicit UTM (strongest)
+        if raw_utm_source:
+            candidates.append({
+                "source": raw_utm_source,
+                "type": "explicit_utm"
+            })
+
+        # Referrer inference (outweighs UA)
+        ref_source = (
+            detect_source_from_url_or_domain(referrer)
+            or detect_source_from_url_or_domain(page_url)
+        )
+        if ref_source:
+            candidates.append({
+                "source": ref_source.lower(),
+                "type": "inferred_referrer"
+            })
+
+        # User agent inference
+        ua_source = detect_source_from_user_agent(agent)
+        if ua_source:
+            candidates.append({
+                "source": ua_source.lower(),
+                "type": "inferred_user_agent"
+            })
+
+        # Traffic source fallback (weakest)
+        traffic_fallback = (traffic_source.get("source") or "").strip().lower()
+        if traffic_fallback:
+            candidates.append({
+                "source": traffic_fallback,
+                "type": "traffic_source"
+            })
+
+        if not candidates:
+            candidates.append({
+                "source": "unknown",
+                "type": "unknown"
+            })
+
+        # --------------------------------------------------
+        # PICK STRONGEST CANDIDATE FROM THE LIST
+        winner = candidates[0]
+        for c in candidates[1:]:
+            if source_weight(c["source"]) > source_weight(winner["source"]):
+                winner = c
+
+        incoming_source = winner["source"]
+        attribution_type = winner["type"]
+
+        dprint(f"[SOURCE WINNER] {incoming_source} ({attribution_type})")
+
+        ### MOVING ON WITH DIRECT CONFIRMATION AND HISTORY OUTLOOK. --- 
         # --------------------------------------------------
         # DIRECT CONFIRMATION  --- if it's an actual direct, modify the incoming source to point for direct, then the rest of the logic applies if we're gonna need to change that according to previous recorded history.
         # Having it in the section underneath would have the resutls from the 2 next blocks overwritten.
@@ -1947,6 +2008,8 @@ def save_tracking(request):
             "Screen_Resolution": client_info.get("screen_resolution"),
             "Device_Memory": client_info.get("device_memory"),
             "Last_Updated": get_uae_current_date(),
+            "RAW_UTM_SOURCE": raw_utm_source,
+            "Which_Update": "270126 1115"
 
             **session_customer_info,
         }
