@@ -78,7 +78,16 @@ def detect_source_from_url_or_domain(url):
     parsed = urllib.parse.urlparse(url_clean)
     params = urllib.parse.parse_qs(parsed.query or "")
 
-    # 1) URL parameters
+    # 0) Direct check for utm_source
+    utm_source = params.get("utm_source")
+    if utm_source:
+        # take first value, normalize
+        src = utm_source[0].strip().lower()
+        if src in ["content creators", "content_creators", "content creator", "content_creator"]:
+            return "content creators"  ### Same value in the weight function.
+        return src
+
+    # 1) URL parameters mapping
     for key, source in PARAM_MAPPING.items():
         key_clean = key.strip().lower()
         if key_clean in params:
@@ -92,6 +101,7 @@ def detect_source_from_url_or_domain(url):
             return source.strip().lower() if isinstance(source, str) else source
 
     return None
+
 
 
 # def detect_primary_source(url):

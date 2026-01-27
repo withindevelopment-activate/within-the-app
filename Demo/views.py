@@ -1197,6 +1197,7 @@ def source_weight(source):
         "facebook": 100,
         "tiktok": 100,
         "snapchat": 100,
+        "content creators": 100,  # same as socials
 
         "google": 70,
         "bing": 60,
@@ -2204,6 +2205,8 @@ def save_tracking(request):
         # --------------------------------------------------
         ### LOG THE RAW UTM 
         raw_utm_source = str(utm_params.get("utm_source") or "").strip().lower()
+        if raw_utm_source.replace("_", " ") in ["content creator", "content creators"]:
+            raw_utm_source = "content creators"
         dprint(f"[RAW UTM SOURCE] {raw_utm_source or 'none'}")
 
         # Intialize a list to store possible candidates to act as the incoming source (NO DECISIONS YET)
