@@ -2177,6 +2177,14 @@ def save_tracking(request):
         visitor_info = clean_dict(data.get("visitor_info"))
         client_info = clean_dict(data.get("client_info"))
 
+        ###
+        ## Normalize the utm_medium such that it's consistent
+        utm_medium_raw = str(utm_params.get("utm_medium") or "").strip().lower()
+        if utm_medium_raw == "social media":
+            utm_medium = "Social Media"
+        else:
+            utm_medium = utm_medium_raw
+
         # --------------------------------------------------
         # Extract extra customer data
         session_customer_info = {}
@@ -2369,7 +2377,7 @@ def save_tracking(request):
             "Visited_at": get_uae_current_date(),
 
             "UTM_Source": final_source,
-            "UTM_Medium": utm_params.get("utm_medium"),
+            "UTM_Medium": utm_medium,
             "UTM_Campaign": utm_params.get("utm_campaign"),
             "UTM_Term": utm_params.get("utm_term"),
             "UTM_Content": utm_params.get("utm_content"),
