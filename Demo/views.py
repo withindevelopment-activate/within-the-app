@@ -2389,7 +2389,7 @@ def save_tracking(request):
             "Device_Memory": client_info.get("device_memory"),
             "Last_Updated": get_uae_current_date(),
             "RAW_UTM_SOURCE": raw_utm_source,
-            "Which_Update": "270126 1218",
+            "Which_Update": "270126 1228",
 
             **session_customer_info,
         }
