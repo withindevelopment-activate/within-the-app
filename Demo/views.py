@@ -2228,6 +2228,8 @@ def save_tracking(request):
         ref_source = None
         if referrer or page_url:
             ref_source = detect_source_from_url_or_domain(referrer) or detect_source_from_url_or_domain(page_url)
+            ### I want to have the exact result from the referrer to confirm the visitor_id condition below.
+            #referrer_source = detect_source_from_url_or_domain(referrer)
         if ref_source:
             candidates.append({"source": ref_source.lower(), "type": "inferred_referrer"})
 
@@ -2258,6 +2260,10 @@ def save_tracking(request):
 
         dprint(f"[SOURCE WINNER] {incoming_source} ({attribution_type})")
 
+        #### Initializing the final source to equal the incoming
+        # Default final_source to incoming_source
+        final_source = incoming_source
+
         # --------------------------------------------------
         # DIRECT CONFIRMATION
         if incoming_source == "direct":
@@ -2272,10 +2278,12 @@ def save_tracking(request):
                 incoming_source = "unknown"
                 attribution_type = "unknown_first_touch"
                 dprint("[DIRECT DOWNGRADED] incoming_source set to 'unknown'")
+            
+            # Resyncing final_source after direct confirmation -- we did this again here because not all sources == 'direct'
+            final_source = incoming_source
 
         # --------------------------------------------------
         ### THE BLOCK TO DECIDE ON WHETHER INCOMING SOURCE IS UPDATED OR NOT
-        session_source = None
         session_rows = (
             supabase.table("Tracking_Visitors_duplicate")
             .select("UTM_Source")
@@ -2283,28 +2291,40 @@ def save_tracking(request):
             .execute()
         ).data or []
 
+        ### Confirm whether any of the entires for the said session had at one point a Referrer_Platform that explicitly had UTM_Source == 'google' -- this is a portal to our visitor_id condition because the source for this session could be updaated. -- we ahve this outside to avoid intialization errors later on.
+        google_confirmed_in_session = any(
+            detect_source_from_url_or_domain((row.get("Referrer_Platform") or "").strip().lower()) == "google"
+            for row in session_rows
+        )
+        
         if session_rows:
             recorded_source = ((session_rows[0].get("UTM_Source") or "").strip().lower() or "unknown")
             dprint(f"[SESSION FOUND] recorded={recorded_source}")
 
-            if recorded_source != "unknown":
-                session_source = recorded_source
+            if recorded_source == "unknown":
+                # backfill the session with incoming source -- as in we updated the final source to be the incoming which it already is and we updated prior session values with the value incoming because the one recorded is unknown.
+                final_source = incoming_source
+                attribution_type = "session_backfilled"
+                supabase.table("Tracking_Visitors_duplicate") \
+                    .update({"UTM_Source": final_source}) \
+                    .eq("Session_ID", session_id).execute()
+                dprint(f"[SESSION BACKFILLED] unknown >> {final_source}")
 
-            # CASE 1 -- VALID SESSION SOURCE EXISTS
-            if session_source:
-                if source_weight(incoming_source) > source_weight(session_source):
-                    final_source = incoming_source
-                    attribution_type = "session_upgraded"
+            elif source_weight(incoming_source) > source_weight(recorded_source): ## case 2 if theres one prior we compare the weight with the incoming and update accordingly as well.
+                final_source = incoming_source
+                attribution_type = "session_upgraded"
+                supabase.table("Tracking_Visitors_duplicate") \
+                    .update({"UTM_Source": final_source}) \
+                    .eq("Session_ID", session_id).execute()
+                dprint(f"[SESSION UPGRADE] {recorded_source} >> {final_source}")
 
-                    supabase.table("Tracking_Visitors_duplicate").update({"UTM_Source": final_source}).eq("Session_ID", session_id).execute()
-                    dprint(f"[SESSION UPGRADE] {session_source} >> {final_source}")
-                else:
-                    final_source = session_source
-                    attribution_type = "session_persisted"
-                    dprint(f"[SESSION PERSISTED] using {final_source}")
+            else:
+                final_source = recorded_source
+                attribution_type = "session_persisted"
+                dprint(f"[SESSION PERSISTED] using {final_source}")
 
-        # CASE 2: SESSION UNKNOWN >>> CHECK USING VISITOR_ID
-        elif visitor_id:
+        # CASE 2: SESSION UNKNOWN >>> CHECK USING VISITOR_ID -- before it would start if the session id found int he previoud block == unknown and it would just take it. Instead, if it == unknown (in case the incoming == 'unknown') visit this block.
+        if visitor_id and (final_source == "unknown" or (final_source == "google" and not google_confirmed_in_session)): ## there's a visitor id and the sosurce have not been resolved from the previous block. -- I'm cehcking for the google source like this becasue if the utm_source was not found in the referrer explicitly as google then it's weak and let's look for other stronger sources using the visitor_id
             dprint("[VISITOR CHECK] session unknown >> checking visitor history")
 
             res = (
@@ -2324,15 +2344,24 @@ def save_tracking(request):
                 if row.get("Customer_Mobile"):
                     discovered_mobile = row["Customer_Mobile"]
 
-            if strongest_source != "unknown":
+            if strongest_source != "unknown" and strongest_source != final_source:
                 final_source = strongest_source
                 attribution_type = "visitor_inferred"
                 dprint(f"[VISITOR INFERRED] {final_source}")
 
-                # Backfill the UNKNOWN session using the source found in the visitor_id
-                if session_rows:
-                    supabase.table("Tracking_Visitors_duplicate").update({"UTM_Source": final_source}).eq("Session_ID", session_id).execute()
-                    dprint(f"[SESSION BACKFILLED FROM VISITOR] {final_source}")
+                ## This section is commented because it has no meaning based ont he logic. The history session source updates were moved to the prior block.
+                # --------------------------------------------------
+                # Special case: backfill weak Google sessions if applicable -- none of the records in session have utm_Source google in referrer and a stronger source is found thru the visitor_id
+                if session_rows and any(
+                    (row.get("UTM_Source") or "").strip().lower() == "google" and not google_confirmed_in_session
+                    for row in session_rows
+                ):
+                    supabase.table("Tracking_Visitors_duplicate") \
+                        .update({"UTM_Source": final_source}) \
+                        .eq("Session_ID", session_id) \
+                        .execute()
+                    dprint(f"[SESSION GOOGLE BACKFILLED] weak Google >> {final_source}")
+
 
             if discovered_mobile:
                 session_customer_info["Customer_Mobile"] = discovered_mobile
@@ -2397,7 +2426,7 @@ def save_tracking(request):
             "Device_Memory": client_info.get("device_memory"),
             "Last_Updated": get_uae_current_date(),
             "RAW_UTM_SOURCE": raw_utm_source,
-            "Which_Update": "270126 1228",
+            "Which_Update": "270126 1827",
 
             **session_customer_info,
         }
