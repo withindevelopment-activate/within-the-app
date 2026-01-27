@@ -1835,6 +1835,7 @@ def save_tracking(request):
         # --------------------------------------------------
         ### THE BLOCK TO DECIDE ON WEHTHER INCOMING SOURCE IS UPDATED OR NOT --- 
         # SESSION = AUTHORITATIVE SOURCE -- LOOK FOR THE INCOMING SESSION -- IF SESSION FOUND COMPARE ICNOMING SOURCE WITH EXISTING SOURCE GIVE IN WEIGHTS AND UPDATE ACCORDINGLY.
+        session_source = None
         session_rows = (
             supabase.table("Tracking_Visitors_duplicate")
             .select("UTM_Source")
@@ -1849,7 +1850,10 @@ def save_tracking(request):
             )
             dprint(f"[SESSION FOUND] recorded={recorded_source}")
 
-            if source_weight(incoming_source) > source_weight(recorded_source):
+            if recorded_source != "unknown":
+                session_source = recorded_source
+
+            '''if source_weight(incoming_source) > source_weight(recorded_source):
                 final_source = incoming_source
                 attribution_type = "session_upgraded"
 
@@ -1863,11 +1867,70 @@ def save_tracking(request):
                 final_source = recorded_source
                 attribution_type = "session_persisted"
 
-                dprint(f"[SESSION PERSISTED] using {final_source}")
+                dprint(f"[SESSION PERSISTED] using {final_source}")'''
+
+            # --------------------------------------------------
+            # CASE 1 -- VALID SESSION SOURCE EXISTS
+            if session_source:
+                if source_weight(incoming_source) > source_weight(session_source):
+                    final_source = incoming_source
+                    attribution_type = "session_upgraded"
+
+                    supabase.table("Tracking_Visitors_duplicate") \
+                        .update({"UTM_Source": final_source}) \
+                        .eq("Session_ID", session_id) \
+                        .execute()
+
+                    dprint(f"[SESSION UPGRADE] {session_source} >> {final_source}")
+                else:
+                    final_source = session_source
+                    attribution_type = "session_persisted"
+                    dprint(f"[SESSION PERSISTED] using {final_source}")
 
         # --------------------------------------------------
         # VISITOR ID = ONLY IF SESSION UNRESOLVED --- If no records founded for the said session to pull'em sources from, we resort to the visitor_id, get the greates weighing source.
+        # --------------------------------------------------
+        # CASE 2: SESSION UNKNOWN >>> CHECK USING VISITOR_ID
+
         elif visitor_id:
+            dprint("[VISITOR CHECK] session unknown >> checking visitor history")
+
+            res = (
+                supabase.table("Tracking_Visitors_duplicate")
+                .select("UTM_Source, Session_ID, Customer_Mobile")
+                .eq("Visitor_ID", visitor_id)
+                .execute()
+            )
+
+            strongest_source = incoming_source
+            discovered_mobile = None
+
+            for row in res.data or []:
+                existing = (str((row.get("UTM_Source") or "")).strip().lower() or "unknown")
+                strongest_source = pick_stronger_source(strongest_source, existing)
+
+                if row.get("Customer_Mobile"):
+                    discovered_mobile = row["Customer_Mobile"]
+
+            if strongest_source != "unknown":
+                final_source = strongest_source
+                attribution_type = "visitor_inferred"
+                dprint(f"[VISITOR INFERRED] {final_source}")
+
+                # Backfill the UNKNOWN session using the source found in the visitor_id
+                if session_rows:
+                    supabase.table("Tracking_Visitors_duplicate") \
+                        .update({"UTM_Source": final_source}) \
+                        .eq("Session_ID", session_id) \
+                        .execute()
+                    dprint(f"[SESSION BACKFILLED FROM VISITOR] {final_source}")
+
+            if discovered_mobile:
+                session_customer_info["Customer_Mobile"] = discovered_mobile
+                dprint(f"[VISITOR>>MOBILE LINK] {discovered_mobile}")
+
+
+        ''''elif visitor_id:
             dprint("[VISITOR CHECK] session unresolved >> checking visitor history")
 
             res = (
@@ -1894,10 +1957,10 @@ def save_tracking(request):
 
             if discovered_mobile:
                 session_customer_info["Customer_Mobile"] = discovered_mobile
-                dprint(f"[VISITOR>>MOBILE LINK] {discovered_mobile}")
+                dprint(f"[VISITOR>>MOBILE LINK] {discovered_mobile}")'''
 
         # --------------------------------------------------
-        # MOBILE = LAST RESORT RECONCILIATION
+        '''# MOBILE = LAST RESORT RECONCILIATION
         mobile = str(visitor_info.get("mobile") or "").strip()
 
         if final_source == incoming_source and mobile:
@@ -1917,6 +1980,33 @@ def save_tracking(request):
                 strongest_source = pick_stronger_source(strongest_source, existing)
 
             if strongest_source != incoming_source:
+                final_source = strongest_source
+                attribution_type = "mobile_unified"
+                dprint(f"[MOBILE UNIFIED] {final_source}")
+
+            session_customer_info["Customer_Mobile"] = mobile'''
+
+        # --------------------------------------------------
+        # CASE 3: BOTH SESSION + VISITOR UNKNOWN RESORT TO MOBILE SOURCE 
+        mobile = str(visitor_info.get("mobile") or "").strip()
+
+        if final_source == "unknown" and mobile:
+            dprint(f"[MOBILE RECONCILE] unresolved >> checking mobile {mobile}")
+
+            res = (
+                supabase.table("Tracking_Visitors_duplicate")
+                .select("UTM_Source")
+                .eq("Customer_Mobile", mobile)
+                .execute()
+            )
+
+            strongest_source = incoming_source
+
+            for row in res.data or []:
+                existing = (str((row.get("UTM_Source") or "")).strip().lower() or "unknown")
+                strongest_source = pick_stronger_source(strongest_source, existing)
+
+            if strongest_source != "unknown":
                 final_source = strongest_source
                 attribution_type = "mobile_unified"
                 dprint(f"[MOBILE UNIFIED] {final_source}")
@@ -2009,7 +2099,7 @@ def save_tracking(request):
             "Device_Memory": client_info.get("device_memory"),
             "Last_Updated": get_uae_current_date(),
             "RAW_UTM_SOURCE": raw_utm_source,
-            "Which_Update": "270126 1115"
+            "Which_Update": "270126 1155"
 
             **session_customer_info,
         }
