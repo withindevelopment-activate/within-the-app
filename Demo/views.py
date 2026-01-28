@@ -2286,15 +2286,10 @@ def save_tracking(request):
         ### THE BLOCK TO DECIDE ON WHETHER INCOMING SOURCE IS UPDATED OR NOT
         session_rows = (
             supabase.table("Tracking_Visitors_duplicate")
-            .select("UTM_Source, Referrer_Platform")
+            .select("UTM_Source", "UTM_Medium", "UTM_Campaign", "UTM_Term", "UTM_Content")
             .eq("Session_ID", session_id)
             .execute()
         ).data or []
-
-        google_confirmed_in_session = any(
-            detect_source_from_url_or_domain((row.get("Referrer_Platform") or "").lower()) == "google"
-            for row in session_rows
-        )
         
         if session_rows:
             # Current recorded source -- get all the data to backfill for session.
@@ -2306,82 +2301,42 @@ def save_tracking(request):
 
 
             dprint(f"[SESSION FOUND] recorded={recorded_source}")
+            # Verify if upgradable -- 
+            allow_upgrade = recorded_source in ["unknown", "google"]
 
-            # Treat weak Google as "upgradeable"
-            is_weak_google = False
-            if recorded_source == "google" and not google_confirmed_in_session:
-                for row in session_rows:
-                    ref_url = row.get("Referrer_Platform")
-                    if ref_url:
-                        query_params = parse_qs(urlparse(ref_url).query)
-                        campaign = query_params.get("utm_campaign", [""])[0]
-                        if campaign == "Search-1": ## it is a weak google and check in visitor_id only if the camapign = Search
-                            is_weak_google = True
-                            break
+            ## Check if we upgrade the final_source with the one recorded.
+            if source_weight(recorded_source) > source_weight(final_source): ## else this means that the recorded is not weak, let's compare it with the final source (initially set to incoming) then take it if it's valid.
+                # Persist the recorded source because it's stronger or equal
+                final_source = recorded_source
+                attribution_type = "session_persisted_took_session_source"
 
-            allow_upgrade = recorded_source == "unknown" or is_weak_google
-
-            if allow_upgrade and source_weight(incoming_source) > source_weight(recorded_source):
+            ### Check if the incoming source is better than the one recorded, update the session with that if it's not google or unknown because we are going to stop with the final_source update here anyways.
+            elif allow_upgrade and source_weight(final_source) > source_weight(recorded_source) and final_source not in ['unknown', 'google']:
                 # Upgrade session with stronger source
-                final_source = incoming_source
-                attribution_type = "session_upgraded"
-                supabase.table("Tracking_Visitors_duplicate") \
-                    .update({"UTM_Source": final_source}) \
-                    .eq("Session_ID", session_id).execute()
-                dprint(f"[SESSION UPGRADE] {recorded_source} >> {final_source}")
-
-            elif recorded_source == "unknown" and incoming_source != "unknown":
-                # Rare case: backfill unknown
-                final_source = incoming_source
-                attribution_type = "session_backfilled"
-                supabase.table("Tracking_Visitors_duplicate") \
-                    .update({"UTM_Source": final_source}) \
-                    .eq("Session_ID", session_id).execute()
-                dprint(f"[SESSION BACKFILLED] unknown >> {final_source}")
-
-            else:
-                # Persist strong/confirmed sources
-                final_source = recorded_source
-                attribution_type = "session_persisted"
-                dprint(f"[SESSION PERSISTED] using {final_source}")
-
-                # Backfill full UTM from first explicit hit -- this is needed because it is only recorded for this row
-                supabase.table("Tracking_Visitors_duplicate") \
+                #final_source = incoming_source
+                attribution_type = "session_upgraded_with_incoming_stronger"
+                '''supabase.table("Tracking_Visitors_duplicate") \
                     .update({
-                        "UTM_Source": recorded_source,
-                        "UTM_Medium": recorded_medium,
-                        "UTM_Campaign": recorded_campaign,
-                        "UTM_Term": recorded_term,
-                        "UTM_Content": recorded_content
+                        "UTM_Source": final_source,
+                        "UTM_Medium": utm_medium,
+                        "UTM_Campaign": str(utm_params.get("utm_campaign")).strip(),
+                        "UTM_Term": str(utm_params.get("utm_term")).strip(),
+                        "UTM_Content": str(utm_params.get("utm_content")).strip
                     }) \
-                    .eq("Session_ID", session_id).execute()
-
-                dprint(f"[SESSION PERSISTED] using {final_source} (full UTM backfilled)")
-
-            '''if recorded_source == "unknown" and incoming_source != "unknown":
-                # backfill the session with incoming source -- as in we updated the final source to be the incoming which it already is and we updated prior session values with the value incoming because the one recorded is unknown.
-                final_source = incoming_source
-                attribution_type = "session_backfilled"
+                    .eq("Session_ID", session_id).execute()'''
                 supabase.table("Tracking_Visitors_duplicate") \
-                    .update({"UTM_Source": final_source}) \
-                    .eq("Session_ID", session_id).execute()
-                dprint(f"[SESSION BACKFILLED] unknown >> {final_source}")
-
-            elif source_weight(incoming_source) > source_weight(recorded_source): ## case 2 if theres one prior we compare the weight with the incoming and update accordingly as well.
-                final_source = incoming_source
-                attribution_type = "session_upgraded"
-                supabase.table("Tracking_Visitors_duplicate") \
-                    .update({"UTM_Source": final_source}) \
+                        .update({
+                            "UTM_Source": final_source
+                        }) \
                     .eq("Session_ID", session_id).execute()
                 dprint(f"[SESSION UPGRADE] {recorded_source} >> {final_source}")
 
             else:
-                final_source = recorded_source
-                attribution_type = "session_persisted"
-                dprint(f"[SESSION PERSISTED] using {final_source}")'''
+                dprint(f"[SESSION SKIPPED] FINAL_SOURCE HAS NOT BEEN UPGRADED, ")
+                
 
         # CASE 2: SESSION UNKNOWN >>> CHECK USING VISITOR_ID -- before it would start if the session id found int he previoud block == unknown and it would just take it. Instead, if it == unknown (in case the incoming == 'unknown') visit this block.
-        if visitor_id and (final_source == "unknown" or is_weak_google): ## there's a visitor id and the sosurce have not been resolved from the previous block. -- I'm cehcking for the google source like this becasue if the utm_source was not found in the referrer explicitly as google then it's weak and let's look for other stronger sources using the visitor_id
+        if visitor_id and (final_source in ["unknown", "google"]): ## there's a visitor id and the sosurce have not been resolved from the previous block. -- I'm cehcking for the google source like this becasue if the utm_source was not found in the referrer explicitly as google then it's weak and let's look for other stronger sources using the visitor_id
             dprint("[VISITOR CHECK] session unknown >> checking visitor history")
 
             res = (
@@ -2391,7 +2346,7 @@ def save_tracking(request):
                 .execute()
             )
 
-            strongest_source = incoming_source
+            strongest_source = final_source ## comapre with the one we got from the session id so far
             discovered_mobile = None
 
             for row in res.data or []:
@@ -2401,27 +2356,22 @@ def save_tracking(request):
                 if row.get("Customer_Mobile"):
                     discovered_mobile = row["Customer_Mobile"]
 
-            if strongest_source != "unknown" and strongest_source != final_source:
+            #if strongest_source != "unknown" and strongest_source != final_source:
+            # Only skip if the strongest_source is still google or unknown and the session already has a strong source
+            if strongest_source not in ["unknown", "google"]:
                 final_source = strongest_source
-                attribution_type = "visitor_inferred"
+                attribution_type = "visitor_id_updated_source"
                 dprint(f"[VISITOR INFERRED] {final_source}")
 
-                ## This section is commented because it has no meaning based ont he logic. The history session source updates were moved to the prior block.
-                # --------------------------------------------------
-                # Special case: backfill weak Google sessions if applicable -- none of the records in session have utm_Source google in referrer and a stronger source is found thru the visitor_id
-                if session_rows and any(
-                    (row.get("UTM_Source") or "").strip().lower() == "google" and not google_confirmed_in_session
-                    for row in session_rows
-                ):
+                # Update all session rows for this session with the stronger source becasue if we are at this point it seems that the session did not have a good source to begin with.
+                if session_rows:
                     supabase.table("Tracking_Visitors_duplicate") \
                         .update({"UTM_Source": final_source}) \
                         .eq("Session_ID", session_id) \
                         .execute()
-                    dprint(f"[SESSION GOOGLE BACKFILLED] weak Google >> {final_source}")
+                    dprint(f"[SESSION UPGRADED] session rows updated to stronger source >> {final_source}")
             else:
-                dprint(
-                    f"[VISITOR CHECK SKIPPED] strongest={strongest_source} final={final_source}"
-    )
+                dprint(f"[VISITOR CHECK SKIPPED] strongest source is still weak ({strongest_source}), final_source remains {final_source}")
 
             if discovered_mobile:
                 session_customer_info["Customer_Mobile"] = discovered_mobile
@@ -2430,7 +2380,7 @@ def save_tracking(request):
         # CASE 3: BOTH SESSION + VISITOR UNKNOWN >>> RESORT TO MOBILE SOURCE 
         mobile = str(visitor_info.get("mobile") or "").strip()
 
-        if final_source == "unknown" and mobile:
+        if final_source in ["unknown", "google"] and mobile:
             dprint(f"[MOBILE RECONCILE] unresolved >> checking mobile {mobile}")
 
             res = (
@@ -2440,16 +2390,22 @@ def save_tracking(request):
                 .execute()
             )
 
-            strongest_source = incoming_source
+            strongest_source = final_source ## compare with the source we have recorded so far.
 
             for row in res.data or []:
                 existing = (row.get("UTM_Source") or "").strip().lower() or "unknown"
                 strongest_source = pick_stronger_source(strongest_source, existing)
 
-            if strongest_source != "unknown":
+            if strongest_source != "unknown": ## I'm not adding google here because if it's google at the end of all those steps then just take it.
                 final_source = strongest_source
                 attribution_type = "mobile_unified"
                 dprint(f"[MOBILE UNIFIED] {final_source}")
+
+                # Update all visitor/session rows with this mobile because reaching this point means the ones before were not good enough.
+                supabase.table("Tracking_Visitors_duplicate") \
+                    .update({"UTM_Source": final_source}) \
+                    .eq("Customer_Mobile", mobile) \
+                    .execute()
 
             session_customer_info["Customer_Mobile"] = mobile
 
@@ -2467,9 +2423,9 @@ def save_tracking(request):
 
             "UTM_Source": final_source,
             "UTM_Medium": utm_medium,
-            "UTM_Campaign": utm_params.get("utm_campaign"),
-            "UTM_Term": utm_params.get("utm_term"),
-            "UTM_Content": utm_params.get("utm_content"),
+            "UTM_Campaign": str(utm_params.get("utm_campaign")).strip(),
+            "UTM_Term": str(utm_params.get("utm_term")).strip(),
+            "UTM_Content": str(utm_params.get("utm_content")).strip,
 
             "Attribution_Type": attribution_type,
             "First_Touch_Source": "PLACEHOLDER",
@@ -2486,7 +2442,7 @@ def save_tracking(request):
             "Device_Memory": client_info.get("device_memory"),
             "Last_Updated": get_uae_current_date(),
             "RAW_UTM_SOURCE": raw_utm_source,
-            "Which_Update": "280126 0748",
+            "Which_Update": "280126 1115",
 
             **session_customer_info,
         }
