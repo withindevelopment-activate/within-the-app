@@ -14,7 +14,7 @@ from io import BytesIO
 from supabase import create_client, Client
 from dateutil import parser
 import threading
-
+from urllib.parse import urlparse, parse_qs
 
 ## Custom Imports ------------------
 # Supabase & Supporting imports
@@ -2308,7 +2308,17 @@ def save_tracking(request):
             dprint(f"[SESSION FOUND] recorded={recorded_source}")
 
             # Treat weak Google as "upgradeable"
-            is_weak_google = recorded_source == "google" and not google_confirmed_in_session
+            is_weak_google = False
+            if recorded_source == "google" and not google_confirmed_in_session:
+                for row in session_rows:
+                    ref_url = row.get("Referrer_Platform")
+                    if ref_url:
+                        query_params = parse_qs(urlparse(ref_url).query)
+                        campaign = query_params.get("utm_campaign", [""])[0]
+                        if campaign == "Search-1": ## it is a weak google and check in visitor_id only if the camapign = Search
+                            is_weak_google = True
+                            break
+
             allow_upgrade = recorded_source == "unknown" or is_weak_google
 
             if allow_upgrade and source_weight(incoming_source) > source_weight(recorded_source):
@@ -2371,7 +2381,7 @@ def save_tracking(request):
                 dprint(f"[SESSION PERSISTED] using {final_source}")'''
 
         # CASE 2: SESSION UNKNOWN >>> CHECK USING VISITOR_ID -- before it would start if the session id found int he previoud block == unknown and it would just take it. Instead, if it == unknown (in case the incoming == 'unknown') visit this block.
-        if visitor_id and (final_source == "unknown" or (final_source == "google" and not google_confirmed_in_session)): ## there's a visitor id and the sosurce have not been resolved from the previous block. -- I'm cehcking for the google source like this becasue if the utm_source was not found in the referrer explicitly as google then it's weak and let's look for other stronger sources using the visitor_id
+        if visitor_id and (final_source == "unknown" or is_weak_google): ## there's a visitor id and the sosurce have not been resolved from the previous block. -- I'm cehcking for the google source like this becasue if the utm_source was not found in the referrer explicitly as google then it's weak and let's look for other stronger sources using the visitor_id
             dprint("[VISITOR CHECK] session unknown >> checking visitor history")
 
             res = (
