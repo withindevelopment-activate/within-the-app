@@ -2452,7 +2452,11 @@ def save_tracking(request):
                 dprint(f"[VISITOR>>MOBILE LINK] {discovered_mobile}")
 
         # CASE 3: BOTH SESSION + VISITOR UNKNOWN >>> RESORT TO MOBILE SOURCE 
-        mobile = str(visitor_info.get("mobile") or "").strip()
+        #mobile = str(visitor_info.get("mobile") or "").strip()
+        mobile = (
+            str(visitor_info.get("Customer_Mobile") or "").strip()
+            or (str(event_details.get("Customer_Mobile") or "").strip() if event_type in ["purchase", "add_to_cart"] else "")
+        )
 
         if final_source in weak_sources and mobile:
             dprint(f"[MOBILE RECONCILE] unresolved >> checking mobile {mobile}")
