@@ -2264,6 +2264,9 @@ def save_tracking(request):
         # Default final_source to incoming_source
         final_source = incoming_source
 
+        ### Inialize a list of weak sources -- 
+        weak_sources = ['unknown', 'google', 'direct', 'referral']
+
         # --------------------------------------------------
         # DIRECT CONFIRMATION
         if incoming_source == "direct":
@@ -2280,7 +2283,7 @@ def save_tracking(request):
                 dprint("[DIRECT LANDING] incoming_source kept as 'direct'")
             
             # Resyncing final_source after direct confirmation -- we did this again here because not all sources == 'direct'
-            final_source = incoming_source
+            final_source = 'direct' if is_homepage and not referrer else final_source
 
         # --------------------------------------------------
         ### THE BLOCK TO DECIDE ON WHETHER INCOMING SOURCE IS UPDATED OR NOT
@@ -2302,7 +2305,7 @@ def save_tracking(request):
 
             dprint(f"[SESSION FOUND] recorded={recorded_source}")
             # Verify if upgradable -- 
-            allow_upgrade = recorded_source in ["unknown", "google"]
+            allow_upgrade = recorded_source in weak_sources
 
             ## Check if we upgrade the final_source with the one recorded.
             if source_weight(recorded_source) > source_weight(final_source): ## else this means that the recorded is not weak, let's compare it with the final source (initially set to incoming) then take it if it's valid.
@@ -2311,19 +2314,10 @@ def save_tracking(request):
                 attribution_type = "session_persisted_took_session_source"
 
             ### Check if the incoming source is better than the one recorded, update the session with that if it's not google or unknown because we are going to stop with the final_source update here anyways.
-            elif allow_upgrade and source_weight(final_source) > source_weight(recorded_source) and final_source not in ['unknown', 'google']:
+            elif allow_upgrade and source_weight(final_source) > source_weight(recorded_source) and final_source not in weak_sources:
                 # Upgrade session with stronger source
                 #final_source = incoming_source
                 attribution_type = "session_upgraded_with_incoming_stronger"
-                '''supabase.table("Tracking_Visitors_duplicate") \
-                    .update({
-                        "UTM_Source": final_source,
-                        "UTM_Medium": utm_medium,
-                        "UTM_Campaign": str(utm_params.get("utm_campaign")).strip(),
-                        "UTM_Term": str(utm_params.get("utm_term")).strip(),
-                        "UTM_Content": str(utm_params.get("utm_content")).strip
-                    }) \
-                    .eq("Session_ID", session_id).execute()'''
                 supabase.table("Tracking_Visitors_duplicate") \
                         .update({
                             "UTM_Source": final_source
@@ -2336,7 +2330,7 @@ def save_tracking(request):
                 
 
         # CASE 2: SESSION UNKNOWN >>> CHECK USING VISITOR_ID -- before it would start if the session id found int he previoud block == unknown and it would just take it. Instead, if it == unknown (in case the incoming == 'unknown') visit this block.
-        if visitor_id and (final_source in ["unknown", "google"]): ## there's a visitor id and the sosurce have not been resolved from the previous block. -- I'm cehcking for the google source like this becasue if the utm_source was not found in the referrer explicitly as google then it's weak and let's look for other stronger sources using the visitor_id
+        if visitor_id and (final_source in weak_sources): ## there's a visitor id and the sosurce have not been resolved from the previous block. -- I'm cehcking for the google source like this becasue if the utm_source was not found in the referrer explicitly as google then it's weak and let's look for other stronger sources using the visitor_id
             dprint("[VISITOR CHECK] session unknown >> checking visitor history")
 
             res = (
@@ -2358,7 +2352,7 @@ def save_tracking(request):
 
             #if strongest_source != "unknown" and strongest_source != final_source:
             # Only skip if the strongest_source is still google or unknown and the session already has a strong source
-            if strongest_source not in ["unknown", "google"]:
+            if strongest_source not in weak_sources:
                 final_source = strongest_source
                 attribution_type = "visitor_id_updated_source"
                 dprint(f"[VISITOR INFERRED] {final_source}")
@@ -2380,7 +2374,7 @@ def save_tracking(request):
         # CASE 3: BOTH SESSION + VISITOR UNKNOWN >>> RESORT TO MOBILE SOURCE 
         mobile = str(visitor_info.get("mobile") or "").strip()
 
-        if final_source in ["unknown", "google"] and mobile:
+        if final_source in weak_sources and mobile:
             dprint(f"[MOBILE RECONCILE] unresolved >> checking mobile {mobile}")
 
             res = (
@@ -2396,7 +2390,7 @@ def save_tracking(request):
                 existing = (row.get("UTM_Source") or "").strip().lower() or "unknown"
                 strongest_source = pick_stronger_source(strongest_source, existing)
 
-            if strongest_source != "unknown": ## I'm not adding google here because if it's google at the end of all those steps then just take it.
+            if strongest_source not in weak_sources: ## I'm not adding google here because if it's google at the end of all those steps then just take it.
                 final_source = strongest_source
                 attribution_type = "mobile_unified"
                 dprint(f"[MOBILE UNIFIED] {final_source}")
