@@ -2298,7 +2298,7 @@ def save_tracking(request):
         dprint(f"[RAW UTM SOURCE] {raw_utm_source or 'none'}")
 
         # ------------------------------------------
-        # First-touch context -- gotten first touches because sometimes the first url is directly a product page and is accounted as direct and that is inaccurate and indicates that it came in from an ad becasue usually direct product landing pages = AD
+        '''# First-touch context -- gotten first touches because sometimes the first url is directly a product page and is accounted as direct and that is inaccurate and indicates that it came in from an ad becasue usually direct product landing pages = AD
         first_touch_context = clean_dict(data.get("first_touch_context") or {})
         ft_utm = clean_dict(first_touch_context.get("utm") or {})
         ft_ref = clean_dict(first_touch_context.get("referrer") or {})
@@ -2312,7 +2312,17 @@ def save_tracking(request):
         ft_is_search_referrer = ft_ref.get("is_search_referrer", False)
 
         ft_page_url = (ft_landing.get("landing_url") or "").strip().lower()
-        ft_is_product_landing = ft_landing.get("is_product_landing", False)
+        ft_is_product_landing = ft_landing.get("is_product_landing", False)'''
+
+        first_touch_context = clean_dict(data.get("first_touch_context") or {})
+
+        ft_source = (first_touch_context.get("source") or "unknown").strip().lower()
+        ft_medium = (first_touch_context.get("medium") or "none").strip().lower()
+        ft_referrer = (first_touch_context.get("referrer_url") or "").strip().lower()
+        ft_is_social_referrer = first_touch_context.get("is_social_referrer", False)
+        ft_is_search_referrer = first_touch_context.get("is_search_referrer", False)
+        ft_page_url = (first_touch_context.get("landing_url") or "").strip().lower()
+        ft_is_product_landing = first_touch_context.get("is_product_landing", False)
 
 
         # Intialize a list to store possible candidates to act as the incoming source (NO DECISIONS YET)
