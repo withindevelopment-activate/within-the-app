@@ -94,9 +94,19 @@
         // Get stored first-touch
         const firstTouch = getPersistedFirstTouch() || {};
 
+        // --- enrich with referrer intelligence for backend extraction ---
+        const refHost = (() => { try { return referrer ? new URL(referrer).hostname.toLowerCase() : null } catch { return null } })();
+        const isSocialRef = refHost ? ["instagram","facebook","tiktok","snapchat","twitter","linkedin"].some(s => refHost.includes(s)) : false;
+        const isSearchRef = refHost ? ["google","bing","yahoo"].some(s => refHost.includes(s)) : false;
+
         // Return enriched first-touch context
         return {
             ...firstTouch,
+            referrer_url: referrer || "",
+            referrer_host: refHost,
+            is_social_referrer: isSocialRef,
+            is_search_referrer: isSearchRef,
+
             landing_url: location.href,
             landing_path: landingPath,
             is_product_landing: landingPath.includes("/products/"),
