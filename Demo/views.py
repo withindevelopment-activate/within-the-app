@@ -1202,12 +1202,12 @@ def source_weight(source):
         "google": 70,
         "bing": 60,
 
-        "referral": 50,
-        "email": 40,
+        "direct": 50,
 
-        "direct": 20,
+        "referral": 20,
         "unknown": 10,
     }
+
     return weights.get((source or "").lower(), 10) ## Any source not listed gets a 10
 
 def pick_stronger_source(incoming, existing):
