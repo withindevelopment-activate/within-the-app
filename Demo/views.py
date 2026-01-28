@@ -2286,14 +2286,13 @@ def save_tracking(request):
         ### THE BLOCK TO DECIDE ON WHETHER INCOMING SOURCE IS UPDATED OR NOT
         session_rows = (
             supabase.table("Tracking_Visitors_duplicate")
-            .select("UTM_Source")
+            .select("UTM_Source, Referrer_Platform")
             .eq("Session_ID", session_id)
             .execute()
         ).data or []
 
-        ### Confirm whether any of the entires for the said session had at one point a Referrer_Platform that explicitly had UTM_Source == 'google' -- this is a portal to our visitor_id condition because the source for this session could be updaated. -- we ahve this outside to avoid intialization errors later on.
         google_confirmed_in_session = any(
-            detect_source_from_url_or_domain((row.get("Referrer_Platform") or "").strip().lower()) == "google"
+            detect_source_from_url_or_domain((row.get("Referrer_Platform") or "").lower()) == "google"
             for row in session_rows
         )
         
@@ -2301,7 +2300,7 @@ def save_tracking(request):
             recorded_source = ((session_rows[0].get("UTM_Source") or "").strip().lower() or "unknown")
             dprint(f"[SESSION FOUND] recorded={recorded_source}")
 
-            if recorded_source == "unknown":
+            if recorded_source == "unknown" and incoming_source != "unknown":
                 # backfill the session with incoming source -- as in we updated the final source to be the incoming which it already is and we updated prior session values with the value incoming because the one recorded is unknown.
                 final_source = incoming_source
                 attribution_type = "session_backfilled"
@@ -2361,7 +2360,10 @@ def save_tracking(request):
                         .eq("Session_ID", session_id) \
                         .execute()
                     dprint(f"[SESSION GOOGLE BACKFILLED] weak Google >> {final_source}")
-
+            else:
+                dprint(
+                    f"[VISITOR CHECK SKIPPED] strongest={strongest_source} final={final_source}"
+    )
 
             if discovered_mobile:
                 session_customer_info["Customer_Mobile"] = discovered_mobile
@@ -2426,7 +2428,7 @@ def save_tracking(request):
             "Device_Memory": client_info.get("device_memory"),
             "Last_Updated": get_uae_current_date(),
             "RAW_UTM_SOURCE": raw_utm_source,
-            "Which_Update": "270126 1827",
+            "Which_Update": "280126 0748",
 
             **session_customer_info,
         }
@@ -2438,8 +2440,8 @@ def save_tracking(request):
         # --------------------------------------------------
         # Backfill ONLY non-social sources across same mobile
         if session_customer_info.get("Customer_Mobile") and source_weight(final_source) < 100:
-            dprint(f"[BACKFILL] non-social → {final_source}")
-            supabase.table("Tracking_Visitors").update({"UTM_Source": final_source}).eq("Customer_Mobile", session_customer_info["Customer_Mobile"]).execute()
+            dprint(f"[BACKFILL] non-social >> {final_source}")
+            supabase.table("Tracking_Visitors_duplicate").update({"UTM_Source": final_source}).eq("Customer_Mobile", session_customer_info["Customer_Mobile"]).execute()
 
         dprint("========== END save_tracking (SUCCESS) ==========")
         return JsonResponse({"status": "success"})
