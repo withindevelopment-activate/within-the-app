@@ -2126,6 +2126,69 @@ def save_tracking_with_commented_sections_for_future_reference(request):
         traceback.print_exc()
         return JsonResponse({"status": "error"}, status=500)
 
+def extract_event_identity(event_type, event_details):
+    """
+    A helper function that extrcats the needed identifiers from the Event_Type dict and stores in db for future dedupe proofing.
+    """
+    try:
+        # Noamlize -- 
+        event_type = str(event_type).strip()
+
+        if event_type == "purchase":
+            order = event_details.get("order") or {}
+            order_id = order.get("id")
+            if order_id:
+                return ("order_id", str(order_id))
+
+        if event_type == "add_to_cart":
+            cart_id = event_details.get("id")
+            if cart_id:
+                return ("cart_id", str(cart_id))
+
+    except Exception as e:
+        print(f"[EVENT ID EXTRACT ERROR] {e}")
+
+    return (None, None)
+
+def normalize_event_details(d):
+    """
+    Normalizing the 'Event_Details' dict
+    """
+    if not d:
+        return {}
+
+    if isinstance(d, dict):
+        return d
+
+    if isinstance(d, str):
+        try:
+            return json.loads(d.replace("'", '"'))
+        except Exception:
+            return {}
+
+    return {}
+
+
+def is_duplicate_event(event_type, identity_type, identity_value):
+    """
+    Fast DB dupe check by calling either the Order_ID or the Cart_ID based on 'Event_Type'
+    """
+    if not identity_type or not identity_value:
+        return False
+
+    col = "Order_ID" if identity_type == "order_id" else "Cart_ID"
+
+    res = (
+        supabase.table("Tracking_Visitors_duplicate")
+        .select("Distinct_ID")
+        .eq("Event_Type", event_type)
+        .eq(col, identity_value)
+        .limit(1)
+        .execute()
+    )
+
+    return bool(res.data)
+
 
 @csrf_exempt
 @require_POST
@@ -2172,6 +2235,23 @@ def save_tracking(request):
         dprint(f"[IDS] visitor_id={visitor_id} | session_id={session_id} | event_type={event_type}")
 
         event_details = clean_dict(data.get("event_details"))
+        # --------------------------------------------------
+        # Normalize + clean event_details
+        event_details = normalize_event_details(event_details)
+        dprint(f"[EVENT_DETAILS] normalized keys={list(event_details.keys())}")
+
+        # --------------------------------------------------
+        # Extract event identity + dupe check
+        identity_type, identity_value = extract_event_identity(event_type, event_details)
+
+        if identity_type:
+            dprint(f"[EVENT IDENTITY] {identity_type}={identity_value}")
+
+            if is_duplicate_event(event_type, identity_type, identity_value):
+                dprint("[DUPLICATE EVENT] skipping insert")
+                return JsonResponse({"status": "duplicate_skipped"})
+
+        
         utm_params = clean_dict(data.get("utm_params"))
         traffic_source = clean_dict(data.get("traffic_source"))
         visitor_info = clean_dict(data.get("visitor_info"))
@@ -2404,22 +2484,25 @@ def save_tracking(request):
             session_customer_info["Customer_Mobile"] = mobile
 
         # --------------------------------------------------
+        def safe_strip(v):
+            return v.strip() if isinstance(v, str) else ""
+
         # Build tracking row
         tracking_entry = {
             "Distinct_ID": int(get_next_id_from_supabase_compatible_all(name="Tracking_Visitors_duplicate", column="Distinct_ID")),
             "Visitor_ID": visitor_id,
             "Session_ID": session_id,
             "Event_Type": event_type,
-            "Event_Details": str(event_details),
+            "Event_Details": json.dumps(event_details, sort_keys=True),
             "Page_URL": page_url,
             "Referrer_Platform": referrer,
             "Visited_at": get_uae_current_date(),
 
             "UTM_Source": final_source,
             "UTM_Medium": utm_medium,
-            "UTM_Campaign": str(utm_params.get("utm_campaign")).strip(),
-            "UTM_Term": str(utm_params.get("utm_term")).strip(),
-            "UTM_Content": str(utm_params.get("utm_content")).strip(),
+            "UTM_Campaign": safe_strip(utm_params.get("utm_campaign")),
+            "UTM_Term": safe_strip(utm_params.get("utm_term")),
+            "UTM_Content": safe_strip(utm_params.get("utm_content")),
 
             "Attribution_Type": attribution_type,
             "First_Touch_Source": "PLACEHOLDER",
@@ -2437,9 +2520,18 @@ def save_tracking(request):
             "Last_Updated": get_uae_current_date(),
             "RAW_UTM_SOURCE": raw_utm_source,
             "Which_Update": "280126 1147",
+            "Order_ID": "",
+            "Cart_ID": "",
 
             **session_customer_info,
         }
+
+        # Attach identity columns
+        if event_type == "purchase":
+            tracking_entry["Order_ID"] = identity_value
+
+        if event_type == "add_to_cart":
+            tracking_entry["Cart_ID"] = identity_value
 
         dprint(f"[INSERT PAYLOAD PREVIEW] {tracking_entry}")
 
