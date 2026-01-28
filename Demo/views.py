@@ -2350,6 +2350,7 @@ def save_tracking(request):
 
         # Get the source from the ft_referrer as well.
         #ft_referrer = first_touch.get("referrer_url")
+        ft_ref_source = None
         if ft_referrer:
             ft_ref_source = detect_source_from_url_or_domain(ft_referrer)
             if ft_ref_source:
