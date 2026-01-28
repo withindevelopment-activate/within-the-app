@@ -2576,7 +2576,7 @@ def save_tracking(request):
             "FT_Page_URL": ft_page_url,
             "ft_is_product_landing": ft_is_product_landing,
             "ft_is_social_referrer": ft_is_social_referrer,
-            "ft_is_search_referrer": ft_is_search_referrer
+            "ft_is_search_referrer": ft_is_search_referrer,
 
             **session_customer_info,
         }
