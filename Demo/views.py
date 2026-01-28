@@ -2482,6 +2482,8 @@ def save_tracking(request):
                     .execute()
 
             session_customer_info["Customer_Mobile"] = mobile
+        else:
+            dprint(f"[MOBILE NOT FOUND] NO MOBILE FOUND FOR ENTRY, COULD NOT UPDATE BASED ON MOBILE: MOBILE IS {mobile}")
 
         # --------------------------------------------------
         def safe_strip(v):
