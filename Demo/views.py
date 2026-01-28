@@ -2300,7 +2300,35 @@ def save_tracking(request):
             recorded_source = ((session_rows[0].get("UTM_Source") or "").strip().lower() or "unknown")
             dprint(f"[SESSION FOUND] recorded={recorded_source}")
 
-            if recorded_source == "unknown" and incoming_source != "unknown":
+            # Treat weak Google as "upgradeable"
+            is_weak_google = recorded_source == "google" and not google_confirmed_in_session
+            allow_upgrade = recorded_source == "unknown" or is_weak_google
+
+            if allow_upgrade and source_weight(incoming_source) > source_weight(recorded_source):
+                # Upgrade session with stronger source
+                final_source = incoming_source
+                attribution_type = "session_upgraded"
+                supabase.table("Tracking_Visitors_duplicate") \
+                    .update({"UTM_Source": final_source}) \
+                    .eq("Session_ID", session_id).execute()
+                dprint(f"[SESSION UPGRADE] {recorded_source} >> {final_source}")
+
+            elif recorded_source == "unknown" and incoming_source != "unknown":
+                # Rare case: backfill unknown
+                final_source = incoming_source
+                attribution_type = "session_backfilled"
+                supabase.table("Tracking_Visitors_duplicate") \
+                    .update({"UTM_Source": final_source}) \
+                    .eq("Session_ID", session_id).execute()
+                dprint(f"[SESSION BACKFILLED] unknown >> {final_source}")
+
+            else:
+                # Persist strong/confirmed sources
+                final_source = recorded_source
+                attribution_type = "session_persisted"
+                dprint(f"[SESSION PERSISTED] using {final_source}")
+
+            '''if recorded_source == "unknown" and incoming_source != "unknown":
                 # backfill the session with incoming source -- as in we updated the final source to be the incoming which it already is and we updated prior session values with the value incoming because the one recorded is unknown.
                 final_source = incoming_source
                 attribution_type = "session_backfilled"
@@ -2320,7 +2348,7 @@ def save_tracking(request):
             else:
                 final_source = recorded_source
                 attribution_type = "session_persisted"
-                dprint(f"[SESSION PERSISTED] using {final_source}")
+                dprint(f"[SESSION PERSISTED] using {final_source}")'''
 
         # CASE 2: SESSION UNKNOWN >>> CHECK USING VISITOR_ID -- before it would start if the session id found int he previoud block == unknown and it would just take it. Instead, if it == unknown (in case the incoming == 'unknown') visit this block.
         if visitor_id and (final_source == "unknown" or (final_source == "google" and not google_confirmed_in_session)): ## there's a visitor id and the sosurce have not been resolved from the previous block. -- I'm cehcking for the google source like this becasue if the utm_source was not found in the referrer explicitly as google then it's weak and let's look for other stronger sources using the visitor_id
