@@ -2297,6 +2297,24 @@ def save_tracking(request):
             raw_utm_source = "content creators"
         dprint(f"[RAW UTM SOURCE] {raw_utm_source or 'none'}")
 
+        # ------------------------------------------
+        # First-touch context -- gotten first touches because sometimes the first url is directly a product page and is accounted as direct and that is inaccurate and indicates that it came in from an ad becasue usually direct product landing pages = AD
+        first_touch_context = clean_dict(data.get("first_touch_context") or {})
+        ft_utm = clean_dict(first_touch_context.get("utm") or {})
+        ft_ref = clean_dict(first_touch_context.get("referrer") or {})
+        ft_landing = clean_dict(first_touch_context.get("landing") or {})
+
+        ft_source = (ft_utm.get("utm_source") or "").strip().lower() or "unknown"
+        ft_medium = (ft_utm.get("utm_medium") or "").strip().lower() or "none"
+
+        ft_referrer = (ft_ref.get("referrer_url") or "").strip().lower() ## This differs from the referrer_platform because it shows where the user first clicked from. This is permanent for the user whereas the typical referrer_platform we've been using is dynamic and changes with navigation.
+        ft_is_social_referrer = ft_ref.get("is_social_referrer", False)
+        ft_is_search_referrer = ft_ref.get("is_search_referrer", False)
+
+        ft_page_url = (ft_landing.get("landing_url") or "").strip().lower()
+        ft_is_product_landing = ft_landing.get("is_product_landing", False)
+
+
         # Intialize a list to store possible candidates to act as the incoming source (NO DECISIONS YET)
         candidates = []
 
@@ -2319,6 +2337,27 @@ def save_tracking(request):
             ua_source = detect_source_from_user_agent(agent)
         if ua_source:
             candidates.append({"source": ua_source.lower(), "type": "inferred_user_agent"})
+
+        # First-touch candidate (competes normally, no bonus)
+        #ft_source = first_touch.get("source")
+        if ft_source and ft_source != "unknown":
+            candidates.append({
+                "source": ft_source.lower(),
+                "type": "first_touch",
+                "referrer": ft_referrer,
+                "page_url": ft_page_url
+            })
+
+        # Get the source from the ft_referrer as well.
+        #ft_referrer = first_touch.get("referrer_url")
+        if ft_referrer:
+            ft_ref_source = detect_source_from_url_or_domain(ft_referrer)
+            if ft_ref_source:
+                candidates.append({
+                    "source": ft_ref_source.lower(),
+                    "type": "first_touch_referrer",
+                    "referrer": ft_referrer
+                })
 
         # Traffic source fallback (weakest)
         traffic_fallback = str((traffic_source.get("source") or "")).strip().lower()
@@ -2454,7 +2493,7 @@ def save_tracking(request):
         # CASE 3: BOTH SESSION + VISITOR UNKNOWN >>> RESORT TO MOBILE SOURCE 
         #mobile = str(visitor_info.get("mobile") or "").strip()
         mobile = (
-            str(visitor_info.get("Customer_Mobile") or "").strip()
+            str(session_customer_info.get("Customer_Mobile") or "").strip()
             or (str(event_details.get("Customer_Mobile") or "").strip() if event_type in ["purchase", "add_to_cart"] else "")
         )
 
@@ -2488,6 +2527,9 @@ def save_tracking(request):
             session_customer_info["Customer_Mobile"] = mobile
         else:
             dprint(f"[MOBILE NOT FOUND] NO MOBILE FOUND FOR ENTRY, COULD NOT UPDATE BASED ON MOBILE: MOBILE IS {mobile}")
+
+        ############################ This section is for whenever the case is purchase and the first page recorded is directly from a product
+
 
         # --------------------------------------------------
         def safe_strip(v):
@@ -2525,9 +2567,16 @@ def save_tracking(request):
             "Device_Memory": client_info.get("device_memory"),
             "Last_Updated": get_uae_current_date(),
             "RAW_UTM_SOURCE": raw_utm_source,
-            "Which_Update": "280126 1147",
+            "Which_Update": "290126 0050",
             "Order_ID": "",
             "Cart_ID": "",
+            "FT_Referrer_Link": ft_referrer,
+            "FT_Extract_Source":ft_ref_source,
+            "FT_Source": ft_source,
+            "FT_Page_URL": ft_page_url,
+            "ft_is_product_landing": ft_is_product_landing,
+            "ft_is_social_referrer": ft_is_social_referrer,
+            "ft_is_search_referrer": ft_is_search_referrer
 
             **session_customer_info,
         }
