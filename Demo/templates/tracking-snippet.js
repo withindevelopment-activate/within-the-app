@@ -29,51 +29,45 @@
     }
 
     function inferSource(utm, referrer) {
-            // Explicit UTM = strongest
-            if (utm.utm_source) {
-                return {
-                    source: utm.utm_source,
-                    medium: utm.utm_medium || "paid",
-                    campaign: utm.utm_campaign || "n/a",
-                    attribution_type: "explicit_utm"
-                };
-            }
-
-            // Referrer-based inference
-            if (referrer) {
-                const h = new URL(referrer).hostname.toLowerCase();
-
-                if (h.includes("instagram")) return { source: "instagram", medium: "social", campaign: "organic", attribution_type: "referrer" };
-                if (h.includes("facebook"))  return { source: "facebook",  medium: "social", campaign: "organic", attribution_type: "referrer" };
-                if (h.includes("tiktok"))    return { source: "tiktok",    medium: "social", campaign: "organic", attribution_type: "referrer" };
-                if (h.includes("snapchat"))  return { source: "snapchat",  medium: "social", campaign: "organic", attribution_type: "referrer" };
-
-                if (h.includes("google")) {
-                    return {
-                        source: "google",
-                        medium: "organic",
-                        campaign: "n/a",
-                        attribution_type: "referrer_confirmed"
-                    };
-                }
-
-                // Other websites
-                return {
-                    source: "referral",
-                    medium: "referral",
-                    campaign: "n/a",
-                    attribution_type: "referrer"
-                };
-            }
-
-            // TRUE DIRECT (no utm, no referrer)
+        // Explicit UTM = strongest
+        if (utm.utm_source) {
             return {
-                source: "direct",
-                medium: "none",
-                campaign: "n/a",
-                attribution_type: "direct_confirmed"
+                source: utm.utm_source,
+                medium: utm.utm_medium || "paid",
+                campaign: utm.utm_campaign || "n/a",
+                attribution_type: "explicit_utm"
             };
         }
+
+        // Referrer-based inference
+        if (referrer) {
+            const h = new URL(referrer).hostname.toLowerCase();
+
+            if (h.includes("instagram")) return { source: "instagram", medium: "social", campaign: "organic", attribution_type: "referrer" };
+            if (h.includes("facebook"))  return { source: "facebook",  medium: "social", campaign: "organic", attribution_type: "referrer" };
+            if (h.includes("tiktok"))    return { source: "tiktok",    medium: "social", campaign: "organic", attribution_type: "referrer" };
+            if (h.includes("snapchat"))  return { source: "snapchat",  medium: "social", campaign: "organic", attribution_type: "referrer" };
+
+            if (h.includes("google")) {
+                return {
+                    source: "google",
+                    medium: "organic",
+                    campaign: "n/a",
+                    attribution_type: "referrer_confirmed"
+                };
+            }
+
+            // Anything else falls through to direct
+        }
+
+        // TRUE DIRECT (no utm, no known referrer)
+        return {
+            source: "direct",
+            medium: "none",
+            campaign: "n/a",
+            attribution_type: "direct_confirmed"
+        };
+    }
 
 
     function persistFirstTouch(source) {
