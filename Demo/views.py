@@ -2297,7 +2297,14 @@ def save_tracking(request):
         )
         
         if session_rows:
+            # Current recorded source -- get all the data to backfill for session.
             recorded_source = ((session_rows[0].get("UTM_Source") or "").strip().lower() or "unknown")
+            recorded_medium = session_rows[0].get("UTM_Medium") or ""
+            recorded_campaign = session_rows[0].get("UTM_Campaign") or ""
+            recorded_term = session_rows[0].get("UTM_Term") or ""
+            recorded_content = session_rows[0].get("UTM_Content") or ""
+
+
             dprint(f"[SESSION FOUND] recorded={recorded_source}")
 
             # Treat weak Google as "upgradeable"
@@ -2327,6 +2334,19 @@ def save_tracking(request):
                 final_source = recorded_source
                 attribution_type = "session_persisted"
                 dprint(f"[SESSION PERSISTED] using {final_source}")
+
+                # Backfill full UTM from first explicit hit -- this is needed because it is only recorded for this row
+                supabase.table("Tracking_Visitors_duplicate") \
+                    .update({
+                        "UTM_Source": recorded_source,
+                        "UTM_Medium": recorded_medium,
+                        "UTM_Campaign": recorded_campaign,
+                        "UTM_Term": recorded_term,
+                        "UTM_Content": recorded_content
+                    }) \
+                    .eq("Session_ID", session_id).execute()
+
+                dprint(f"[SESSION PERSISTED] using {final_source} (full UTM backfilled)")
 
             '''if recorded_source == "unknown" and incoming_source != "unknown":
                 # backfill the session with incoming source -- as in we updated the final source to be the incoming which it already is and we updated prior session values with the value incoming because the one recorded is unknown.
