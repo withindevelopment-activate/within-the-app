@@ -2425,7 +2425,7 @@ def save_tracking(request):
             "UTM_Medium": utm_medium,
             "UTM_Campaign": str(utm_params.get("utm_campaign")).strip(),
             "UTM_Term": str(utm_params.get("utm_term")).strip(),
-            "UTM_Content": str(utm_params.get("utm_content")).strip,
+            "UTM_Content": str(utm_params.get("utm_content")).strip(),
 
             "Attribution_Type": attribution_type,
             "First_Touch_Source": "PLACEHOLDER",
