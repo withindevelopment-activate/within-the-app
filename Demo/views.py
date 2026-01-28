@@ -2271,13 +2271,13 @@ def save_tracking(request):
             dprint(f"[DIRECT CHECK] homepage={is_homepage} referrer={referrer}")
 
             if not referrer and is_homepage:
-                incoming_source = "direct"
+                #incoming_source = "direct"
                 attribution_type = "direct_confirmed"
                 dprint("[DIRECT CONFIRMED] incoming_source set to 'direct'")
             else:
-                incoming_source = "unknown"
-                attribution_type = "unknown_first_touch"
-                dprint("[DIRECT DOWNGRADED] incoming_source set to 'unknown'")
+                #incoming_source = "unknown"
+                attribution_type = "direct_landing"
+                dprint("[DIRECT LANDING] incoming_source kept as 'direct'")
             
             # Resyncing final_source after direct confirmation -- we did this again here because not all sources == 'direct'
             final_source = incoming_source
