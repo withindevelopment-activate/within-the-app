@@ -28,78 +28,7 @@
         };
     }
 
-    // ------------------- FIRST TOUCH LOCK -------------------
-    function persistFirstTouchContext(context) {
-        if (!localStorage.getItem("first_touch_context")) {
-            localStorage.setItem("first_touch_context", JSON.stringify({
-                ...context,
-                ts: new Date().toISOString()
-            }));
-        }
-    }
-
-    function getFirstTouchContext() {
-        try {
-            return JSON.parse(localStorage.getItem("first_touch_context"));
-        } catch {
-            return null;
-        }
-    }
-
-    // ------------------- Referrer Intelligence -------------------
-    function getReferrerContext() {
-        const ref = document.referrer || null;
-        let refHost = null;
-
-        try {
-            if (ref) refHost = new URL(ref).hostname.toLowerCase();
-        } catch {}
-
-        const ua = navigator.userAgent.toLowerCase();
-
-        return {
-            referrer_url: ref,
-            referrer_host: refHost,
-            is_social_referrer:
-                refHost?.includes("instagram") ||
-                refHost?.includes("facebook") ||
-                refHost?.includes("tiktok") ||
-                refHost?.includes("snapchat") ||
-                refHost?.includes("twitter") ||
-                refHost?.includes("linkedin") ||
-                false,
-
-            is_search_referrer:
-                refHost?.includes("google") ||
-                refHost?.includes("bing") ||
-                refHost?.includes("yahoo") ||
-                false,
-
-            in_app_browser_hint:
-                ua.includes("instagram") ||
-                ua.includes("fbav") ||
-                ua.includes("tiktok") ||
-                ua.includes("snapchat"),
-
-            user_agent: navigator.userAgent
-        };
-    }
-
-    // ------------------- Landing Context -------------------
-    function getLandingContext() {
-        const path = location.pathname.toLowerCase();
-
-        return {
-            landing_url: location.href,
-            landing_path: path,
-            is_product_landing: path.includes("/products/"),
-            is_collection_landing: path.includes("/collections/"),
-            is_homepage: path === "/" || path === ""
-        };
-    }
-
-    // ------------------- Source Inference + FIRST TOUCH -------------------
-    function inferImmediateSource(utm, refCtx) {
+    function inferSource(utm, referrer) {
         if (utm.utm_source) {
             return {
                 source: utm.utm_source,
@@ -108,26 +37,34 @@
                 attribution_type: "explicit_utm"
             };
         }
-
-        if (refCtx.referrer_host) {
-            return {
-                source: refCtx.referrer_host,
-                medium: refCtx.is_search_referrer
-                    ? "organic"
-                    : refCtx.is_social_referrer
-                    ? "social"
-                    : "referral",
-                campaign: "n/a",
-                attribution_type: "referrer"
-            };
+        if (referrer) {
+            try {
+                const h = new URL(referrer).hostname.toLowerCase();
+                if (h.includes("instagram")) return { source: "instagram", medium: "social", campaign: "organic", attribution_type: "referrer" };
+                if (h.includes("facebook"))  return { source: "facebook",  medium: "social", campaign: "organic", attribution_type: "referrer" };
+                if (h.includes("tiktok"))    return { source: "tiktok",    medium: "social", campaign: "organic", attribution_type: "referrer" };
+                if (h.includes("snapchat"))  return { source: "snapchat",  medium: "social", campaign: "organic", attribution_type: "referrer" };
+                if (h.includes("google")) return { source: "google", medium: "organic", campaign: "n/a", attribution_type: "referrer_confirmed" };
+            } catch {}
         }
+        return { source: "direct", medium: "none", campaign: "n/a", attribution_type: "direct_confirmed" };
+    }
 
-        return {
-            source: "direct",
-            medium: "none",
-            campaign: "n/a",
-            attribution_type: "direct_unverified"
-        };
+    function persistFirstTouch(source) {
+        if (!localStorage.getItem("first_touch_attribution")) {
+            localStorage.setItem("first_touch_attribution", JSON.stringify({
+                ...source,
+                ts: new Date().toISOString()
+            }));
+        }
+    }
+
+    function getPersistedFirstTouch() {
+        try {
+            return JSON.parse(localStorage.getItem("first_touch_attribution"));
+        } catch {
+            return null;
+        }
     }
 
     function getVisitorInfo() {
@@ -142,39 +79,58 @@
         return {};
     }
 
+    // ------------------- First Touch Identification -------------------
+    function identifyFirstTouch() {
+        const utm = getUTMParams();
+        const referrer = document.referrer || null;
+        const landingPath = location.pathname.toLowerCase();
+
+        // Infer source
+        const inferred = inferSource(utm, referrer);
+
+        // Persist first-touch if not yet stored
+        persistFirstTouch(inferred);
+
+        // Get stored first-touch
+        const firstTouch = getPersistedFirstTouch() || {};
+
+        // Return enriched first-touch context
+        return {
+            ...firstTouch,
+            landing_url: location.href,
+            landing_path: landingPath,
+            is_product_landing: landingPath.includes("/products/"),
+            is_collection_landing: landingPath.includes("/collections/"),
+            is_homepage: landingPath === "/" || landingPath === ""
+        };
+    }
+
     // ------------------- Tracking -------------------
     const BACKEND_URL = "https://testing-within.onrender.com";
 
     function sendTrackingEvent(type, details = {}) {
         const utm = getUTMParams();
-        const refCtx = getReferrerContext();
-        const landingCtx = getLandingContext();
+        const referrer = document.referrer || null;
 
-        persistFirstTouchContext({
-            utm,
-            referrer: refCtx,
-            landing: landingCtx
-        });
-
-        const firstTouchContext = getFirstTouchContext();
-        const inferred = inferImmediateSource(utm, refCtx);
+        const inferred = inferSource(utm, referrer);
+        const firstTouchContext = identifyFirstTouch();
 
         const payload = {
             visitor_id: getOrCreateCookie("visitor_id"),
             session_id: getOrCreateSessionId(),
+            store_url: location.origin,
+            page_url: location.href,
+            referrer,
 
             event_type: type,
             event_details: details,
 
-            page_url: location.href,
-            store_url: location.origin,
-
             utm_params: utm,
             traffic_source: inferred,
-
             first_touch_context: firstTouchContext,
 
             client_info: {
+                user_agent: navigator.userAgent,
                 language: navigator.language,
                 timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
                 platform: navigator.platform,
@@ -198,4 +154,51 @@
     window.addToCartEvent = p => sendTrackingEvent("add_to_cart", p || {});
     window.addToWishlist = pid => sendTrackingEvent("add_to_wishlist", { product_id: pid });
     window.purchaseEvent = p => sendTrackingEvent("purchase", p || {});
+
+    // ------------------- Purchase Interception -------------------
+    (function interceptPurchaseEvent() {
+        if (typeof window.sendPurchaseEvent !== "function") return;
+        const originalSendPurchaseEvent = window.sendPurchaseEvent;
+
+        window.sendPurchaseEvent = function (payload) {
+            try {
+                const order = payload?.order || (payload && payload.id ? payload : null);
+
+                if (order && order.id) {
+                    const orderInfo = {
+                        order_id: order.id,
+                        customer_id: window.customer?.id || null,
+                        customer_name: window.customer?.name || null,
+                        customer_email: window.customer?.email || null,
+                        customer_mobile: window.customer?.mobile || null,
+                        order_total: Number(order.order_total) || null,
+                        order_total_string: order.order_total_string || null,
+                        currency: order.currency_code || "SAR",
+                        issue_date: order.issue_date || null,
+                        payment_method_name: order.payment?.method?.name || null,
+                        products: Array.isArray(order.products)
+                            ? order.products.map(p => ({
+                                  product_id: p.id || p.product_id || null,
+                                  name: p.name || null,
+                                  sku: p.sku || null,
+                                  price: Number(p.sale_price ?? p.price) || null,
+                                  quantity: Number(p.quantity) || 1
+                              }))
+                            : [],
+                        products_count:
+                            order.products_count ||
+                            (Array.isArray(order.products) ? order.products.length : 0)
+                    };
+
+                    sendTrackingEvent("purchase", orderInfo);
+                }
+
+            } catch (err) {
+                // silently fail
+            }
+
+            return originalSendPurchaseEvent.apply(this, arguments);
+        };
+    })();
+
 })();
