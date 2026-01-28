@@ -2493,7 +2493,7 @@ def save_tracking(request):
             "Visitor_ID": visitor_id,
             "Session_ID": session_id,
             "Event_Type": event_type,
-            "Event_Details": json.dumps(event_details, sort_keys=True),
+            "Event_Details": str(event_details),
             "Page_URL": page_url,
             "Referrer_Platform": referrer,
             "Visited_at": get_uae_current_date(),
