@@ -2379,7 +2379,7 @@ def save_tracking(request):
             candidates.append({"source": "unknown", "type": "unknown"})
 
         # --------------------------------------------------
-        # PICK STRONGEST CANDIDATE FROM THE LIST
+        # PICK STRONGEST CANDIDATE FROM THE LIST -- 
         winner = candidates[0]
         for c in candidates[1:]:
             if source_weight(c["source"]) > source_weight(winner["source"]):
@@ -2591,7 +2591,7 @@ def save_tracking(request):
 
             #Fingerprint JS
             'Fingerprint_ID': str(data.get('fingerprint_id')).strip(),
-            'Fingerprint_Confidence': float(data.get('fingerprint_confidence')),
+            'Fingerprint_Confidence': data.get('fingerprint_confidence'),
 
             **session_customer_info
         }
