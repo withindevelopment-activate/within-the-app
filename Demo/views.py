@@ -2190,6 +2190,18 @@ def is_duplicate_event(event_type, identity_type, identity_value):
     return bool(res.data)
 
 
+def has_explicit_google(rows):
+    """
+    True if ANY row contains google with explicit_utm -- this helps with the case of overriding weak sources but rows have an explicit google utm_soruce.
+    """
+    for r in rows or []:
+        src = (r.get("UTM_Source") or "").strip().lower()
+        attr = r.get("Attribution_Type") or ""
+        if src == "google" and attr == "explicit_utm":
+            return True
+    return False
+
+
 @csrf_exempt
 @require_POST
 def save_tracking(request):
@@ -2419,7 +2431,7 @@ def save_tracking(request):
         ### THE BLOCK TO DECIDE ON WHETHER INCOMING SOURCE IS UPDATED OR NOT
         session_rows = (
             supabase.table("Tracking_Visitors_duplicate")
-            .select("UTM_Source", "UTM_Medium", "UTM_Campaign", "UTM_Term", "UTM_Content")
+            .select("UTM_Source", "UTM_Medium", "UTM_Campaign", "UTM_Term", "UTM_Content", "Attribution_Type")
             .eq("Session_ID", session_id)
             .execute()
         ).data or []
@@ -2432,10 +2444,19 @@ def save_tracking(request):
             recorded_term = session_rows[0].get("UTM_Term") or ""
             recorded_content = session_rows[0].get("UTM_Content") or ""
 
-
             dprint(f"[SESSION FOUND] recorded={recorded_source}")
             # Verify if upgradable -- 
             allow_upgrade = recorded_source in weak_sources
+
+            ## A first initial step that compares weak against weak let's say direct is incoming, but there's an explicit google utm_source in history override.
+            if (
+                final_source in weak_sources
+                and recorded_source in weak_sources
+                and has_explicit_google(session_rows) and final_source != 'google'
+            ):
+                final_source = "google"
+                attribution_type = "session_explicit_google_override"
+                dprint("[SESSION EXPLICIT GOOGLE] weak incoming overridden")
 
             ## Check if we upgrade the final_source with the one recorded.
             if source_weight(recorded_source) > source_weight(final_source): ## else this means that the recorded is not weak, let's compare it with the final source (initially set to incoming) then take it if it's valid.
@@ -2465,20 +2486,31 @@ def save_tracking(request):
 
             res = (
                 supabase.table("Tracking_Visitors_duplicate")
-                .select("UTM_Source, Session_ID, Customer_Mobile")
+                .select("UTM_Source, Session_ID, Customer_Mobile", "Attribution_Type")
                 .eq("Visitor_ID", visitor_id)
                 .execute()
             )
-
+            rows = res.data or []
             strongest_source = final_source ## comapre with the one we got from the session id so far
             discovered_mobile = None
 
-            for row in res.data or []:
+            for row in rows:
                 existing = (row.get("UTM_Source") or "").strip().lower() or "unknown"
                 strongest_source = pick_stronger_source(strongest_source, existing)
 
                 if row.get("Customer_Mobile"):
                     discovered_mobile = row["Customer_Mobile"]
+
+            # ── weak vs weak explicit google normalization
+            if (
+                final_source in weak_sources
+                and strongest_source in weak_sources
+                and has_explicit_google(rows)
+                and strongest_source != "google"
+            ):
+                strongest_source = "google"
+                attribution_type = "visitor_explicit_google_override"
+                dprint("[VISITOR] explicit google promoted")
 
             #if strongest_source != "unknown" and strongest_source != final_source:
             # Only skip if the strongest_source is still google or unknown and the session already has a strong source
@@ -2513,16 +2545,27 @@ def save_tracking(request):
 
             res = (
                 supabase.table("Tracking_Visitors_duplicate")
-                .select("UTM_Source")
+                .select("UTM_Source", "Attribution_Type")
                 .eq("Customer_Mobile", mobile)
                 .execute()
             )
-
+            rows = res.data or []
             strongest_source = final_source ## compare with the source we have recorded so far.
 
-            for row in res.data or []:
+            for row in rows:
                 existing = (row.get("UTM_Source") or "").strip().lower() or "unknown"
                 strongest_source = pick_stronger_source(strongest_source, existing)
+
+            # ── weak vs weak explicit google normalization
+            if (
+                final_source in weak_sources
+                and strongest_source in weak_sources
+                and has_explicit_google(rows)
+                and strongest_source != "google"
+            ):
+                strongest_source = "google"
+                attribution_type = "mobile_explicit_google_override"
+                dprint("[MOBILE] explicit google promoted")
 
             if strongest_source not in weak_sources: ## I'm not adding google here because if it's google at the end of all those steps then just take it.
                 final_source = strongest_source
