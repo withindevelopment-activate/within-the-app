@@ -159,6 +159,8 @@
         const inferred = inferSource(utm, referrer);
         const firstTouchContext = identifyFirstTouch();
 
+        const fingerprint = getFingerprint();
+
         const payload = {
             visitor_id: getOrCreateCookie("visitor_id"),
             session_id: getOrCreateSessionId(),
@@ -168,6 +170,9 @@
 
             event_type: type,
             event_details: details,
+
+            fingerprint_id: fingerprint?.visitor_id || null,
+            fingerprint_confidence: fingerprint?.confidence || null,
 
             utm_params: utm,
             traffic_source: inferred,
