@@ -2589,7 +2589,11 @@ def save_tracking(request):
             "ft_is_social_referrer": ft_is_social_referrer,
             "ft_is_search_referrer": ft_is_search_referrer,
 
-            **session_customer_info,
+            #Fingerprint JS
+            'Fingerprint_ID': str(data.get('fingerprint_id')).strip(),
+            'Fingerprint_Confidence': float(data.get('fingerprint_confidence')),
+
+            **session_customer_info
         }
 
         # Attach identity columns

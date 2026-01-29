@@ -1,5 +1,39 @@
 (function () {
+    var fpScript = document.createElement("script");
+    fpScript.src = "https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs@3/dist/fp.min.js";
+    fpScript.async = true;
+    document.head.appendChild(fpScript);
+})();
+
+(function () {
     // ------------------- Helpers -------------------
+    // ------------------- Fingerprint Identifiers -------------------
+    let fingerprintPromise = null;
+
+    function getFingerprint() {
+        if (fingerprintPromise) return fingerprintPromise;
+
+        fingerprintPromise = new Promise((resolve) => {
+            if (!window.FingerprintJS) {
+                resolve(null);
+                return;
+            }
+
+            FingerprintJS.load()
+                .then(fp => fp.get())
+                .then(result => {
+                    resolve({
+                        visitor_id: result.visitorId,
+                        confidence: result.confidence?.score || null
+                    });
+                })
+                .catch(() => resolve(null));
+        });
+
+        return fingerprintPromise;
+    }
+    // ------------------- Fingerprint End -------------------
+
     function getOrCreateCookie(name, days = 365) {
         const existing = document.cookie.split('; ').find(row => row.startsWith(name + '='));
         if (existing) return existing.split('=')[1];
