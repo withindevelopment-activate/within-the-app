@@ -152,6 +152,11 @@
     // ------------------- Tracking -------------------
     const BACKEND_URL = "https://testing-within.onrender.com";
 
+    async function fingerprintReady() {
+        console.log("Fetching fingerprint...");
+        return await getFingerprint();
+    }
+    
     function sendTrackingEvent(type, details = {}) {
         const utm = getUTMParams();
         const referrer = document.referrer || null;
@@ -159,7 +164,8 @@
         const inferred = inferSource(utm, referrer);
         const firstTouchContext = identifyFirstTouch();
 
-        const fingerprint = getFingerprint();
+        const fingerprint = fingerprintReady();
+        console.log("Fingerprint promise:", fingerprint);
 
         const payload = {
             visitor_id: getOrCreateCookie("visitor_id"),
