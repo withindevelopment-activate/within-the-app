@@ -4411,11 +4411,15 @@ def events_table_view(request):
     timezone_search = request.GET.get("timezone", "")
     number_search = request.GET.get("number_search", "")
     action = request.GET.get("action", "filter")
+    fingerprint = request.GET.get("fingerprint", "")
 
     filters = {}
 
     if event_type:
         filters["Event_Type"] = ("eq", event_type)
+
+    if fingerprint and fingerprint != "None":
+        filters["Fingerprint_ID"] = ("eq", fingerprint)
 
     if session_search and session_search != "None":
         filters["Session_ID"] = ("eq", session_search)
@@ -4520,6 +4524,7 @@ def events_table_view(request):
         "selected_date_end": date_end,
         "session_search": session_search,
         "visitor_search": visitor_search,
+        "fingerprint": fingerprint,
         "number_search": number_search,
         "sort_field": sort_field,
         "timezone_search": timezone_search,

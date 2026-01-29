@@ -32,12 +32,13 @@
             </select>
         </div>
 
-        <!-- Date After -->
+        <!-- from Date -->
         <div class="col-md-3">
             <label class="form-label">From Date</label>
             <input type="datetime-local" name="date_after" value="{{ selected_date }}" class="form-control">
         </div>
 
+        <!-- to Date -->
         <div class="col-md-3">
             <label class="form-label">To Date</label>
             <input type="datetime-local" name="date_end" value="{{ selected_date_end }}" class="form-control">
@@ -53,6 +54,12 @@
         <div class="col-md-2">
             <label class="form-label">Visitor ID</label>
             <input type="text" name="visitor_id" value="{{ visitor_search }}" placeholder="Visitor ID..." class="form-control">
+        </div>
+
+        <!-- Search Fingerprint ID -->
+        <div class="col-md-2">
+            <label class="form-label">Fingerprint ID</label>
+            <input type="text" name="fingerprint" value="{{ fingerprint}}" placeholder="Fingerprint ID..." class="form-control">
         </div>
 
         <!-- Search Number -->
@@ -89,12 +96,6 @@
                 Export Excel
             </button>
 
-            {% comment %} <button type="submit"
-                    class="btn btn-outline-warning"
-                    onclick="return confirm('Update database using current filters?') &&
-                            (document.getElementById('action-field').value='update_db')">
-                Update Database
-            </button> {% endcomment %}
         </div>
         <input type="hidden" name="action" id="action-field">
     </form>
