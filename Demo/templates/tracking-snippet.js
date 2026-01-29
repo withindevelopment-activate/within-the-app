@@ -152,20 +152,53 @@
     // ------------------- Tracking -------------------
     const BACKEND_URL = "https://testing-within.onrender.com";
 
-    async function fingerprintReady() {
-        console.log("Fetching fingerprint...");
-        return await getFingerprint();
+    function waitForFingerprintJS(timeout = 2000) {
+        return new Promise(resolve => {
+            const start = Date.now();
+            const i = setInterval(() => {
+                if (window.FingerprintJS) {
+                    clearInterval(i);
+                    resolve(true);
+                }
+                if (Date.now() - start > timeout) {
+                    clearInterval(i);
+                    resolve(false);
+                }
+            }, 50);
+        });
     }
+
+    async function getFingerprint() {
+        if (fingerprintPromise) return fingerprintPromise;
+
+        fingerprintPromise = (async () => {
+            const ready = await waitForFingerprintJS();
+            if (!ready) return null;
+
+            try {
+                const fp = await FingerprintJS.load();
+                const result = await fp.get();
+                return {
+                    visitor_id: result.visitorId,
+                    confidence: result.confidence?.score || null
+                };
+            } catch {
+                return null;
+            }
+        })();
+
+        return fingerprintPromise;
+    }
+
     
-    function sendTrackingEvent(type, details = {}) {
+    async function sendTrackingEvent(type, details = {}) {
         const utm = getUTMParams();
         const referrer = document.referrer || null;
 
         const inferred = inferSource(utm, referrer);
         const firstTouchContext = identifyFirstTouch();
 
-        const fingerprint = fingerprintReady();
-        console.log("Fingerprint promise:", fingerprint);
+        const fingerprint = await fingerprintReady(); 
 
         const payload = {
             visitor_id: getOrCreateCookie("visitor_id"),
@@ -203,6 +236,7 @@
             body: JSON.stringify(payload)
         }).catch(() => {});
     }
+
 
     // ------------------- Base Events -------------------
     window.addEventListener("load", () => sendTrackingEvent("pageview"));
