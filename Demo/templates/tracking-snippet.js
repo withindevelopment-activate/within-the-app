@@ -7,31 +7,6 @@
 
 (function () {
     // ------------------- Helpers -------------------
-    // ------------------- Fingerprint Identifiers -------------------
-    let fingerprintPromise = null;
-
-    function getFingerprint() {
-        if (fingerprintPromise) return fingerprintPromise;
-
-        fingerprintPromise = new Promise((resolve) => {
-            if (!window.FingerprintJS) {
-                resolve(null);
-                return;
-            }
-
-            FingerprintJS.load()
-                .then(fp => fp.get())
-                .then(result => {
-                    resolve({
-                        visitor_id: result.visitorId,
-                        confidence: result.confidence?.score || null
-                    });
-                })
-                .catch(() => resolve(null));
-        });
-
-        return fingerprintPromise;
-    }
     // ------------------- Fingerprint End -------------------
 
     function getOrCreateCookie(name, days = 365) {
@@ -198,7 +173,7 @@
         const inferred = inferSource(utm, referrer);
         const firstTouchContext = identifyFirstTouch();
 
-        const fingerprint = await fingerprintReady(); 
+        const fingerprint = await getFingerprint(); 
 
         const payload = {
             visitor_id: getOrCreateCookie("visitor_id"),
