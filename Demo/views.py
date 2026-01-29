@@ -2730,10 +2730,10 @@ def save_tracking(request):
         batch_insert_to_supabase(pd.DataFrame([tracking_entry]), "Tracking_Visitors_duplicate")
 
         # --------------------------------------------------
-        # Backfill ONLY non-social sources across same mobile
-        if session_customer_info.get("Customer_Mobile") and source_weight(final_source) < 100:
+        '''# Backfill ONLY non-social sources across same mobile
+        if session_customer_info.get("Customer_Mobile"):
             dprint(f"[BACKFILL] non-social >> {final_source}")
-            supabase.table("Tracking_Visitors_duplicate").update({"UTM_Source": final_source}).eq("Customer_Mobile", session_customer_info["Customer_Mobile"]).execute()
+            supabase.table("Tracking_Visitors_duplicate").update({"UTM_Source": final_source}).eq("Customer_Mobile", session_customer_info["Customer_Mobile"]).execute()'''
 
         dprint("========== END save_tracking (SUCCESS) ==========")
         return JsonResponse({"status": "success"})
