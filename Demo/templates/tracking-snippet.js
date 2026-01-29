@@ -7,6 +7,31 @@
 
 (function () {
     // ------------------- Helpers -------------------
+    // ------------------- Fingerprint Identifiers -------------------
+    let fingerprintPromise = null;
+
+    function getFingerprint() {
+        if (fingerprintPromise) return fingerprintPromise;
+
+        fingerprintPromise = new Promise((resolve) => {
+            if (!window.FingerprintJS) {
+                resolve(null);
+                return;
+            }
+
+            FingerprintJS.load()
+                .then(fp => fp.get())
+                .then(result => {
+                    resolve({
+                        visitor_id: result.visitorId,
+                        confidence: result.confidence?.score || null
+                    });
+                })
+                .catch(() => resolve(null));
+        });
+
+        return fingerprintPromise;
+    }
     // ------------------- Fingerprint End -------------------
 
     function getOrCreateCookie(name, days = 365) {
@@ -126,44 +151,6 @@
 
     // ------------------- Tracking -------------------
     const BACKEND_URL = "https://testing-within.onrender.com";
-
-    function waitForFingerprintJS(timeout = 2000) {
-        return new Promise(resolve => {
-            const start = Date.now();
-            const i = setInterval(() => {
-                if (window.FingerprintJS) {
-                    clearInterval(i);
-                    resolve(true);
-                }
-                if (Date.now() - start > timeout) {
-                    clearInterval(i);
-                    resolve(false);
-                }
-            }, 50);
-        });
-    }
-
-    async function getFingerprint() {
-        if (fingerprintPromise) return fingerprintPromise;
-
-        fingerprintPromise = (async () => {
-            const ready = await waitForFingerprintJS();
-            if (!ready) return null;
-
-            try {
-                const fp = await FingerprintJS.load();
-                const result = await fp.get();
-                return {
-                    visitor_id: result.visitorId,
-                    confidence: result.confidence?.score || null
-                };
-            } catch {
-                return null;
-            }
-        })();
-
-        return fingerprintPromise;
-    }
 
     
     async function sendTrackingEvent(type, details = {}) {
