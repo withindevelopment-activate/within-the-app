@@ -2539,8 +2539,130 @@ def save_tracking(request):
         else:
             dprint(f"[MOBILE NOT FOUND] NO MOBILE FOUND FOR ENTRY, COULD NOT UPDATE BASED ON MOBILE: MOBILE IS {mobile}")
 
-        ############################ This section is for whenever the case is purchase and the first page recorded is directly from a product
+        '''############################ This section is for whenever the case is purchase and the first page recorded is directly from a product
+        # ==================== CASE 4: FINGERPRINT RESCUE (PURCHASE ONLY) ====================
+        # Conditions:
+        # event_type == purchase
+        # final_source still weak
+        # first page / referrer is deep inside store (not homepage)
+        # fingerprint_id exists (even if from another visitor_id)
 
+        if event_type == "purchase" and final_source in weak_sources:
+
+            # -------- Make sure that it's a deep in store entry from either the page_url or the referrer_platform --------
+            is_deep_store_entry = False
+            first_session_row = None
+
+            try:
+                session_entries = (
+                    supabase.table("Tracking_Visitors_duplicate")
+                    .select("Page_URL", "Referrer_Platform", "Distinct_ID")
+                    .eq("Session_ID", session_id)
+                    .order("Distinct_ID", desc=False)  # earliest first
+                    .limit(1)
+                    .execute()
+                ).data or []
+
+                if session_entries:
+                    first_session_row = session_entries[0]
+
+                    first_page_url = (first_session_row.get("Page_URL") or "").lower()
+                    first_referrer = (first_session_row.get("Referrer_Platform") or "").lower()
+
+                    def is_store_deep(url):
+                        if not url or not store_url:
+                            return False
+                        try:
+                            path = url.replace(store_url.lower(), "")
+                            return path.startswith("/") and path not in ["/", "/en/", "/ar/"]
+                        except Exception:
+                            return False
+
+                    if is_store_deep(first_page_url) or is_store_deep(first_referrer):
+                        is_deep_store_entry = True
+
+            except Exception:
+                pass
+
+            if is_deep_store_entry:
+                dprint("[FINGERPRINT CHECK] purchase + weak source + deep store entry")
+
+                fingerprint_id = None
+
+                # -------- Try getting the Fingerprint from the current passed entry --------
+                fingerprint_id = str(data.get('fingerprint_id')).strip()
+
+                # -------- Try session getting it from previous sessions --------
+                if not fingerprint_id and session_id:
+                    res = (
+                        supabase.table("Tracking_Visitors_duplicate")
+                        .select("Fingerprint_ID")
+                        .eq("Session_ID", session_id)
+                        .limit(1)
+                        .execute()
+                    )
+                    if res.data and res.data[0].get("Fingerprint_ID"):
+                        fingerprint_id = res.data[0]["Fingerprint_ID"]
+
+                # -------- Try visitor_id --------
+                if not fingerprint_id and visitor_id:
+                    res = (
+                        supabase.table("Tracking_Visitors_duplicate")
+                        .select("Fingerprint_ID")
+                        .eq("Visitor_ID", visitor_id)
+                        .execute()
+                    )
+                    for r in res.data or []:
+                        if r.get("Fingerprint_ID"):
+                            fingerprint_id = r["Fingerprint_ID"]
+                            break
+
+                # -------- Try mobile --------
+                if not fingerprint_id and mobile:
+                    res = (
+                        supabase.table("Tracking_Visitors_duplicate")
+                        .select("Fingerprint_ID")
+                        .eq("Customer_Mobile", mobile)
+                        .execute()
+                    )
+                    for r in res.data or []:
+                        if r.get("Fingerprint_ID"):
+                            fingerprint_id = r["Fingerprint_ID"]
+                            break
+
+                # -------- Resolve source using fingerprint --------
+                if fingerprint_id:
+                    dprint(f"[FINGERPRINT FOUND] {fingerprint_id} >> checking history")
+
+                    res = (
+                        supabase.table("Tracking_Visitors_duplicate")
+                        .select("UTM_Source")
+                        .eq("Fingerprint_ID", fingerprint_id)
+                        .execute()
+                    )
+
+                    strongest_fp_source = final_source
+
+                    for row in res.data or []:
+                        existing = (row.get("UTM_Source") or "").strip().lower() or "unknown"
+                        strongest_fp_source = pick_stronger_source(strongest_fp_source, existing)
+
+                    if strongest_fp_source not in weak_sources:
+                        final_source = strongest_fp_source
+                        attribution_type = "fingerprint_rescued_purchase"
+
+                        dprint(f"[FINGERPRINT RESCUED] final_source → {final_source}")
+
+                        # If better source founded, backfill this session
+                        if session_id:
+                            supabase.table("Tracking_Visitors_duplicate") \
+                                .update({"UTM_Source": final_source}) \
+                                .eq("Session_ID", session_id) \
+                                .execute()
+                else:
+                    dprint("[FINGERPRINT CHECK] no fingerprint_id found")
+            else:
+                dprint("[FINGERPRINT CHECK] purchase + weak source BUT NOT DEEP IN STORE ENTRY >> SKIPPING THIS PROCESS")'''
 
         # --------------------------------------------------
         def safe_strip(v):
