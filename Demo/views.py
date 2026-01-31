@@ -2197,7 +2197,7 @@ def has_explicit_google(rows):
     for r in rows or []:
         src = (r.get("UTM_Source") or "").strip().lower()
         attr = r.get("Attribution_Type") or ""
-        if src == "google" and attr == "explicit_utm":
+        if src == "google" and attr in ["explicit_utm", "inferred_referrer"]:
             return True
     return False
 
