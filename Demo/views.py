@@ -2758,6 +2758,14 @@ def save_tracking(request):
             'Fingerprint_ID': str(data.get('fingerprint_id')).strip(),
             'Fingerprint_Confidence': data.get('fingerprint_confidence'),
 
+            #Device ID
+            'Device_ID': str(data.get('device_id')).strip(),
+            'SleecID': str(data.get('device_id')).strip(),
+            'Meta_ID': str(data.get('meta_device_id')).strip(),
+            'Titkok_ID': str(data.get('tiktok_device_id')).strip(),
+            'Snapchat_ID': str(data.get('snapchat_device_id')).strip(),
+            'Google_ID': str(data.get('google_device_id')).strip(),
+
             **session_customer_info
         }
 

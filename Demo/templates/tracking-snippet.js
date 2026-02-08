@@ -7,6 +7,125 @@
 
 (function () {
     // ------------------- Helpers -------------------
+
+    // ------------------- Secure Platform Identity Engine -------------------
+    function detectPlatform() {
+        const ua = navigator.userAgent.toLowerCase();
+        const params = new URLSearchParams(window.location.search);
+
+        if (ua.includes("instagram")) return "instagram";
+        if (ua.includes("fbav") || ua.includes("fban") || ua.includes("facebook")) return "facebook";
+        if (ua.includes("musical_ly") || ua.includes("tiktok")) return "tiktok";
+        if (ua.includes("snapchat")) return "snapchat";
+        if (params.has("gclid") || ua.includes("youtube")) return "google";
+        if (ua.includes("twitter") || ua.includes("x.com")) return "x";
+        if (ua.includes("linkedin")) return "linkedin";
+        if (ua.includes("pinterest")) return "pinterest";
+        if (ua.includes("reddit")) return "reddit";
+        if (ua.includes("whatsapp")) return "whatsapp";
+        if (ua.includes("telegram")) return "telegram";
+
+        return "web";
+    }
+
+    function getPlatformPrefix(platform) {
+        const prefixes = {
+            instagram: "insta_",
+            facebook: "fb_",
+            tiktok: "tiktok_",
+            snapchat: "snap_",
+            google: "google_",
+            x: "x_",
+            linkedin: "li_",
+            pinterest: "pin_",
+            reddit: "rdt_",
+            whatsapp: "wa_",
+            telegram: "tg_",
+            web: "web_"
+        };
+        return prefixes[platform] || "web_";
+    }
+
+    /**
+     * Generates a cryptographically strong unique ID.
+     * Falls back to a high-entropy random string if crypto.randomUUID is unavailable.
+     */
+    function generateSecureID(prefix) {
+        if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+            return prefix + crypto.randomUUID();
+        }
+        // Fallback for older browsers
+        const timestamp = Date.now().toString(36);
+        const randomBits = Math.random().toString(36).substring(2, 15);
+        return `${prefix}${timestamp}-${randomBits}`;
+    }
+
+    function getOrCreateDeviceIdentity() {
+        // PRIVACY SAFETY: Respect "Do Not Track" and "Global Privacy Control"
+        const isPrivacyEnabled = navigator.doNotTrack === "1" || navigator.globalPrivacyControl === true;
+        
+        if (isPrivacyEnabled) {
+            console.info("Identity generation skipped: User has privacy protections enabled.");
+            return null; 
+        }
+
+        let deviceId = localStorage.getItem("device_id");
+        let platform = localStorage.getItem("device_platform");
+
+        if (!deviceId) {
+            platform = detectPlatform();
+            const prefix = getPlatformPrefix(platform);
+            
+            // Generate a 100% unique ID
+            deviceId = generateSecureID(prefix);
+
+            try {
+                localStorage.setItem("device_id", deviceId);
+                localStorage.setItem("device_platform", platform);
+            } catch (e) {
+                console.error("Local Storage is disabled or full.", e);
+            }
+        }
+
+        // Initialize Identity Object
+        const ids = {
+            device_id: deviceId,
+            device_platform: platform,
+            meta_device_id: null,
+            tiktok_device_id: null,
+            snapchat_device_id: null,
+            google_device_id: null,
+        };
+
+        // Map platform-specific IDs for easier tracking integration
+        const platformMap = {
+            "instagram": "meta_device_id",
+            "facebook": "meta_device_id",
+            "tiktok": "tiktok_device_id",
+            "snapchat": "snapchat_device_id",
+            "google": "google_device_id",
+        };
+
+        const specificKey = platformMap[platform];
+        if (specificKey) {
+            ids[specificKey] = deviceId;
+            localStorage.setItem(specificKey, deviceId);
+        }
+
+        return ids;
+    }
+
+    function appendSleeid(deviceId) {
+        const url = new URL(location.href);
+        if (!url.searchParams.has("sleecid")) {
+            url.searchParams.set("sleecid", deviceId);
+            history.replaceState({}, "", url.toString());
+        }
+    }
+
+    const platformIdentity = getOrCreateDeviceIdentity();
+    appendSleeid(platformIdentity.device_id);
+
     // ------------------- Fingerprint Identifiers -------------------
     let fingerprintPromise = null;
 
@@ -162,6 +281,8 @@
 
         const fingerprint = await getFingerprint(); 
 
+        const platformIdentity = getOrCreateDeviceIdentity() || {};
+
         const payload = {
             visitor_id: getOrCreateCookie("visitor_id"),
             session_id: getOrCreateSessionId(),
@@ -174,6 +295,14 @@
 
             fingerprint_id: fingerprint?.visitor_id || null,
             fingerprint_confidence: fingerprint?.confidence || null,
+
+            device_id: platformIdentity.device_id,
+            sleecid: platformIdentity.device_id,
+
+            meta_device_id: platformIdentity.meta_device_id,
+            tiktok_device_id: platformIdentity.tiktok_device_id,
+            snapchat_device_id: platformIdentity.snapchat_device_id,
+            google_device_id: platformIdentity.google_device_id,
 
             utm_params: utm,
             traffic_source: inferred,

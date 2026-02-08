@@ -10,7 +10,7 @@
     <form method="GET" class="row g-3 mb-4">
 
         <!-- Event Type -->
-        <div class="col-md-3">
+        <div class="col-md-2">
             <label class="form-label">Event Type</label>
             <select name="event_type" class="form-select">
                 <option value="">All</option>
@@ -21,7 +21,7 @@
         </div>
 
         <!-- Limit -->
-        <div class="col-md-2">
+        <div class="col-md-1">
             <label class="form-label">Limit</label>
             <select name="limit" class="form-select">
                 <option value="50" {% if selected_limit == 50 %}selected{% endif %}>50</option>
@@ -42,6 +42,16 @@
         <div class="col-md-3">
             <label class="form-label">To Date</label>
             <input type="datetime-local" name="date_end" value="{{ selected_date_end }}" class="form-control">
+        </div>
+
+        <!-- Sorting -->
+        <div class="col-md-3">
+            <label class="form-label">Sort By</label>
+            <select name="sort_by" class="form-select">
+                <option value="Distinct_ID">Distinct_ID</option>
+                <option value="Session_ID" {% if request.GET.sort_by == "Session_ID" %}selected{% endif %}>Session ID</option>
+                <option value="Visitor_ID" {% if request.GET.sort_by == "Visitor_ID" %}selected{% endif %}>Visitor ID</option>
+            </select>
         </div>
 
         <!-- Search Session ID -->
@@ -71,16 +81,6 @@
         <div class="col-md-2">
             <label class="form-label">Timezone</label>
             <input type="text" name="timezone" value="{{ timezone_search }}" placeholder="Timezone..." class="form-control">
-        </div>
-
-        <!-- Sorting -->
-        <div class="col-md-2">
-            <label class="form-label">Sort By</label>
-            <select name="sort_by" class="form-select">
-                <option value="Distinct_ID">Distinct_ID</option>
-                <option value="Session_ID" {% if request.GET.sort_by == "Session_ID" %}selected{% endif %}>Session ID</option>
-                <option value="Visitor_ID" {% if request.GET.sort_by == "Visitor_ID" %}selected{% endif %}>Visitor ID</option>
-            </select>
         </div>
 
         <div class="col-md-12 d-flex justify-content-end gap-2">
