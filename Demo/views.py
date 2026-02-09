@@ -4583,6 +4583,7 @@ def events_table_view(request):
     sort_field = request.GET.get("sort_by", "Distinct_ID")
     timezone_search = request.GET.get("timezone", "")
     number_search = request.GET.get("number_search", "")
+    sleecid = request.GET.get("sleecid", "")
     action = request.GET.get("action", "filter")
     fingerprint = request.GET.get("fingerprint", "")
 
@@ -4602,6 +4603,9 @@ def events_table_view(request):
 
     if number_search and number_search != "None":
         filters["Customer_Mobile"] = ("eq", number_search)
+
+    if sleecid and sleecid != "None":
+        filters["SleecID"] = ("eq", sleecid)
 
     if timezone_search and timezone_search != "None":
         filters["Timezone"] = ("eq", timezone_search)
@@ -4698,6 +4702,7 @@ def events_table_view(request):
         "session_search": session_search,
         "visitor_search": visitor_search,
         "fingerprint": fingerprint,
+        'sleecid': sleecid,
         "number_search": number_search,
         "sort_field": sort_field,
         "timezone_search": timezone_search,
