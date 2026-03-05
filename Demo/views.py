@@ -105,30 +105,30 @@ def zid_callback(request):
         else:
             print("Store ID not found in profile response.")
 
-        ## Add an entry with the tokens into the database
-        tokens = {
-            "Distinct_ID": int(get_next_id_from_supabase_compatible_all(name='tokens', column='Distinct_ID')),
-            'Access': access_token,
-            'Authorization': authorization_token,
-            'Refresh': refresh_token,
-            'Store_ID': store_id if store_id else 'No Store ID',
-            'Tiktok_Access': '',
-            'Tiktok_Org': '',
-            'Snapchat_Access': '',
-            'Snapchat_Refresh': ''
-        }
+        # ## Add an entry with the tokens into the database
+        # tokens = {
+        #     "Distinct_ID": int(get_next_id_from_supabase_compatible_all(name='tokens', column='Distinct_ID')),
+        #     'Access': access_token,
+        #     'Authorization': authorization_token,
+        #     'Refresh': refresh_token,
+        #     'Store_ID': store_id if store_id else 'No Store ID',
+        #     'Tiktok_Access': '',
+        #     'Tiktok_Org': '',
+        #     'Snapchat_Access': '',
+        #     'Snapchat_Refresh': ''
+        # }
 
-        tokens_df = pd.DataFrame([tokens])
-        batch_insert_to_supabase(tokens_df, 'tokens')
+        # tokens_df = pd.DataFrame([tokens])
+        # batch_insert_to_supabase(tokens_df, 'tokens')
 
-        ### Subscribe to the products webhook --
-        print("Creating the product webhook")
+        # ### Subscribe to the products webhook --
+        # print("Creating the product webhook")
         # subscribe_store_to_product_update(authorization_token, access_token)
-        ## Subscribe to the order webhook
-        print("creating the new order webhook")
-        #subscribe_store_to_order_create(authorization_token, access_token)
+        # ## Subscribe to the order webhook
+        # print("creating the new order webhook")
+        # #subscribe_store_to_order_create(authorization_token, access_token)
 
-        ##### Initial fetch for the products and orders
+        # ##### Initial fetch for the products and orders
         # threading.Thread(
         #     target=initial_fetch_products,
         #     args=(authorization_token, access_token, store_id)
@@ -2759,7 +2759,6 @@ def save_tracking(request):
             'Fingerprint_Confidence': data.get('fingerprint_confidence'),
 
             #Device ID
-            
             #'Device_ID': str(data.get('device_id')).strip(),
             'SleecID': str(data.get('device_id')).strip(),
             'Meta_ID': str(data.get('meta_device_id')).strip(),
