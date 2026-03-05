@@ -2759,6 +2759,7 @@ def save_tracking(request):
             'Fingerprint_Confidence': data.get('fingerprint_confidence'),
 
             #Device ID
+            
             #'Device_ID': str(data.get('device_id')).strip(),
             'SleecID': str(data.get('device_id')).strip(),
             'Meta_ID': str(data.get('meta_device_id')).strip(),
