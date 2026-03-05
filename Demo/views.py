@@ -129,10 +129,10 @@ def zid_callback(request):
         #subscribe_store_to_order_create(authorization_token, access_token)
 
         ##### Initial fetch for the products and orders
-        threading.Thread(
-            target=initial_fetch_products,
-            args=(authorization_token, access_token, store_id)
-        ).start()
+        # threading.Thread(
+        #     target=initial_fetch_products,
+        #     args=(authorization_token, access_token, store_id)
+        # ).start()
 
         return redirect('Demo:home')  # go to the home view
 
