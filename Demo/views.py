@@ -123,7 +123,7 @@ def zid_callback(request):
 
         ### Subscribe to the products webhook --
         print("Creating the product webhook")
-        subscribe_store_to_product_update(authorization_token, access_token)
+        # subscribe_store_to_product_update(authorization_token, access_token)
         ## Subscribe to the order webhook
         print("creating the new order webhook")
         #subscribe_store_to_order_create(authorization_token, access_token)
