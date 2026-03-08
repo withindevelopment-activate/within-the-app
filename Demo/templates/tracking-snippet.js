@@ -69,8 +69,30 @@
             return null; 
         }
 
-        let deviceId = localStorage.getItem("device_id");
-        let platform = localStorage.getItem("device_platform");
+        const params = new URLSearchParams(window.location.search);
+
+        let deviceId = null;
+        let platform = null;
+
+        /* 1️⃣ PRIORITY: URL parameter */
+        const urlSleeecid = params.get("sleecid");
+
+        if (urlSleeecid) {
+            deviceId = urlSleeecid;
+            platform = detectPlatform();
+
+            try {
+                localStorage.setItem("device_id", deviceId);
+                localStorage.setItem("device_platform", platform);
+            } catch {}
+        }
+
+        if (!deviceId) {
+            try {
+                deviceId = localStorage.getItem("device_id");
+                platform = localStorage.getItem("device_platform");
+            } catch {}
+        }
 
         if (!deviceId) {
             platform = detectPlatform();
