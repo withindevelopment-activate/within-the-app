@@ -60,56 +60,124 @@
         return `${prefix}${timestamp}-${randomBits}`;
     }
 
+    const LOCKED_PREFIXES = ["insta_", "fb_", "tiktok_", "snap_"];
+
+    function getPrefixStrength(prefix) {
+        const strength = {
+            insta_: 100,
+            fb_: 100,
+            tiktok_: 100,
+            snap_: 100,
+            google_: 80,
+            x_: 70,
+            li_: 60,
+            pin_: 55,
+            rdt_: 50,
+            wa_: 40,
+            tg_: 35,
+            web_: 10
+        };
+
+        return strength[prefix] || 0;
+    }
+
+    function extractPrefix(deviceId) {
+        if (!deviceId) return null;
+
+        const i = deviceId.indexOf("_");
+        if (i === -1) return null;
+
+        return deviceId.substring(0, i + 1);
+    }
+
+    function resolveDeviceId(localId, incomingId) {
+
+        if (!localId) return incomingId;
+        if (!incomingId) return localId;
+
+        const localPrefix = extractPrefix(localId);
+        const incomingPrefix = extractPrefix(incomingId);
+
+        const localLocked = LOCKED_PREFIXES.includes(localPrefix);
+        const incomingLocked = LOCKED_PREFIXES.includes(incomingPrefix);
+
+        // If local is locked → never override
+        if (localLocked && !incomingLocked) {
+            return localId;
+        }
+
+        // If incoming is locked and local is not → upgrade
+        if (!localLocked && incomingLocked) {
+            return incomingId;
+        }
+
+        // If both locked → keep existing
+        if (localLocked && incomingLocked) {
+            return incomingLocked;
+        }
+
+        // Otherwise compare strength
+        const localStrength = getPrefixStrength(localPrefix);
+        const incomingStrength = getPrefixStrength(incomingPrefix);
+
+        return incomingStrength > localStrength ? incomingId : localId;
+    }
+
+    function extractPrefix(deviceId) {
+        if (!deviceId) return null;
+
+        const i = deviceId.indexOf("_");
+        if (i === -1) return null;
+
+        return deviceId.substring(0, i + 1);
+    }
+
     function getOrCreateDeviceIdentity() {
-        // PRIVACY SAFETY: Respect "Do Not Track" and "Global Privacy Control"
-        const isPrivacyEnabled = navigator.doNotTrack === "1" || navigator.globalPrivacyControl === true;
-        
+
+        const isPrivacyEnabled =
+            navigator.doNotTrack === "1" ||
+            navigator.globalPrivacyControl === true;
+
         if (isPrivacyEnabled) {
             console.info("Identity generation skipped: User has privacy protections enabled.");
-            return null; 
+            return null;
         }
 
         const params = new URLSearchParams(window.location.search);
 
-        let deviceId = null;
+        const incomingId = params.get("sleecid");
+
+        let localId = null;
         let platform = null;
 
-        /* 1️⃣ PRIORITY: URL parameter */
-        const urlSleeecid = params.get("sleecid");
+        try {
+            localId = localStorage.getItem("device_id");
+            platform = localStorage.getItem("device_platform");
+        } catch {}
 
-        if (urlSleeecid) {
-            deviceId = urlSleeecid;
-            platform = detectPlatform();
+        /* Resolve strongest device id */
+        let deviceId = resolveDeviceId(localId, incomingId);
 
-            try {
-                localStorage.setItem("device_id", deviceId);
-                localStorage.setItem("device_platform", platform);
-            } catch {}
-        }
-
-        if (!deviceId) {
-            try {
-                deviceId = localStorage.getItem("device_id");
-                platform = localStorage.getItem("device_platform");
-            } catch {}
-        }
-
+        /* If nothing exists yet → generate new */
         if (!deviceId) {
             platform = detectPlatform();
             const prefix = getPlatformPrefix(platform);
-            
-            // Generate a 100% unique ID
             deviceId = generateSecureID(prefix);
-
-            try {
-                localStorage.setItem("device_id", deviceId);
-                localStorage.setItem("device_platform", platform);
-            } catch (e) {
-                console.error("Local Storage is disabled or full.", e);
-            }
         }
 
-        // Initialize Identity Object
+        /* Update platform based on final ID */
+        if (!platform) {
+            platform = detectPlatform();
+        }
+
+        /* Persist */
+        try {
+            localStorage.setItem("device_id", deviceId);
+            localStorage.setItem("device_platform", platform);
+        } catch (e) {
+            console.warn("LocalStorage unavailable");
+        }
+
         const ids = {
             device_id: deviceId,
             device_platform: platform,
@@ -119,19 +187,22 @@
             google_device_id: null,
         };
 
-        // Map platform-specific IDs for easier tracking integration
         const platformMap = {
-            "instagram": "meta_device_id",
-            "facebook": "meta_device_id",
-            "tiktok": "tiktok_device_id",
-            "snapchat": "snapchat_device_id",
-            "google": "google_device_id",
+            instagram: "meta_device_id",
+            facebook: "meta_device_id",
+            tiktok: "tiktok_device_id",
+            snapchat: "snapchat_device_id",
+            google: "google_device_id",
         };
 
         const specificKey = platformMap[platform];
+
         if (specificKey) {
             ids[specificKey] = deviceId;
-            localStorage.setItem(specificKey, deviceId);
+
+            try {
+                localStorage.setItem(specificKey, deviceId);
+            } catch {}
         }
 
         return ids;
