@@ -149,11 +149,16 @@
 
         try {
             const localIdRaw = localStorage.getItem("device_id");
-            localId =
+
+            if (
                 typeof localIdRaw === "string" &&
                 localIdRaw.includes("_")
-                    ? localIdRaw
-                    : null;
+            ) {
+                localId = localIdRaw;
+            } else {
+                localId = null;
+                localStorage.removeItem("device_id"); // cleanup bad values
+            }
             platform = localStorage.getItem("device_platform");
         } catch {}
 
