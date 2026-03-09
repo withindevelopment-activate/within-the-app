@@ -124,29 +124,24 @@
     }
 
     function getOrCreateDeviceIdentity() {
-
-        const isPrivacyEnabled =
-            navigator.doNotTrack === "1" ||
-            navigator.globalPrivacyControl === true;
-
+        // PRIVACY SAFETY: Respect "Do Not Track" and "Global Privacy Control"
+        const isPrivacyEnabled = navigator.doNotTrack === "1" || navigator.globalPrivacyControl === true;
+        
         if (isPrivacyEnabled) {
             console.info("Identity generation skipped: User has privacy protections enabled.");
-            return null;
+            return null; 
         }
 
         const params = new URLSearchParams(window.location.search);
 
-        const incomingIdRaw = params.get("sleecid");
-
-        const incomingId =
-            typeof incomingIdRaw === "string" &&
-            incomingIdRaw.includes("_")
-                ? incomingIdRaw
-                : null;
-
         let localId = null;
         let platform = null;
 
+        /* 1️⃣ PRIORITY: URL parameter */
+        const incomingIdRaw = params.get("sleecid");
+
+        const incomingId = typeof incomingIdRaw === "string" && incomingIdRaw.includes("_") ? incomingIdRaw : null;
+        
         try {
             const localIdRaw = localStorage.getItem("device_id");
 
@@ -162,10 +157,8 @@
             platform = localStorage.getItem("device_platform");
         } catch {}
 
-        /* Resolve strongest device id */
         let deviceId = resolveDeviceId(localId, incomingId);
 
-        /* If nothing exists yet → generate new */
         if (!deviceId) {
             platform = detectPlatform();
             const prefix = getPlatformPrefix(platform);
@@ -185,6 +178,7 @@
             console.warn("LocalStorage unavailable");
         }
 
+        // Initialize Identity Object
         const ids = {
             device_id: deviceId,
             device_platform: platform,
@@ -194,22 +188,20 @@
             google_device_id: null,
         };
 
+        // Map platform-specific IDs for easier tracking integration
         const platformMap = {
-            instagram: "meta_device_id",
-            facebook: "meta_device_id",
-            tiktok: "tiktok_device_id",
-            snapchat: "snapchat_device_id",
-            google: "google_device_id",
+            "instagram": "meta_device_id",
+            "facebook": "meta_device_id",
+            "tiktok": "tiktok_device_id",
+            "snapchat": "snapchat_device_id",
+            "google": "google_device_id",
         };
 
         const specificKey = platformMap[platform];
 
         if (specificKey) {
             ids[specificKey] = deviceId;
-
-            try {
-                localStorage.setItem(specificKey, deviceId);
-            } catch {}
+            localStorage.setItem(specificKey, deviceId);
         }
 
         return ids;
@@ -227,7 +219,6 @@
     if (platformIdentity?.device_id) {
         appendSleeid(platformIdentity.device_id);
     }
-
     // ------------------- Fingerprint Identifiers -------------------
     let fingerprintPromise = null;
 
