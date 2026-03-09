@@ -148,7 +148,12 @@
         let platform = null;
 
         try {
-            localId = localStorage.getItem("device_id");
+            const localIdRaw = localStorage.getItem("device_id");
+            localId =
+                typeof localIdRaw === "string" &&
+                localIdRaw.includes("_")
+                    ? localIdRaw
+                    : null;
             platform = localStorage.getItem("device_platform");
         } catch {}
 
