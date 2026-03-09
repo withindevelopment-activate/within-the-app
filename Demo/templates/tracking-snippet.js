@@ -211,6 +211,13 @@
             history.replaceState({}, "", url.toString());
         }
     }
+    
+    // ------------------- Clean up localStorage -------------------
+    const val = localStorage.getItem(device_id);
+    const cleanVal = sanitizeDeviceId(val);
+    if (!cleanVal) {
+        localStorage.removeItem(key);
+    }
 
     const platformIdentity = getOrCreateDeviceIdentity();
     if (platformIdentity?.device_id) {
