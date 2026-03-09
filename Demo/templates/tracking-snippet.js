@@ -224,7 +224,9 @@
     }
 
     const platformIdentity = getOrCreateDeviceIdentity();
-    appendSleeid(platformIdentity.device_id);
+    if (platformIdentity?.device_id) {
+        appendSleeid(platformIdentity.device_id);
+    }
 
     // ------------------- Fingerprint Identifiers -------------------
     let fingerprintPromise = null;
