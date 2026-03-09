@@ -93,7 +93,7 @@
     function sanitizeDeviceId(rawId) {
         if (!rawId) return null;
         // Coerce boolean values to null
-        if (rawId === true || rawId === "true" || rawId === "false") return null;
+        if (rawId === true || rawId === "true" || rawId === "True" || rawId === "false") return null;
         // Only accept strings with a prefix "_"
         if (typeof rawId === "string" && rawId.includes("_")) return rawId;
         return null;
