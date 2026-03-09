@@ -92,44 +92,30 @@
 
     function sanitizeDeviceId(rawId) {
         if (!rawId) return null;
-        // Coerce boolean values to null
-        if (rawId === true || rawId === "true" || rawId === "True" || rawId === "false") return null;
-        // Only accept strings with a prefix "_"
-        if (typeof rawId === "string" && rawId.includes("_")) return rawId;
+        
+        // Explicitly catch string versions of booleans or invalid placeholders
+        const invalid = ["true", "false", "null", "undefined", "none"];
+        if (invalid.includes(String(rawId).toLowerCase())) return null;
+
+        // Ensure it contains an underscore to be considered a valid prefixed ID
+        if (typeof rawId === "string" && rawId.includes("_")) {
+            return rawId;
+        }
+        
         return null;
     }
 
     function resolveDeviceId(localId, incomingId) {
-
-        if (!localId) return incomingId;
+        if (!localId) return incomingId; 
         if (!incomingId) return localId;
 
         const localPrefix = extractPrefix(localId);
         const incomingPrefix = extractPrefix(incomingId);
 
-        const localLocked = LOCKED_PREFIXES.includes(localPrefix);
-        const incomingLocked = LOCKED_PREFIXES.includes(incomingPrefix);
-
-        // If local is locked → never override
-        if (localLocked && !incomingLocked) {
-            return localId;
-        }
-
-        // If incoming is locked and local is not → upgrade
-        if (!localLocked && incomingLocked) {
-            return incomingId;
-        }
-
-        // If both locked → override existing
-        if (localLocked && incomingLocked) {
-            return incomingId;
-        }
-
-        // Otherwise compare strength
         const localStrength = getPrefixStrength(localPrefix);
         const incomingStrength = getPrefixStrength(incomingPrefix);
 
-        return incomingStrength > localStrength ? incomingId : localId;
+        return incomingStrength >= localStrength ? incomingId : localId;
     }
 
     function getOrCreateDeviceIdentity() {
