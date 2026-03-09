@@ -113,7 +113,7 @@
 
         // If both locked → keep existing
         if (localLocked && incomingLocked) {
-            return incomingLocked;
+            return incomingId;
         }
 
         // Otherwise compare strength
