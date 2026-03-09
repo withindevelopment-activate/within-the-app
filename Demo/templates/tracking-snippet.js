@@ -123,15 +123,6 @@
         return incomingStrength > localStrength ? incomingId : localId;
     }
 
-    function extractPrefix(deviceId) {
-        if (!deviceId) return null;
-
-        const i = deviceId.indexOf("_");
-        if (i === -1) return null;
-
-        return deviceId.substring(0, i + 1);
-    }
-
     function getOrCreateDeviceIdentity() {
 
         const isPrivacyEnabled =
@@ -145,7 +136,13 @@
 
         const params = new URLSearchParams(window.location.search);
 
-        const incomingId = params.get("sleecid");
+        const incomingIdRaw = params.get("sleecid");
+
+        const incomingId =
+            typeof incomingIdRaw === "string" &&
+            incomingIdRaw.includes("_")
+                ? incomingIdRaw
+                : null;
 
         let localId = null;
         let platform = null;
