@@ -90,6 +90,15 @@
         return deviceId.substring(0, i + 1);
     }
 
+    function sanitizeDeviceId(rawId) {
+        if (!rawId) return null;
+        // Coerce boolean values to null
+        if (rawId === true || rawId === "true" || rawId === "false") return null;
+        // Only accept strings with a prefix "_"
+        if (typeof rawId === "string" && rawId.includes("_")) return rawId;
+        return null;
+    }
+
     function resolveDeviceId(localId, incomingId) {
 
         if (!localId) return incomingId;
@@ -111,7 +120,7 @@
             return incomingId;
         }
 
-        // If both locked → keep existing
+        // If both locked → override existing
         if (localLocked && incomingLocked) {
             return incomingId;
         }
@@ -134,28 +143,16 @@
 
         const params = new URLSearchParams(window.location.search);
 
-        let localId = null;
         let platform = null;
 
         /* 1️⃣ PRIORITY: URL parameter */
-        const incomingIdRaw = params.get("sleecid");
+        const incomingId = sanitizeDeviceId(params.get("sleecid"));
+        const localIdRaw = localStorage.getItem("device_id");
+        const localId = sanitizeDeviceId(localIdRaw);
 
-        const incomingId = typeof incomingIdRaw === "string" && incomingIdRaw.includes("_") ? incomingIdRaw : null;
-        
-        try {
-            const localIdRaw = localStorage.getItem("device_id");
-
-            if (
-                typeof localIdRaw === "string" &&
-                localIdRaw.includes("_")
-            ) {
-                localId = localIdRaw;
-            } else {
-                localId = null;
-                localStorage.removeItem("device_id"); // cleanup bad values
-            }
-            platform = localStorage.getItem("device_platform");
-        } catch {}
+        if (!localId) {
+            localStorage.removeItem("device_id");
+        }
 
         let deviceId = resolveDeviceId(localId, incomingId);
 
