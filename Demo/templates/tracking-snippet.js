@@ -138,10 +138,6 @@
         const localIdRaw = localStorage.getItem("device_id");
         const localId = sanitizeDeviceId(localIdRaw);
 
-        if (!localId) {
-            localStorage.removeItem("device_id");
-        }
-
         let deviceId = resolveDeviceId(localId, incomingId);
 
         if (!deviceId) {
@@ -198,13 +194,6 @@
             url.searchParams.set("sleecid", deviceId);
             history.replaceState({}, "", url.toString());
         }
-    }
-    
-    // ------------------- Clean up localStorage -------------------
-    const val = localStorage.getItem(device_id);
-    const cleanVal = sanitizeDeviceId(val);
-    if (!cleanVal) {
-        localStorage.removeItem(key);
     }
 
     const platformIdentity = getOrCreateDeviceIdentity();
