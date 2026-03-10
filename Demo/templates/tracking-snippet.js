@@ -115,7 +115,7 @@
         const localStrength = getPrefixStrength(localPrefix);
         const incomingStrength = getPrefixStrength(incomingPrefix);
 
-        return incomingStrength >= localStrength ? incomingId : localId;
+        return (incomingStrength >= localStrength) ? incomingId : localId;
     }
 
     function getOrCreateDeviceIdentity() {
