@@ -8,6 +8,94 @@
 (function () {
     // ------------------- Helpers -------------------
 
+    function getAllCookies() {
+        return document.cookie.split("; ").reduce((acc, c) => {
+            const [k, v] = c.split("=");
+            acc[k] = decodeURIComponent(v);
+            return acc;
+        }, {});
+    }
+
+    function parseGAClientId(ga) {
+        if (!ga) return null;
+        const parts = ga.split(".");
+        if (parts.length >= 4) {
+            return parts[2] + "." + parts[3];
+        }
+        return null;
+    }
+
+    function parseFBP(fbp) {
+        if (!fbp) return null;
+        const parts = fbp.split(".");
+        return parts.length >= 4 ? parts[3] : null;
+    }
+
+    function parseTikTok(tt) {
+        if (!tt) return null;
+        return tt.split(".")[0];
+    }
+
+    function parsePosthog(cookie) {
+        try {
+            return JSON.parse(cookie);
+        } catch {
+            return null;
+        }
+    }
+
+    function parseJSONCookie(cookie) {
+        try {
+            return JSON.parse(decodeURIComponent(cookie));
+        } catch {
+            return null;
+        }
+    }
+
+    function extractAnalyticsCookies() {
+        const cookies = getAllCookies();
+
+        const posthogKey = Object.keys(cookies).find(k =>
+            k.startsWith("ph_") && k.endsWith("_posthog")
+        );
+
+        const posthog = posthogKey ? parsePosthog(cookies[posthogKey]) : null;
+
+        const mzutm = cookies["_mz_utm"]
+            ? parseJSONCookie(cookies["_mz_utm"])
+            : null;
+
+        return {
+            visitor_ids: {
+                visitor_id: cookies["visitor_id"] || null,
+                custom_visitor_id: cookies["custom_visitor_id"] || null,
+                segment_anonymous_id: cookies["ajs_anonymous_id"] || null
+            },
+
+            analytics_ids: {
+                ga_client_id: parseGAClientId(cookies["_ga"]),
+                fb_browser_id: parseFBP(cookies["_fbp"]),
+                fb_click_id: cookies["_fbc"] || null,
+                tiktok_browser_id: parseTikTok(cookies["_ttp"]),
+                snapchat_browser_id: cookies["_scid"] || null
+            },
+
+            session_ids: {
+                tiktok_session: cookies["ttcsid"] || null,
+                session_timestamp: cookies["_sctr"] || null
+            },
+
+            attribution: {
+                mz_utm: mzutm,
+            },
+
+            posthog_identity: {
+                device_id: posthog?.$device_id || null,
+                distinct_id: posthog?.distinct_id || null
+            }
+        };
+    }
+
     // ------------------- Secure Platform Identity Engine -------------------
     function detectPlatform() {
         const ua = navigator.userAgent.toLowerCase();
@@ -356,9 +444,11 @@
         const fingerprint = await getFingerprint(); 
 
         const platformIdentity = getOrCreateDeviceIdentity() || {};
+        const cookieIntel = extractAnalyticsCookies();
 
         const payload = {
             visitor_id: getOrCreateCookie("visitor_id"),
+            cookie_id: cookieIntel,
             session_id: getOrCreateSessionId(),
             store_url: location.origin,
             page_url: location.href,

@@ -2243,6 +2243,7 @@ def save_tracking(request):
         visitor_id = str(data.get("visitor_id") or "").strip()
         session_id = str(data.get("session_id") or "").strip()
         event_type = str(data.get("event_type") or "").strip()
+        cookie_id = str(data.get("cookie_id") or "")
 
         dprint(f"[IDS] visitor_id={visitor_id} | session_id={session_id} | event_type={event_type}")
 
@@ -2715,6 +2716,7 @@ def save_tracking(request):
         tracking_entry = {
             "Distinct_ID": int(get_next_id_from_supabase_compatible_all(name="Tracking_Visitors_duplicate", column="Distinct_ID")),
             "Visitor_ID": visitor_id,
+            "Cookie_ID" : cookie_id,
             "Session_ID": session_id,
             "Event_Type": event_type,
             "Event_Details": str(event_details),
