@@ -10,7 +10,7 @@
     <form method="GET" class="row g-3 mb-4">
 
         <!-- Event Type -->
-        <div class="col-md-2">
+        <div class="col-md-1">
             <label class="form-label">Event Type</label>
             <select name="event_type" class="form-select">
                 <option value="">All</option>
@@ -33,19 +33,19 @@
         </div>
 
         <!-- from Date -->
-        <div class="col-md-3">
+        <div class="col-md-2">
             <label class="form-label">From Date</label>
             <input type="datetime-local" name="date_after" value="{{ selected_date }}" class="form-control">
         </div>
 
         <!-- to Date -->
-        <div class="col-md-3">
+        <div class="col-md-2">
             <label class="form-label">To Date</label>
             <input type="datetime-local" name="date_end" value="{{ selected_date_end }}" class="form-control">
         </div>
 
         <!-- Sorting -->
-        <div class="col-md-3">
+        <div class="col-md-2">
             <label class="form-label">Sort By</label>
             <select name="sort_by" class="form-select">
                 <option value="Distinct_ID">Distinct_ID</option>
@@ -87,6 +87,42 @@
             <label class="form-label">Timezone</label>
             <input type="text" name="timezone" value="{{ timezone_search }}" placeholder="Timezone..." class="form-control">
         </div>
+
+        <div class="col-md-2">
+            <label class="form-label">Custom ID</label>
+            <input type="text" name="custom_visitor_id" value="{{ custom_search }}" placeholder="Custom ID..." class="form-control">
+        </div>
+
+        <div class="col-md-2">
+            <label class="form-label">Segment ID</label>
+            <input type="text" name="segment_anonymous_id" value="{{ segment_search }}" placeholder="Segment ID..." class="form-control">
+        </div>
+
+        <div class="col-md-2">
+            <label class="form-label">GA ID</label>
+            <input type="text" name="ga_client_id" value="{{ ga_search }}" placeholder="GA ID..." class="form-control">
+        </div>
+
+        <div class="col-md-2">
+            <label class="form-label">FB ID</label>
+            <input type="text" name="fb_browser_id" value="{{ fb_search }}" placeholder="FB ID..." class="form-control">
+        </div>
+
+        <div class="col-md-2">
+            <label class="form-label">TikTok ID</label>
+            <input type="text" name="tiktok_browser_id" value="{{ tiktok_search }}" placeholder="Tiktok ID..." class="form-control">
+        </div>
+
+        <div class="col-md-2">
+            <label class="form-label">Snapchat ID</label>
+            <input type="text" name="snapchat_browser_id" value="{{ snapchat_search }}" placeholder="Snapchat ID..." class="form-control">
+        </div>
+
+        <div class="col-md-2">
+            <label class="form-label">Device ID</label>
+            <input type="text" name="device_id" value="{{ device_search }}" placeholder="Device ID..." class="form-control">
+        </div>
+
 
         <div class="col-md-12 d-flex justify-content-end gap-2">
             <button type="submit"

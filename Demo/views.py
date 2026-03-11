@@ -4588,9 +4588,32 @@ def events_table_view(request):
     sleecid = request.GET.get("sleecid", "")
     action = request.GET.get("action", "filter")
     fingerprint = request.GET.get("fingerprint", "")
-
+#############
+    custom_search = request.GET.get("custom_visitor_id", "")
+    segment_search = request.GET.get("segment_anonymous_id", "")
+    ga_search = request.GET.get("ga_client_id", "")
+    fb_search = request.GET.get("fb_browser_id", "")
+    tiktok_search = request.GET.get("tiktok_browser_id", "")
+    snapchat_search = request.GET.get("snapchat_browser_id", "")
+    device_search = request.GET.get("device_id", "")
+#############
     filters = {}
-
+#############
+    if custom_search and custom_search != "None":
+        filters["custom_visitor_id"] = ("like", f"%{custom_search}%")
+    if segment_search and segment_search != "None":
+        filters["segment_anonymous_id"] = ("like", f"%{segment_search}%")
+    if ga_search and ga_search != "None":
+        filters["ga_client_id"] = ("like", f"%{ga_search}%")
+    if fb_search and fb_search != "None":
+        filters["fb_browser_id"] = ("like", f"%{fb_search}%")
+    if tiktok_search and tiktok_search != "None":
+        filters["tiktok_browser_id"] = ("like", f"%{tiktok_search}%")
+    if snapchat_search and snapchat_search != "None":
+        filters["snapchat_browser_id"] = ("like", f"%{snapchat_search}%")
+    if device_search and device_search != "None":
+        filters["device_id"] = ("like", f"%{device_search}%")
+############
     if event_type:
         filters["Event_Type"] = ("eq", event_type)
 
