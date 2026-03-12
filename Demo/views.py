@@ -2711,6 +2711,9 @@ def save_tracking(request):
         # --------------------------------------------------
         def safe_strip(v):
             return v.strip() if isinstance(v, str) else ""
+        
+        ip = get_client_ip(request)
+        ip_hash = generate_ip_hash(ip)
 
         # Build tracking row
         tracking_entry = {
@@ -2718,6 +2721,7 @@ def save_tracking(request):
             "Visitor_ID": visitor_id,
             "Cookie_ID" : cookie_id,
             "Session_ID": session_id,
+            "Client_IP": ip_hash,
             "Event_Type": event_type,
             "Event_Details": str(event_details),
             "Page_URL": page_url,
@@ -2827,6 +2831,20 @@ def get_client_ip(request):
         return real_ip
 
     return "0.0.0.0"
+
+import hashlib
+
+def generate_ip_hash(ip):
+    """
+    Generates a stable hash from the IP address.
+    Uses a secret salt so hashes cannot be reversed.
+    """
+
+    if not ip:
+        return None
+
+    salted = f"{ip}{settings.SECRET_KEY}"
+    return hashlib.sha256(salted.encode()).hexdigest()
 
 def search_view(request):
     query = request.GET.get("q", "").lower()
