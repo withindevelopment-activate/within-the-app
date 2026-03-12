@@ -2583,18 +2583,125 @@ def save_tracking(request):
         else:
             dprint(f"[MOBILE NOT FOUND] NO MOBILE FOUND FOR ENTRY, COULD NOT UPDATE BASED ON MOBILE: MOBILE IS {mobile}")
 
-        '''############################ This section is for whenever the case is purchase and the first page recorded is directly from a product
+        ############################ This section is for whenever the case is purchase and the first page recorded is directly from a product
         # ==================== CASE 4: FINGERPRINT RESCUE (PURCHASE ONLY) ====================
         # Conditions:
         # event_type == purchase
         # final_source still weak
-        # first page / referrer is deep inside store (not homepage)
-        # fingerprint_id exists (even if from another visitor_id)
-
+        # first page / referrer is deep inside store (not homepage) -- without this condition.
+        # fingerprint_id exists (even if from another visitor_id) -- instead of fingerprint we'll be looking at our sleecid
+        sleec_id = str(data.get('device_id')).strip()
+        
         if event_type == "purchase" and final_source in weak_sources:
 
+            print("[FINGERPRINT CHECK] purchase + weak source + deep store entry")
+
+            sleec_id = None
+
+            # -------- Try getting the sleec_id from the current passed entry --------
+            sleec_id = str(data.get('device_id')).strip()
+
+            # -------- Try session getting it from previous sessions --------
+            if not sleec_id and session_id:
+                res = (
+                        supabase.table("Tracking_Visitors_duplicate")
+                        .select("SleecID")
+                        .eq("Session_ID", session_id)
+                        .limit(1)
+                        .execute()
+                    )
+                if res.data and res.data[0].get("SleecID"):
+                    sleec_id = res.data[0]["SleecID"]
+
+            # -------- Try visitor_id --------
+            if not sleec_id and visitor_id:
+                res = (
+                        supabase.table("Tracking_Visitors_duplicate")
+                        .select("SleecID")
+                        .eq("Visitor_ID", visitor_id)
+                        .execute()
+                )
+                for r in res.data or []:
+                    if r.get("SleecID"):
+                        sleec_id = r["SleecID"]
+                        break
+
+            # -------- Try mobile --------
+            if not sleec_id and mobile:
+                res = (
+                    supabase.table("Tracking_Visitors_duplicate")
+                    .select("SleecID")
+                    .eq("Customer_Mobile", mobile)
+                    .execute()
+                )
+                for r in res.data or []:
+                    if r.get("SleecID"):
+                        sleec_id = r["SleecID"]
+                        break
+
+            # -------- Resolve source using fingerprint --------
+            if sleec_id:
+                ## Extract and map the source from SleecID
+
+                prefix_to_source = {
+                    "insta": "instagram",
+                    "fb": "facebook",
+                    "tiktok": "tiktok",
+                    "snap": "snapchat",
+                    "google": "google",
+                    "x": "x",
+                    "li": "linkedin",
+                    "pin": "pinterest",
+                    "rdt": "reddit",
+                    "wa": "whatsapp",
+                    "tg": "telegram",
+                    "web": "web"
+                }
+
+                try:
+                    source_key = sleec_id.split("_", 1)[0].lower()
+                    extracted_source = prefix_to_source.get(source_key)
+
+                    if extracted_source:
+                        dprint(f"[SLEECID PREFIX] extracted source → {extracted_source}")
+                        final_source = pick_stronger_source(final_source, extracted_source)
+
+                except Exception as e:
+                    dprint(f"[SLEECID PREFIX ERROR] {e}")
+
+                dprint(f"[SLEECID FOUND] {sleec_id} >> checking history")
+
+                res = (
+                    supabase.table("Tracking_Visitors_duplicate")
+                    .select("UTM_Source")
+                    .eq("SleecID", sleec_id)
+                    .execute()
+                )
+
+                strongest_scid_source = final_source
+
+                for row in res.data or []:
+                    existing = (row.get("UTM_Source") or "").strip().lower() or "unknown"
+                    strongest_scid_source = pick_stronger_source(strongest_scid_source, existing)
+
+                if strongest_scid_source not in weak_sources:
+                    final_source = strongest_scid_source
+                    attribution_type = "scID_rescued_purchase"
+
+                    dprint(f"[FINGERPRINT RESCUED] final_source → {final_source}")
+
+                    # If better source found, backfill this session
+                    if session_id:
+                        supabase.table("Tracking_Visitors_duplicate") \
+                            .update({"UTM_Source": final_source}) \
+                            .eq("Session_ID", session_id) \
+                            .execute()
+
+            else:
+                dprint("[SLEECID CHECK] no Sleecid found")
+
             # -------- Make sure that it's a deep in store entry from either the page_url or the referrer_platform --------
-            is_deep_store_entry = False
+            '''#is_deep_store_entry = False
             first_session_row = None
 
             try:
@@ -2626,9 +2733,9 @@ def save_tracking(request):
                         is_deep_store_entry = True
 
             except Exception:
-                pass
+                pass'''
 
-            if is_deep_store_entry:
+            '''if is_deep_store_entry:
                 dprint("[FINGERPRINT CHECK] purchase + weak source + deep store entry")
 
                 fingerprint_id = None
