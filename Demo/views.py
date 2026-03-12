@@ -4608,11 +4608,15 @@ def events_table_view(request):
     fingerprint = request.GET.get("fingerprint", "")
 #############
     custom_search = request.GET.get("custom_visitor_id", "")
+    client_ip = request.GET.get("client_ip", "")
 #############
     filters = {}
 #############
     if custom_search and custom_search != "None":
         filters["Cookie_ID"] = ("like", f"%{custom_search}%")
+
+    if client_ip:
+        filters["Client_IP"] = ("eq", client_ip)
 ############
     if event_type:
         filters["Event_Type"] = ("eq", event_type)
@@ -4726,6 +4730,8 @@ def events_table_view(request):
         "selected_date_end": date_end,
         "session_search": session_search,
         "visitor_search": visitor_search,
+        "client_ip": client_ip,
+        "custom_search":custom_search,
         "fingerprint": fingerprint,
         'sleecid': sleecid,
         "number_search": number_search,
