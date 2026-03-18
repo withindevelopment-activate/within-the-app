@@ -134,7 +134,7 @@
         <input id="table-search" class="form-control m-2 w-25" type="search" placeholder="Search" aria-label="Search">
         <div class="data-viewport">
             <div class="data-scroller" role="region" aria-label="Scrollable data table" tabindex="0">
-                <table class="data-table no-order data-table-big" role="table" aria-label="Analytics dataset">
+                <table class="data-table no-order" role="table" aria-label="Analytics dataset">
                     <thead>
                         <tr>
                             {% if data %}
@@ -313,7 +313,7 @@ $(document).ready(function () {
         ordering = false;
     }
 
-    const table_big = $('.data-table-big').DataTable({
+    const table_big = $('.data-table').DataTable({
         paging: true,
         ordering: ordering,
         order: initialSort,
@@ -327,10 +327,6 @@ $(document).ready(function () {
 
   // If you want to connect it to your own search input:
     $('#table-search').on('keyup', function () {
-        table.search(this.value).draw();
-    });
-
-    $('#table-search-big').on('keyup', function () {
         table_big.search(this.value).draw();
     });
 
