@@ -131,9 +131,10 @@
     <p class="blockquote-footer">Total rows: {{ row_count }}</p>
     <!-- Data Table -->
     <div class="data-wrap">
+        <input id="table-search" class="form-control m-2 w-25" type="search" placeholder="Search" aria-label="Search">
         <div class="data-viewport">
             <div class="data-scroller" role="region" aria-label="Scrollable data table" tabindex="0">
-                <table class="data-table" role="table" aria-label="Analytics dataset">
+                <table class="data-table no-order data-table-big" role="table" aria-label="Analytics dataset">
                     <thead>
                         <tr>
                             {% if data %}
@@ -159,6 +160,25 @@
                 </table>
             </div>
         </div>
+        <nav aria-label="Table navigation">
+            <ul class="pagination justify-content-center mt-3">
+                <li class="page-item" id="prev-item">
+                    <button class="page-link" id="prev-btn" aria-label="Previous">
+                        <span aria-hidden="true">&laquo; Previous</span>
+                    </button>
+                </li>
+                
+                <li class="page-item disabled">
+                    <span class="page-link" id="page-status">Page 1 of 1</span>
+                </li>
+                
+                <li class="page-item" id="next-item">
+                    <button class="page-link" id="next-btn" aria-label="Next">
+                        <span aria-hidden="true">Next &raquo;</span>
+                    </button>
+                </li>
+            </ul>
+        </nav>
     </div>
 </div>
 <!--
@@ -277,6 +297,77 @@
             options: pieOptions
         });
     }
+
+
+$(document).ready(function () {
+    // Logic to determine order based on a class name
+    let initialSort = [[0, 'desc']]; // Default
+
+    if ($('table').hasClass('default-order-1')) {
+        initialSort = [[1, 'desc']];
+    }
+
+    let ordering = true;
+
+    if ($('table').hasClass('no-order')) {
+        ordering = false;
+    }
+
+    const table_big = $('.data-table-big').DataTable({
+        paging: true,
+        ordering: ordering,
+        order: initialSort,
+        searching: true,
+        info: false,
+        lengthChange: false,
+        deferRender: true,
+        pageLength: 200,
+        dom: 't',  // ← IMPORTANT: only table, no UI controls
+    });
+
+  // If you want to connect it to your own search input:
+    $('#table-search').on('keyup', function () {
+        table.search(this.value).draw();
+    });
+
+    $('#table-search-big').on('keyup', function () {
+        table_big.search(this.value).draw();
+    });
+
+    // Function to refresh the Bootstrap UI
+    function syncPagination() {
+        const info = table_big.page.info();
+        const currentPage = info.page + 1;
+        const totalPages = info.pages;
+
+        // Update the "Page X of Y" text
+        $('#page-status').text(`Page ${currentPage} of ${totalPages}`);
+
+        // Update Button States
+        $('#prev-item').toggleClass('disabled', info.page === 0);
+        $('#next-item').toggleClass('disabled', info.page >= totalPages - 1 || totalPages === 0);
+    }
+
+    table_big.on('load', function() {
+        syncPagination();
+    });
+
+    // Trigger sync on every draw (Pagination, Search, Sort)
+    table_big.on('draw', function() {
+        syncPagination();
+    });
+
+    // Bootstrap Button Click Events
+    $('#next-btn').on('click', function(e) {
+        e.preventDefault();
+        table_big.page('next').draw('page');
+    });
+
+    $('#prev-btn').on('click', function(e) {
+        e.preventDefault();
+        table_big.page('previous').draw('page');
+    });
+});
 </script>
 
 
