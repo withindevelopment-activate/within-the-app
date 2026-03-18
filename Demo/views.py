@@ -4712,7 +4712,7 @@ def events_table_view(request):
     number_search = request.GET.get("number_search", "")
     sleecid = request.GET.get("sleecid", "")
     action = request.GET.get("action", "filter")
-    fingerprint = request.GET.get("fingerprint", "")
+    source = request.GET.get("source", "")
 #############
     custom_search = request.GET.get("custom_visitor_id", "")
     client_ip = request.GET.get("client_ip", "")
@@ -4728,8 +4728,8 @@ def events_table_view(request):
     if event_type:
         filters["Event_Type"] = ("eq", event_type)
 
-    if fingerprint and fingerprint != "None":
-        filters["Fingerprint_ID"] = ("eq", fingerprint)
+    if source and source != "None":
+        filters["UTM_Source"] = ("eq", source)
 
     if session_search and session_search != "None":
         filters["Session_ID"] = ("eq", session_search)
@@ -4839,7 +4839,7 @@ def events_table_view(request):
         "visitor_search": visitor_search,
         "client_ip": client_ip,
         "custom_search":custom_search,
-        "fingerprint": fingerprint,
+        "source": source,
         'sleecid': sleecid,
         "number_search": number_search,
         "sort_field": sort_field,
