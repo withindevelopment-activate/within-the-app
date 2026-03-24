@@ -85,7 +85,13 @@ def zid_callback(request):
         print("Retrieved Token data:", token_data)
 
         # Save tokens to session
-        request.session['access_token'] = access_token
+        try:
+            request.session['access_token'] = access_token
+        except Exception as e:
+            from django.db import connection, close_old_connections
+            close_old_connections()
+            connection.close()
+            raise e
         request.session['refresh_token'] = refresh_token
         request.session['authorization_token'] = authorization_token
 
