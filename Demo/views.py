@@ -112,20 +112,20 @@ def zid_callback(request):
             print("Store ID not found in profile response.")
 
         # ## Add an entry with the tokens into the database
-        # tokens = {
-        #     "Distinct_ID": int(get_next_id_from_supabase_compatible_all(name='tokens', column='Distinct_ID')),
-        #     'Access': access_token,
-        #     'Authorization': authorization_token,
-        #     'Refresh': refresh_token,
-        #     'Store_ID': store_id if store_id else 'No Store ID',
-        #     'Tiktok_Access': '',
-        #     'Tiktok_Org': '',
-        #     'Snapchat_Access': '',
-        #     'Snapchat_Refresh': ''
-        # }
+        tokens = {
+             "Distinct_ID": int(get_next_id_from_supabase_compatible_all(name='tokens', column='Distinct_ID')),
+             'Access': access_token,
+             'Authorization': authorization_token,
+             'Refresh': refresh_token,
+             'Store_ID': store_id if store_id else 'No Store ID',
+             'Tiktok_Access': '',
+             'Tiktok_Org': '',
+             'Snapchat_Access': '',
+             'Snapchat_Refresh': ''
+         }
 
-        # tokens_df = pd.DataFrame([tokens])
-        # batch_insert_to_supabase(tokens_df, 'tokens')
+        tokens_df = pd.DataFrame([tokens])
+        batch_insert_to_supabase(tokens_df, 'tokens')
 
         # ### Subscribe to the products webhook --
         # print("Creating the product webhook")

@@ -98,11 +98,14 @@ WSGI_APPLICATION = 'Django_Demo.wsgi.application'
 # }
 
 DATABASES = {
-    'default': dj_database_url.config(
-        default=os.environ.get('DATABASE_URL'),
-        conn_max_age=60,
-        ssl_require=True
-    )
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": "postgres", 
+        "USER": "postgres.ekjygvaobnyqlqwxwdnu",  
+        "PASSWORD": "Testing@Sleepy123",  
+        "HOST": "aws-0-ap-northeast-1.pooler.supabase.com",  # pooler host
+        "PORT": "5432",
+    }
 }
 
 
