@@ -2574,7 +2574,7 @@ def save_tracking(request):
             file_path = os.path.join(settings.BASE_DIR, "selected_row_session.xlsx")
             pd.DataFrame(row).to_excel(file_path, index=False)
 
-            print("THE SELECTED SORTED ROW [SESSION WISE]\n", row.head())
+            print("THE SELECTED SORTED ROW [SESSION WISE]\n", row)
 
             recorded_source = ((row.get("UTM_Source") or "").strip().lower() or "unknown")
             recorded_medium = (row.get("UTM_Medium") or "").strip()
