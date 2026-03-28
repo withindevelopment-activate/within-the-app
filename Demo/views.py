@@ -2740,7 +2740,7 @@ def save_tracking(request):
             '''recorded_medium_visitor = (strongest_row.get("UTM_Medium") or "").strip()
             recorded_campaign_visitor = (strongest_row.get("UTM_Campaign") or "").strip()
             recorded_term_visitor = (strongest_row.get("UTM_Term") or "").strip()
-            recorded_content_visitor = (strongest_row.get("UTM_Content") or "").strip(''')
+            recorded_content_visitor = (strongest_row.get("UTM_Content") or "").strip()'''
 
             # ── weak vs weak explicit google normalization
             if (
