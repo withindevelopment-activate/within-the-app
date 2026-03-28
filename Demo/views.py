@@ -2563,16 +2563,16 @@ def save_tracking(request):
                     ])
                 )
             )
-            print("THE SORTED ROWS [SESSION WISE]\n", sorted_rows.head())
+            print("THE SORTED ROWS [SESSION WISE]\n", sorted_rows)
 
             ## save to excel temporarily for inspection
             file_path = os.path.join(settings.BASE_DIR, "selected_rows.xlsx")
-            sorted_rows.to_excel(file_path, index=False)
+            pd.DataFrame(sorted_rows).to_excel(file_path, index=False)
 
             row = sorted_rows[0]
             ## save to excel temporarily for inspection
             file_path = os.path.join(settings.BASE_DIR, "selected_row_session.xlsx")
-            row.to_excel(file_path, index=False)
+            pd.DataFrame(row).to_excel(file_path, index=False)
 
             print("THE SELECTED SORTED ROW [SESSION WISE]\n", row.head())
 
