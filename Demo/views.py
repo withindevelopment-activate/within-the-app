@@ -2208,6 +2208,25 @@ def has_explicit_google(rows):
     return False
 
 
+
+# Helper -- safely build update payload
+def build_update_payload(source, medium, campaign, term, content, attribution):
+    payload = {
+        "UTM_Source": source,
+        "Attribution_Type": attribution
+    }
+
+    if medium:
+        payload["UTM_Medium"] = medium
+    if campaign:
+        payload["UTM_Campaign"] = campaign
+    if term:
+        payload["UTM_Term"] = term
+    if content:
+        payload["UTM_Content"] = content
+
+    return payload
+    
 @csrf_exempt
 @require_POST
 def save_tracking(request):
@@ -2249,7 +2268,7 @@ def save_tracking(request):
         visitor_id = str(data.get("visitor_id") or "").strip()
         session_id = str(data.get("session_id") or "").strip()
         event_type = str(data.get("event_type") or "").strip()
-        cookie_id = str(data.get("cookie_id") or "")
+        cookie_id = str(data.get("cookie_id") or "").strip()
 
         dprint(f"[IDS] visitor_id={visitor_id} | session_id={session_id} | event_type={event_type}")
 
@@ -2284,6 +2303,11 @@ def save_tracking(request):
         else:
             utm_medium = utm_medium_raw
 
+        ### Other utm parameters -- basically these are the main ones we got associated with the incoming source --
+        utm_campaign = str(utm_params.get("utm_campaign") or "").strip()
+        utm_term = str(utm_params.get("utm_term") or "").strip()
+        utm_content = str(utm_params.get("utm_cotnent") or "").strip()
+
         # --------------------------------------------------
         # Extract extra customer data
         session_customer_info = {}
@@ -2296,7 +2320,6 @@ def save_tracking(request):
         store_url = str(data.get("store_url") or "").strip()
         referrer = str(data.get("referrer") or "").strip()
         agent = str(client_info.get("user_agent") or "").strip().lower()
-
 
         dprint(f"[CONTEXT] page_url={page_url}")
         dprint(f"[CONTEXT] referrer={referrer}")
@@ -2443,7 +2466,7 @@ def save_tracking(request):
             .execute()
         ).data or []
         
-        if session_rows:
+        '''if session_rows:
             # Current recorded source -- get all the data to backfill for session.
             recorded_source = ((session_rows[0].get("UTM_Source") or "").strip().lower() or "unknown")
             recorded_medium = session_rows[0].get("UTM_Medium") or ""
@@ -2460,10 +2483,17 @@ def save_tracking(request):
                 final_source in weak_sources
                 and recorded_source in weak_sources
                 and has_explicit_google(session_rows) and final_source != 'google'
-            ):
+                ):
                 final_source = "google"
                 attribution_type = "session_explicit_google_override"
                 dprint("[SESSION EXPLICIT GOOGLE] weak incoming overridden")
+
+                ### Update the incoming parameters
+                utm_medium = recorded_medium
+                utm_campaign = recorded_campaign
+                utm_term = recorded_term
+                utm_content = recorded_content
+
 
             ## Check if we upgrade the final_source with the one recorded.
             if source_weight(recorded_source) > source_weight(final_source): ## else this means that the recorded is not weak, let's compare it with the final source (initially set to incoming) then take it if it's valid.
@@ -2471,29 +2501,181 @@ def save_tracking(request):
                 final_source = recorded_source
                 attribution_type = "session_persisted_took_session_source"
 
+                ### Update the incoming parameters
+                utm_medium = recorded_medium
+                utm_campaign = recorded_campaign
+                utm_term = recorded_term
+                utm_content = recorded_content
+
             ### Check if the incoming source is better than the one recorded, update the session with that if it's not google or unknown because we are going to stop with the final_source update here anyways.
             elif allow_upgrade and source_weight(final_source) > source_weight(recorded_source) and final_source not in weak_sources:
                 # Upgrade session with stronger source
                 #final_source = incoming_source
                 attribution_type = "session_upgraded_with_incoming_stronger"
                 supabase.table("Tracking_Visitors_duplicate") \
-                        .update({
-                            "UTM_Source": final_source
-                        }) \
-                    .eq("Session_ID", session_id).execute()
+                    .update({
+                        "UTM_Source": final_source,
+                        "UTM_Medium": utm_medium,
+                        "UTM_Campaign": utm_campaign,
+                        "UTM_Term": utm_term,
+                        "UTM_Content": utm_content,
+                        "Attribution_Type": attribution_type
+                    }) \
+                    .eq("Session_ID", session_id) \
+                    .execute()
                 dprint(f"[SESSION UPGRADE] {recorded_source} >> {final_source}")
 
             else:
                 dprint(f"[SESSION SKIPPED] FINAL_SOURCE HAS NOT BEEN UPGRADED, ")
-                
+                '''
+        if session_rows:
+            ## Sorting based on the one tha
+            '''sorted_rows = sorted(
+                session_rows,
+                key=lambda r: (
+                    ((r.get("UTM_Source") or "").strip().lower() not in ["", "unknown"]),
+                    sum([
+                        bool((r.get("UTM_Medium") or "").strip()),
+                        bool((r.get("UTM_Campaign") or "").strip()),
+                        bool((r.get("UTM_Term") or "").strip()),
+                        bool((r.get("UTM_Content") or "").strip()),
+                    ])
+                ),
+                reverse=True
+            )'''
 
+            for r in session_rows:
+                r["UTM_Source"] = (r.get("UTM_Source") or "").strip().lower()
+                r["UTM_Medium"] = (r.get("UTM_Medium") or "").strip()
+                r["UTM_Campaign"] = (r.get("UTM_Campaign") or "").strip()
+                r["UTM_Term"] = (r.get("UTM_Term") or "").strip()
+                r["UTM_Content"] = (r.get("UTM_Content") or "").strip()
+
+            sorted_rows = sorted(
+                session_rows,
+                key=lambda r: (
+                    (r.get("UTM_Source") or "").strip().lower() in ["", "unknown"],
+                    not bool((r.get("UTM_Campaign") or "").strip()),
+                    -sum([
+                        bool((r.get("UTM_Medium") or "").strip()),
+                        bool((r.get("UTM_Term") or "").strip()),
+                        bool((r.get("UTM_Content") or "").strip()),
+                    ])
+                )
+            )
+            print("THE SORTED ROWS [SESSION WISE]\n", sorted_rows.head())
+
+            ## save to excel temporarily for inspection
+            file_path = os.path.join(settings.BASE_DIR, "selected_rows.xlsx")
+            sorted_rows.to_excel(file_path, index=False)
+
+            row = sorted_rows[0]
+            ## save to excel temporarily for inspection
+            file_path = os.path.join(settings.BASE_DIR, "selected_row_session.xlsx")
+            row.to_excel(file_path, index=False)
+
+            print("THE SELECTED SORTED ROW [SESSION WISE]\n", row.head())
+
+            recorded_source = ((row.get("UTM_Source") or "").strip().lower() or "unknown")
+            recorded_medium = (row.get("UTM_Medium") or "").strip()
+            recorded_campaign = (row.get("UTM_Campaign") or "").strip()
+            recorded_term = (row.get("UTM_Term") or "").strip()
+            recorded_content = (row.get("UTM_Content") or "").strip()
+
+            dprint(f"[SESSION FOUND] recorded={recorded_source}")
+
+            allow_upgrade = recorded_source in weak_sources
+
+            # CASE 1: weak vs weak >> force google
+            if (
+                final_source in weak_sources
+                and recorded_source in weak_sources
+                and has_explicit_google(session_rows)
+                and final_source != 'google'
+            ):
+                final_source = "google"
+                dprint("[SESSION EXPLICIT GOOGLE] weak incoming overridden")
+
+                ## filling with info from the google row that has all of the info present
+                google_rows = [
+                    r for r in session_rows
+                    if (r.get("UTM_Source") or "").strip().lower() == "google"
+                ]
+
+                if google_rows:
+                    # Clean each google row manually
+                    for r in google_rows:
+                        r["UTM_Source"] = (r.get("UTM_Source") or "").strip().lower()
+                        r["UTM_Medium"] = (r.get("UTM_Medium") or "").strip()
+                        r["UTM_Campaign"] = (r.get("UTM_Campaign") or "").strip()
+                        r["UTM_Term"] = (r.get("UTM_Term") or "").strip()
+                        r["UTM_Content"] = (r.get("UTM_Content") or "").strip()
+
+                    ## sort based on availability then pull our vars
+                    google_rows = sorted(
+                        google_rows,
+                        key=lambda r: (
+                            not bool((r.get("UTM_Campaign") or "").strip()),  # campaign first
+                            -sum([
+                                bool((r.get("UTM_Medium") or "").strip()),
+                                bool((r.get("UTM_Term") or "").strip()),
+                                bool((r.get("UTM_Content") or "").strip()),
+                            ])  # richer UTMs first
+                        )
+                    )
+
+                    attribution_type = "session_explicit_google_override"
+                    dprint("[SESSION] explicit google promoted")
+
+                    strongest_row_google = google_rows[0]
+                    # update variables
+                    utm_medium = (strongest_row_google.get("UTM_Medium") or "").strip()
+                    utm_campaign = (strongest_row_google.get("UTM_Campaign") or "").strip()
+                    utm_term = (strongest_row_google.get("UTM_Term") or "").strip()
+                    utm_content = (strongest_row_google.get("UTM_Content") or "").strip()
+
+            # CASE 2: recorded is stronger >> persist it
+            if source_weight(recorded_source) > source_weight(final_source):
+                final_source = recorded_source
+                attribution_type = "session_persisted_took_session_source"
+
+                # Always trust recorded values here
+                utm_medium = recorded_medium
+                utm_campaign = recorded_campaign
+                utm_term = recorded_term
+                utm_content = recorded_content
+
+            # CASE 3: incoming is stronger >> upgrade session
+            elif allow_upgrade and source_weight(final_source) > source_weight(recorded_source) and final_source not in weak_sources:
+                
+                attribution_type = "session_upgraded_with_incoming_stronger"
+                payload = build_update_payload(
+                    final_source,
+                    utm_medium,
+                    utm_campaign,
+                    utm_term,
+                    utm_content,
+                    attribution_type
+                )
+
+                supabase.table("Tracking_Visitors_duplicate") \
+                    .update(payload) \
+                    .eq("Session_ID", session_id) \
+                    .execute()
+
+                dprint(f"[SESSION UPGRADE] {recorded_source} >> {final_source}")
+
+            else:
+                dprint("[SESSION SKIPPED] FINAL_SOURCE HAS NOT BEEN UPGRADED")
+        
+        
         # CASE 2: SESSION UNKNOWN >>> CHECK USING VISITOR_ID -- before it would start if the session id found int he previoud block == unknown and it would just take it. Instead, if it == unknown (in case the incoming == 'unknown') visit this block.
         if visitor_id and (final_source in weak_sources): ## there's a visitor id and the sosurce have not been resolved from the previous block. -- I'm cehcking for the google source like this becasue if the utm_source was not found in the referrer explicitly as google then it's weak and let's look for other stronger sources using the visitor_id
             dprint("[VISITOR CHECK] session unknown >> checking visitor history")
 
             res = (
                 supabase.table("Tracking_Visitors_duplicate")
-                .select("UTM_Source, Session_ID, Customer_Mobile", "Attribution_Type")
+                .select("UTM_Source, UTM_Medium, UTM_Campaign, UTM_Term, UTM_Content, Session_ID, Customer_Mobile, Attribution_Type")
                 .eq("Visitor_ID", visitor_id)
                 .execute()
             )
@@ -2501,12 +2683,64 @@ def save_tracking(request):
             strongest_source = final_source ## comapre with the one we got from the session id so far
             discovered_mobile = None
 
-            for row in rows:
-                existing = (row.get("UTM_Source") or "").strip().lower() or "unknown"
-                strongest_source = pick_stronger_source(strongest_source, existing)
+            ### This is practically a different approach to getting the row that we are going to infer the utms from; in the session-wise, I just sorted based on the row that has a source present.
+            ## This section also is pratically me comparing the incoming with the recorded.
+            # Loop through visitor rows to pick strongest source and richest UTMs
+            ## this covers if for example the visitor id has multiple sources but a certain row for the selected stronger source has valid utms
+            strongest_row_for_source = None
 
+            for row in rows:
+                # Clean
+                row["UTM_Source"] = (row.get("UTM_Source") or "").strip().lower()
+                row["UTM_Medium"] = (row.get("UTM_Medium") or "").strip()
+                row["UTM_Campaign"] = (row.get("UTM_Campaign") or "").strip()
+                row["UTM_Term"] = (row.get("UTM_Term") or "").strip()
+                row["UTM_Content"] = (row.get("UTM_Content") or "").strip()
+
+                ## get the existing source
+                existing = (row.get("UTM_Source") or "").strip().lower() or "unknown"
+
+                # Count non-empty UTMs for this row
+                row_utm_count = sum(
+                    bool((row.get(f"UTM_{f}") or "").strip())
+                    for f in ["Medium", "Campaign", "Term", "Content"]
+                )
+
+                # ---- Case 1: stronger source wins ----
+                if source_weight(existing) > source_weight(strongest_source):
+                    strongest_source = existing
+                    strongest_row_for_source = row  # start with this row for UTMs
+
+                # ---- Case 2: same weight source, pick the richest UTMs ----
+                elif source_weight(existing) == source_weight(strongest_source):
+                    if strongest_row_for_source:
+                        current_utm_count = sum(
+                            bool((strongest_row_for_source.get(f"UTM_{f}") or "").strip())
+                            for f in ["Medium", "Campaign", "Term", "Content"]
+                        )
+                    else:
+                        current_utm_count = 0
+
+                    if row_utm_count > current_utm_count:
+                        strongest_row_for_source = row  # pick richer UTMs
+
+                # ---- Always capture mobile if found ----
                 if row.get("Customer_Mobile"):
                     discovered_mobile = row["Customer_Mobile"]
+
+            # ---- After loop: sync UTMs from the richest row of the strongest source ----
+            if strongest_row_for_source:
+                utm_medium = (strongest_row_for_source.get("UTM_Medium") or "").strip()
+                utm_campaign = (strongest_row_for_source.get("UTM_Campaign") or "").strip()
+                utm_term = (strongest_row_for_source.get("UTM_Term") or "").strip()
+                utm_content = (strongest_row_for_source.get("UTM_Content") or "").strip()
+
+            ### GET THE RECORDED UTMS
+            #recorded_source_visitor = ((strongest_row.get("UTM_Source") or "").strip().lower() or "unknown")
+            '''recorded_medium_visitor = (strongest_row.get("UTM_Medium") or "").strip()
+            recorded_campaign_visitor = (strongest_row.get("UTM_Campaign") or "").strip()
+            recorded_term_visitor = (strongest_row.get("UTM_Term") or "").strip()
+            recorded_content_visitor = (strongest_row.get("UTM_Content") or "").strip(''')
 
             # ── weak vs weak explicit google normalization
             if (
@@ -2514,31 +2748,79 @@ def save_tracking(request):
                 and strongest_source in weak_sources
                 and has_explicit_google(rows)
                 and strongest_source != "google"
-            ):
-                strongest_source = "google"
-                attribution_type = "visitor_explicit_google_override"
-                dprint("[VISITOR] explicit google promoted")
+                ):
+                final_source = "google"
 
-            #if strongest_source != "unknown" and strongest_source != final_source:
+                ## filling with info fromt he google row that has all of the infor present
+                google_rows = [
+                    r for r in rows
+                    if (r.get("UTM_Source") or "").strip().lower() == "google"
+                ]
+
+                if google_rows:
+                    # Clean each google row manually
+                    for r in google_rows:
+                        r["UTM_Source"] = (r.get("UTM_Source") or "").strip().lower()
+                        r["UTM_Medium"] = (r.get("UTM_Medium") or "").strip()
+                        r["UTM_Campaign"] = (r.get("UTM_Campaign") or "").strip()
+                        r["UTM_Term"] = (r.get("UTM_Term") or "").strip()
+                        r["UTM_Content"] = (r.get("UTM_Content") or "").strip()
+                    
+                    ## sort based on availability then pull our vars
+                    google_rows = sorted(
+                        google_rows,
+                        key=lambda r: (
+                            not bool((r.get("UTM_Campaign") or "").strip()),  # campaign first
+                            -sum([
+                                bool((r.get("UTM_Medium") or "").strip()),
+                                bool((r.get("UTM_Term") or "").strip()),
+                                bool((r.get("UTM_Content") or "").strip()),
+                            ])  # richer UTMs first
+                        )
+                    )
+
+                    attribution_type = "visitor_explicit_google_override"
+                    dprint("[VISITOR] explicit google promoted")
+                    ##
+                    strongest_row_google = google_rows[0]
+                    # update variables
+                    utm_medium = (strongest_row_google.get("UTM_Medium") or "").strip()
+                    utm_campaign = (strongest_row_google.get("UTM_Campaign") or "").strip()
+                    utm_term = (strongest_row_google.get("UTM_Term") or "").strip()
+                    utm_content = (strongest_row_google.get("UTM_Content") or "").strip()
+
+            # if strongest_source != "unknown" and strongest_source != final_source:
             # Only skip if the strongest_source is still google or unknown and the session already has a strong source
             if strongest_source not in weak_sources:
                 final_source = strongest_source
                 attribution_type = "visitor_id_updated_source"
                 dprint(f"[VISITOR INFERRED] {final_source}")
 
-                # Update all session rows for this session with the stronger source becasue if we are at this point it seems that the session did not have a good source to begin with.
-                if session_rows:
+                payload = build_update_payload(
+                    final_source,
+                    utm_medium,
+                    utm_campaign,
+                    utm_term,
+                    utm_content,
+                    attribution_type
+                )
+
+                # update ALL rows for this visitor (not just session)
+                supabase.table("Tracking_Visitors_duplicate") \
+                    .update(payload) \
+                    .eq("Visitor_ID", visitor_id) \
+                    .execute()
+
+                dprint(f"[VISITOR UPGRADE] applied strongest UTMs to visitor >> {final_source}")
+
+                # keep session in sync - -these are automaticall updated because they are part of the same visitor id
+                '''if session_rows:
                     supabase.table("Tracking_Visitors_duplicate") \
-                        .update({"UTM_Source": final_source}) \
+                        .update(payload) \
                         .eq("Session_ID", session_id) \
                         .execute()
-                    dprint(f"[SESSION UPGRADED] session rows updated to stronger source >> {final_source}")
-            else:
-                dprint(f"[VISITOR CHECK SKIPPED] strongest source is still weak ({strongest_source}), final_source remains {final_source}")
 
-            if discovered_mobile:
-                session_customer_info["Customer_Mobile"] = discovered_mobile
-                dprint(f"[VISITOR>>MOBILE LINK] {discovered_mobile}")
+                    dprint(f"[SESSION SYNCED WITH VISITOR] >> {final_source}")'''
 
         # CASE 3: BOTH SESSION + VISITOR UNKNOWN >>> RESORT TO MOBILE SOURCE 
         #mobile = str(visitor_info.get("mobile") or "").strip()
@@ -2552,16 +2834,57 @@ def save_tracking(request):
 
             res = (
                 supabase.table("Tracking_Visitors_duplicate")
-                .select("UTM_Source", "Attribution_Type")
+                .select("UTM_Source", "UTM_Medium", "UTM_Campaign", "UTM_Term", "UTM_Content", "Attribution_Type")
                 .eq("Customer_Mobile", mobile)
                 .execute()
             )
             rows = res.data or []
             strongest_source = final_source ## compare with the source we have recorded so far.
 
+            # Track the row with the richest UTMs for the strongest source
+            strongest_row_for_source = None
+
             for row in rows:
+                # Clean
+                row["UTM_Source"] = (row.get("UTM_Source") or "").strip().lower()
+                row["UTM_Medium"] = (row.get("UTM_Medium") or "").strip()
+                row["UTM_Campaign"] = (row.get("UTM_Campaign") or "").strip()
+                row["UTM_Term"] = (row.get("UTM_Term") or "").strip()
+                row["UTM_Content"] = (row.get("UTM_Content") or "").strip()
+
+                ## get the existing source
                 existing = (row.get("UTM_Source") or "").strip().lower() or "unknown"
-                strongest_source = pick_stronger_source(strongest_source, existing)
+
+                # Count non-empty UTMs for this row
+                row_utm_count = sum(
+                    bool((row.get(f"UTM_{f}") or "").strip())
+                    for f in ["Medium", "Campaign", "Term", "Content"]
+                )
+
+                # ---- Case 1: stronger source wins ----
+                if source_weight(existing) > source_weight(strongest_source):
+                    strongest_source = existing
+                    strongest_row_for_source = row  # start with this row for UTMs
+
+                # ---- Case 2: same weight source, pick the row with richer UTMs ----
+                elif source_weight(existing) == source_weight(strongest_source):
+                    if strongest_row_for_source:
+                        current_utm_count = sum(
+                            bool((strongest_row_for_source.get(f"UTM_{f}") or "").strip())
+                            for f in ["Medium", "Campaign", "Term", "Content"]
+                        )
+                    else:
+                        current_utm_count = 0
+
+                    if row_utm_count > current_utm_count:
+                        strongest_row_for_source = row  # pick richer UTMs
+
+            # ---- After loop: sync UTMs from the richest row of the strongest source ----
+            if strongest_row_for_source:
+                utm_medium = (strongest_row_for_source.get("UTM_Medium") or "").strip()
+                utm_campaign = (strongest_row_for_source.get("UTM_Campaign") or "").strip()
+                utm_term = (strongest_row_for_source.get("UTM_Term") or "").strip()
+                utm_content = (strongest_row_for_source.get("UTM_Content") or "").strip()
 
             # ── weak vs weak explicit google normalization
             if (
@@ -2573,15 +2896,59 @@ def save_tracking(request):
                 strongest_source = "google"
                 attribution_type = "mobile_explicit_google_override"
                 dprint("[MOBILE] explicit google promoted")
+                # pick BEST google row
+                google_rows = [
+                    r for r in rows
+                    if (r.get("UTM_Source") or "").strip().lower() == "google"
+                ]
 
-            if strongest_source not in weak_sources: ## I'm not adding google here because if it's google at the end of all those steps then just take it.
+                if google_rows:
+                    ## Clean
+                    for r in google_rows:
+                        r["UTM_Source"] = (r.get("UTM_Source") or "").strip().lower()
+                        r["UTM_Medium"] = (r.get("UTM_Medium") or "").strip()
+                        r["UTM_Campaign"] = (r.get("UTM_Campaign") or "").strip()
+                        r["UTM_Term"] = (r.get("UTM_Term") or "").strip()
+                        r["UTM_Content"] = (r.get("UTM_Content") or "").strip()
+                
+                    ## sort & pick row with most score to use data off of.
+                    google_rows = sorted(
+                        google_rows,
+                        key=lambda r: (
+                            not bool((r.get("UTM_Campaign") or "").strip()),
+                            -sum([
+                                bool((r.get("UTM_Medium") or "").strip()),
+                                bool((r.get("UTM_Term") or "").strip()),
+                                bool((r.get("UTM_Content") or "").strip()),
+                            ])
+                        )
+                    )
+
+                    best_google = google_rows[0]
+
+                    utm_medium = (best_google.get("UTM_Medium") or "").strip()
+                    utm_campaign = (best_google.get("UTM_Campaign") or "").strip()
+                    utm_term = (best_google.get("UTM_Term") or "").strip()
+                    utm_content = (best_google.get("UTM_Content") or "").strip()
+
+            # ONLY upgrade if stronger than incoming AND not weak
+            if strongest_source not in weak_sources:  ## I'm not adding google here because if it's google at the end of all those steps then just take it.
                 final_source = strongest_source
                 attribution_type = "mobile_unified"
                 dprint(f"[MOBILE UNIFIED] {final_source}")
 
+                payload = build_update_payload(
+                    final_source,
+                    utm_medium,
+                    utm_campaign,
+                    utm_term,
+                    utm_content,
+                    attribution_type
+                )
+
                 # Update all visitor/session rows with this mobile because reaching this point means the ones before were not good enough.
                 supabase.table("Tracking_Visitors_duplicate") \
-                    .update({"UTM_Source": final_source}) \
+                    .update(payload) \
                     .eq("Customer_Mobile", mobile) \
                     .execute()
 
@@ -2669,7 +3036,7 @@ def save_tracking(request):
                     extracted_source = prefix_to_source.get(source_key)
 
                     if extracted_source:
-                        dprint(f"[SLEECID PREFIX] extracted source → {extracted_source}")
+                        dprint(f"[SLEECID PREFIX] extracted source -- {extracted_source}")
                         final_source = pick_stronger_source(final_source, extracted_source)
 
                 except Exception as e:
@@ -2677,31 +3044,84 @@ def save_tracking(request):
 
                 dprint(f"[SLEECID FOUND] {sleec_id} >> checking history")
 
+                ## Initialize the scid source
+                strongest_scid_source = final_source
+
                 res = (
                     supabase.table("Tracking_Visitors_duplicate")
-                    .select("UTM_Source")
+                    .select("UTM_Source", "UTM_Medium", "UTM_Campaign", "UTM_Term", "UTM_Content")
                     .eq("SleecID", sleec_id)
                     .execute()
                 )
+  
+                rows = res.data or []
 
-                strongest_scid_source = final_source
+                # Track the row with the richest UTMs for the strongest SleecID source
+                strongest_row_scid = None
 
-                for row in res.data or []:
+                for row in rows:
+                    ## Clean
+                    row["UTM_Source"] = (row.get("UTM_Source") or "").strip().lower()
+                    row["UTM_Medium"] = (row.get("UTM_Medium") or "").strip()
+                    row["UTM_Campaign"] = (row.get("UTM_Campaign") or "").strip()
+                    row["UTM_Term"] = (row.get("UTM_Term") or "").strip()
+                    row["UTM_Content"] = (row.get("UTM_Content") or "").strip()
+
+                    ## get the existing source
                     existing = (row.get("UTM_Source") or "").strip().lower() or "unknown"
-                    strongest_scid_source = pick_stronger_source(strongest_scid_source, existing)
 
-                if strongest_scid_source not in weak_sources:
-                    final_source = strongest_scid_source
-                    attribution_type = "scID_rescued_purchase"
+                    # Count non-empty UTMs for this row
+                    row_utm_count = sum(
+                        bool((row.get(f"UTM_{f}") or "").strip())
+                        for f in ["Medium", "Campaign", "Term", "Content"]
+                    )
 
-                    dprint(f"[FINGERPRINT RESCUED] final_source → {final_source}")
+                    # ---- Case 1: stronger source wins ----
+                    if source_weight(existing) > source_weight(strongest_scid_source):
+                        strongest_scid_source = existing
+                        strongest_row_scid = row  # start with this row for UTMs
 
-                    # If better source found, backfill this session
-                    if session_id:
-                        supabase.table("Tracking_Visitors_duplicate") \
-                            .update({"UTM_Source": final_source}) \
-                            .eq("Session_ID", session_id) \
-                            .execute()
+                    # ---- Case 2: same weight source, pick the row with richer UTMs ----
+                    elif source_weight(existing) == source_weight(strongest_scid_source):
+                        if strongest_row_scid:
+                            current_utm_count = sum(
+                                bool((strongest_row_scid.get(f"UTM_{f}") or "").strip())
+                                for f in ["Medium", "Campaign", "Term", "Content"]
+                            )
+                        else:
+                            current_utm_count = 0
+
+                        if row_utm_count > current_utm_count:
+                            strongest_row_scid = row  # pick richer UTMs
+
+                # ---- After loop: sync UTMs from the richest row of the strongest source ----
+                if strongest_row_scid:
+                    utm_medium = (strongest_row_scid.get("UTM_Medium") or "").strip()
+                    utm_campaign = (strongest_row_scid.get("UTM_Campaign") or "").strip()
+                    utm_term = (strongest_row_scid.get("UTM_Term") or "").strip()
+                    utm_content = (strongest_row_scid.get("UTM_Content") or "").strip()
+
+                    if strongest_scid_source != final_source and strongest_scid_source not in weak_sources:
+                        final_source = strongest_scid_source
+                        attribution_type = "scID_rescued_purchase"
+
+                        dprint(f"[FINGERPRINT RESCUED] final_source -- {final_source}")
+
+                        payload = build_update_payload(
+                            final_source,
+                            utm_medium,
+                            utm_campaign,
+                            utm_term,
+                            utm_content,
+                            attribution_type
+                        )
+
+                        # If better source found, backfill this session
+                        if session_id:
+                            supabase.table("Tracking_Visitors_duplicate") \
+                                .update(payload) \
+                                .eq("Session_ID", session_id) \
+                                .execute()
 
             else:
                 dprint("[SLEECID CHECK] no Sleecid found")
@@ -2843,9 +3263,9 @@ def save_tracking(request):
 
             "UTM_Source": final_source,
             "UTM_Medium": utm_medium,
-            "UTM_Campaign": safe_strip(utm_params.get("utm_campaign")),
-            "UTM_Term": safe_strip(utm_params.get("utm_term")),
-            "UTM_Content": safe_strip(utm_params.get("utm_content")),
+            "UTM_Campaign": utm_campaign,
+            "UTM_Term": utm_term,
+            "UTM_Content": utm_content,
 
             "Attribution_Type": attribution_type,
             "First_Touch_Source": "PLACEHOLDER",
@@ -2862,7 +3282,7 @@ def save_tracking(request):
             "Device_Memory": client_info.get("device_memory"),
             "Last_Updated": get_uae_current_date(),
             "RAW_UTM_SOURCE": raw_utm_source,
-            "Which_Update": "120326",
+            "Which_Update": "280326",
             "Order_ID": "",
             "Cart_ID": "",
             "FT_Referrer_Link": ft_referrer,
