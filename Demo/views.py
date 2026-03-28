@@ -2571,8 +2571,8 @@ def save_tracking(request):
 
             row = sorted_rows[0]
             ## save to excel temporarily for inspection
-            file_path = os.path.join(settings.BASE_DIR, "selected_row_session.xlsx")
-            pd.DataFrame(row).to_excel(file_path, index=False)
+            #file_path = os.path.join(settings.BASE_DIR, "selected_row_session.xlsx")
+            #pd.DataFrame(row).to_excel(file_path, index=False)
 
             print("THE SELECTED SORTED ROW [SESSION WISE]\n", row)
 
