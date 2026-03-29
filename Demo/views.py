@@ -5496,7 +5496,7 @@ def update_tracked_customers(new_event):
             "Distinct_ID": int(get_next_id_from_supabase_compatible_all(name="Customer_Tracking", column="Distinct_ID")),
             "Last_Visit": now,
             "Last_ID_Map": {},
-            "Distinct_Checkpoint": {},
+            "Distinct_Checkpoint": 0,
             "Campaign_Contributions_Purchases": {},
             "Campaign_Contributions_atcs": {"pending": {}, "history": {}},
             "Visitor_IDs": {},
