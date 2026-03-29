@@ -5579,17 +5579,17 @@ def update_tracked_customers(new_event):
     print("Unknown Campaign Counts:", unknown_counts)
 
     row_dict = row.to_dict()
-    row_dict["Sessions"] = json.dumps(sessions)
-    row_dict["Visitor_IDs"] = json.dumps(visitor_ids)
-    row_dict["sc_IDs"] = json.dumps(sc_ids)
-    row_dict["Campaign_Contributions_atcs"] = json.dumps(atc_dict)
-    row_dict["Campaign_Contributions_Purchases"] = json.dumps(purchase_dict)
-    row_dict["Customer_Info"] = json.dumps(row_dict.get("Customer_Info", {}))
+    row_dict["Sessions"] = str(sessions)
+    row_dict["Visitor_IDs"] = str(visitor_ids)
+    row_dict["sc_IDs"] = str(sc_ids)
+    row_dict["Campaign_Contributions_atcs"] = str(atc_dict)
+    row_dict["Campaign_Contributions_Purchases"] = str(purchase_dict)
+    row_dict["Customer_Info"] = str(row_dict.get("Customer_Info", {}))
     row_dict["Updated_at"] = now
     row_dict["Last_Visit"] = now
     row_dict["Visitor_ID"] = visitor_id
     row_dict["Customer_LTV"] = customer_ltv
-    row_dict["Unknown_Campaign_Attribution_Count"] = json.dumps(unknown_counts)
+    row_dict["Unknown_Campaign_Attribution_Count"] = str(unknown_counts)
 
     df_to_upload = pd.DataFrame([row_dict])
     print("Uploading row_dict to Supabase:", row_dict)
