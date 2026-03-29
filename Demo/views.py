@@ -5594,7 +5594,7 @@ def update_tracked_customers(new_event):
     df_to_upload = pd.DataFrame([row_dict])
     print("Uploading row_dict to Supabase:", row_dict)
 
-    upsert_partial(df=df_to_upload, table_name="Customer_Tracking", pk="Customer_ID")
+    upsert_partial(df_to_upload, 'Customer_Tracking', 'Customer_ID')
     print("=== END update_tracked_customers ===\n")
     return True
 
