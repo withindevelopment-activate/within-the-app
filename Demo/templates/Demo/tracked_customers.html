@@ -1,0 +1,49 @@
+{% extends "Demo/base.html" %}
+
+{% block title %} Tracked Customers - Purchases {% endblock title %}
+
+<div class="data-wrap">
+  <div class="data-viewport">
+    <div class="data-scroller" role="region" aria-label="Scrollable data table" tabindex="0">
+      <table class="data-table" role="table" aria-label="Analytics dataset">
+        <thead>
+          <tr>
+            <th class="sticky-col">Customer_ID</th>
+            <th>Customer_Info</th>
+            <th>Add_to_Cart</th>
+            <th>Purchases</th>
+            <th>Updated_at</th>
+            <th>Distinct_ID</th>
+            <th>Last_Visit</th>
+            <th>Campaign_ATC_Contributions</th>
+            <th>Campaign_Purchase_Contributions</th>
+            <th>Customer_LTV</th>
+            <th>Unknown_Campaigns</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in data %}
+          <tr>
+            <td class="sticky-col">{{ row.Customer_ID }}</td>
+            <td>{{ row.Customer_Info|safe }}</td>
+            <td>{{ row.Add_to_Cart|default:"0" }}</td>
+            <td>{{ row.Purchases|default:"0" }}</td>
+            <td>{{ row.Updated_at|default:"N/A" }}</td>
+            <td>{{ row.Distinct_ID|default:"N/A" }}</td>
+            <td>{{ row.Last_Visit|default:"N/A" }}</td>
+            <td>{{ row.Campaign_Contributions_atcs|safe }}</td>
+            <td>{{ row.Campaign_Contributions_Purchases|safe }}</td>
+            <td>{{ row.Customer_LTV|default:"0" }}</td>
+            <td>{{ row.Unknown_Campaign_Attribution_Count|safe }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="10" class="text-center text-muted">No data found.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

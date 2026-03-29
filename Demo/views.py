@@ -18,7 +18,7 @@ from urllib.parse import urlparse, parse_qs
 
 ## Custom Imports ------------------
 # Supabase & Supporting imports
-from Demo.supporting_files.supabase_functions import get_next_id_from_supabase_compatible_all, batch_insert_to_supabase, sync_customers, fetch_data_from_supabase_specific, update_database_after_filter, get_last_non_direct_utm
+from Demo.supporting_files.supabase_functions import get_next_id_from_supabase_compatible_all, batch_insert_to_supabase, sync_customers, fetch_data_from_supabase_specific, update_database_after_filter, get_last_non_direct_utm, upsert_partial
 
 from Demo.supporting_files.supporting_functions import get_uae_current_date, detect_source_from_url_or_domain, detect_source_from_row, detect_source_from_user_agent
 # Marketing Report functions
@@ -3317,6 +3317,11 @@ def save_tracking(request):
 
         dprint(f"[INSERT PAYLOAD PREVIEW] {tracking_entry}")
 
+        ## Update the customers_db
+        events_list = ['purchase', 'add_to_cart']
+        if event_type in events_list:
+            update_tracked_customers(tracking_entry)
+
         batch_insert_to_supabase(pd.DataFrame([tracking_entry]), "Tracking_Visitors_duplicate")
 
         # --------------------------------------------------
@@ -5278,3 +5283,373 @@ def events_table_view(request):
     }
 
     return render(request, "Demo/events_table.html", context)
+
+
+
+##################################################################################################################################################################################
+####################### This section is to add a view for the customers database created and updated upon entry logs, for now, we only store customers with a final purchase #####
+############# Helper functions to help with parsing --- 
+# A list converter --- 
+def ensure_list(value):
+    import ast
+    if isinstance(value, list):
+        return value
+    if pd.isna(value):
+        return []
+    try:
+        v = ast.literal_eval(value)
+        return v if isinstance(v, list) else [str(v)]
+    except:
+        return [str(value)]
+    
+def ensure_dict(value):
+    import ast
+    if isinstance(value, dict):
+        return value
+    if pd.isna(value):
+        return {}
+    try:
+        v = ast.literal_eval(value)
+        return v if isinstance(v, dict) else {}
+    except:
+        return {}
+    
+import ast
+
+def normalize_details(raw):
+    """
+    Accepts raw event details (dict or string), returns a dict with normalized
+    string keys (stripped, lowered) so lookups like 'id' always work.
+    """
+    if raw is None:
+        return {}
+
+    # If it's a pandas/np single-value object, convert to Python native
+    try:
+        # strings like "{'id': 'abc', ...}"
+        if isinstance(raw, str):
+            try:
+                parsed = ast.literal_eval(raw)
+            except Exception:
+                parsed = {}
+        else:
+            parsed = raw
+    except Exception:
+        parsed = {}
+
+    # If parsed isn't a dict, bail out with empty dict
+    if not isinstance(parsed, dict):
+        return {}
+
+    # Normalize keys: strip, lower, and map them to values
+    norm = {}
+    for k, v in parsed.items():
+        try:
+            ks = str(k).strip().lower()
+        except Exception:
+            ks = str(k)
+        norm[ks] = v
+    return norm
+
+## Function to only view the table
+def view_tracked_customers(request):
+    """
+    View the customers table with nicely formatted dicts for display,
+    including UNKNOWN_CAMPAIGN counts by Attribution_Type.
+    """
+
+    tracked_customers = fetch_data_from_supabase_specific("Customer_Tracking")
+
+    # ----------------------------
+    # Helper functions for formatting
+    # ----------------------------
+    def format_customer_info(info):
+        if not info:
+            return ""
+        name = info.get("name", "")
+        email = info.get("email", "")
+        mobile = info.get("mobile", "")
+        return f"{name}<br>{email}<br>{mobile}"
+
+    def format_atc_dict(atc_dict):
+        if not atc_dict:
+            return ""
+        lines = []
+        pending = atc_dict.get("pending", {})
+        history = atc_dict.get("history", {})
+
+        if pending:
+            lines.append("<b>Pending ATCs:</b>")
+            for camp, data in pending.items():
+                lines.append(f"{camp} — count: {data.get('count', 0)}")
+        if history:
+            lines.append("<b>ATC History:</b>")
+            for camp, data in history.items():
+                total = data.get("total_credit", 0)
+                orders = len(data.get("orders", []))
+                lines.append(f"{camp} — total_credit: {total} — orders: {orders}")
+        return "<br>".join(lines)
+
+    def format_purchase_dict(purchase_dict):
+        if not purchase_dict:
+            return ""
+        lines = []
+        for camp, data in purchase_dict.items():
+            total = data.get("total_revenue", 0)
+            orders = len(data.get("orders", []))
+            lines.append(f"{camp} — total_revenue: {total} — orders: {orders}")
+        return "<br>".join(lines)
+
+    def format_unknown_campaigns(unknown_dict):
+        """
+        Format Unknown Campaign counts by Attribution_Type
+        """
+        if not unknown_dict:
+            return ""
+        lines = []
+        for attr_type, count in unknown_dict.items():
+            lines.append(f"{attr_type} — {count}")
+        return "<br>".join(lines)
+
+    # ----------------------------
+    # Format the dict columns for display
+    # ----------------------------
+    display_df = tracked_customers.copy()
+
+    display_df["Customer_Info"] = display_df["Customer_Info"].apply(format_customer_info)
+    display_df["Campaign_Contributions_atcs"] = display_df["Campaign_Contributions_atcs"].apply(format_atc_dict)
+    display_df["Campaign_Contributions_Purchases"] = display_df["Campaign_Contributions_Purchases"].apply(format_purchase_dict)
+    display_df["Unknown_Campaign_Attribution_Count"] = display_df["Unknown_Campaign_Attribution_Count"].apply(format_unknown_campaigns)
+
+    # ----------------------------
+    # Return for template
+    # ----------------------------
+    return render(request, "Demo/tracked_customers.html", {
+        "data": display_df,
+    })
+
+
+
+### Function to update the tracked customers -- 
+def update_tracked_customers(new_event):
+    """
+    This function is to view the customers database -- the database is created from the purchase events.
+    whenever a purchase happens we call this function for updates -- it is called for both adds to cart and purchase events
+    """
+
+    ## Get the database
+    customer_df = fetch_data_from_supabase_specific("Customer_Tracking")
+
+    # ----------------------------
+    # Helper functions
+    # ----------------------------
+    def extract_campaign_key(event):
+        source = str(event.get("UTM_Source")).strip() or "UNKNOWN_SOURCE"
+        campaign = str(event.get("UTM_Campaign")).strip() or "MISSING_CAMPAIGN"
+        return f"{source}__{campaign}"
+
+    def extract_order_total(details):
+        ## Extracts the order total after vat from the event details dict associated with the purchase
+        try:
+            order = details.get("order", {})
+            products = order.get("products", [])
+            for p in products:
+                if p.get("code") == "sub_totals_after_vat":
+                    val = p.get("value_string", "0")
+                    return float(val.split()[0])
+        except:
+            pass
+        return 0.0
+
+    # ----------------------------
+    # Parse incoming event
+    # ----------------------------
+    event_type = new_event.get("Event_Type")
+    details = normalize_details(new_event.get("Event_Details"))
+
+    customer_id = new_event.get("Customer_ID")
+    visitor_id = str(new_event.get("Visitor_ID")).strip()
+    session_id = str(new_event.get("Session_ID")).strip()
+    sc_id = str(new_event.get("SleecID")).strip()
+
+    now = get_uae_current_date()
+
+    # ----------------------------
+    # Check if customer exists
+    # ----------------------------
+    if customer_id in customer_df["Customer_ID"].values:
+        row_idx = customer_df.index[customer_df["Customer_ID"] == customer_id][0]
+        row = customer_df.loc[row_idx].copy()
+    else:
+        # Create new row
+        row = pd.Series({
+            "Customer_ID": customer_id,
+            "Customer_Info": {
+                "name": new_event.get("Customer_Name"),
+                "email": new_event.get("Customer_Email"),
+                "mobile": new_event.get("Customer_Mobile"),
+            },
+            "Visitor_ID": "",
+            "Add_to_Cart": 0,
+            "Purchases": 0,
+            "Sessions": {},
+            "Updated_at": now,
+            "Distinct_ID": int(get_next_id_from_supabase_compatible_all(name="Customer_Tracking", column="Distinct_ID")),
+            "Last_Visit": now,
+            "Last_ID_Map": {},
+            "Distinct_Checkpoint": {},
+            "Campaign_Contributions_Purchases": {},
+            "Campaign_Contributions_atcs": {"pending": {}, "history": {}},
+            "Visitor_IDs": {},
+            "sc_IDs": {},
+            "Unknown_Campaign_Attribution_Count": {} 
+        })
+        customer_df = pd.concat([customer_df, pd.DataFrame([row])], ignore_index=True)
+        row_idx = customer_df.index[-1]
+
+    # ----------------------------
+    # Parse stored dicts
+    # ----------------------------
+    sessions = ensure_dict(row.get("Sessions"))
+    visitor_ids = ensure_dict(row.get("Visitor_IDs"))
+    sc_ids = ensure_dict(row.get("sc_IDs"))
+
+    atc_dict = ensure_dict(row.get("Campaign_Contributions_atcs"))
+    purchase_dict = ensure_dict(row.get("Campaign_Contributions_Purchases"))
+
+    if "pending" not in atc_dict:
+        atc_dict = {"pending": {}, "history": {}}
+
+    # ----------------------------
+    # Update Sessions / IDs
+    # ----------------------------
+    sessions[session_id] = sessions.get(session_id, 0) + 1
+    visitor_ids[visitor_id] = visitor_ids.get(visitor_id, 0) + 1
+    sc_ids[sc_id] = sc_ids.get(sc_id, 0) + 1
+
+    # ----------------------------
+    # EVENT: ADD TO CART
+    # ----------------------------
+    if event_type == "add_to_cart":
+        row["Add_to_Cart"] = int(row.get("Add_to_Cart", 0)) + 1
+
+        campaign_key = extract_campaign_key(new_event)
+
+        atc_entry = atc_dict["pending"].get(campaign_key, {
+            "utm_source": str(new_event.get("UTM_Source")).strip(),
+            "utm_campaign": str(new_event.get("UTM_Campaign")).strip() or "MISSING_CAMPAIGN",
+            "events": [],
+            "count": 0
+        })
+
+        atc_entry["events"].append({
+            "timestamp": now,
+            "details": details
+        })
+        atc_entry["count"] += 1
+
+        atc_dict["pending"][campaign_key] = atc_entry
+
+    # ----------------------------
+    # EVENT: PURCHASE
+    # ----------------------------
+    elif event_type == "purchase":
+        row["Purchases"] = int(row.get("Purchases", 0)) + 1
+
+        order_total = extract_order_total(details)
+        purchase_campaign_key = extract_campaign_key(new_event)
+
+        # ---- 1. Process ATC contributions -- 25% per each atc campaign contributing to the purchase.
+        if atc_dict["pending"]:
+            for camp, data in atc_dict["pending"].items():
+                credit = order_total * 0.25
+                hist_entry = atc_dict["history"].get(camp, {
+                    "utm_source": str(data.get("utm_source")).strip(),
+                    "utm_campaign": str(data.get("utm_campaign")).strip(),
+                    "total_credit": 0,
+                    "orders": []
+                })
+                hist_entry["total_credit"] += credit
+                hist_entry["orders"].append({
+                    "timestamp": now,
+                    "credit": credit,
+                    "order_total": order_total
+                })
+                atc_dict["history"][camp] = hist_entry
+
+        # ---- 2. Reset pending ATCs
+        atc_dict["pending"] = {}
+
+        # ---- 3. Process PURCHASE campaign -- 100%
+        purchase_entry = purchase_dict.get(purchase_campaign_key, {
+            "utm_source": str(new_event.get("UTM_Source")).strip(),
+            "utm_campaign": str(new_event.get("UTM_Campaign")).strip() or "MISSING_CAMPAIGN",
+            "total_revenue": 0,
+            "orders": []
+        })
+
+        purchase_entry["total_revenue"] += order_total
+        purchase_entry["orders"].append({
+            "timestamp": now,
+            "revenue": order_total
+        })
+
+        purchase_dict[purchase_campaign_key] = purchase_entry
+
+    # ----------------------------
+    # Customer LTV
+    # ----------------------------
+    def calculate_customer_ltv(purchase_dict, atc_dict):
+        total = 0
+        for v in purchase_dict.values():
+            total += float(v.get("total_revenue", 0))
+        history = atc_dict.get("history", {})
+        for v in history.values():
+            total += float(v.get("total_credit", 0))
+        return total
+
+    customer_ltv = calculate_customer_ltv(purchase_dict, atc_dict)
+
+    # ----------------------------
+    # Final Updates
+    # ----------------------------
+    row_dict = row.to_dict()
+
+    row_dict["Sessions"] = json.dumps(sessions)
+    row_dict["Visitor_IDs"] = json.dumps(visitor_ids)
+    row_dict["sc_IDs"] = json.dumps(sc_ids)
+    row_dict["Campaign_Contributions_atcs"] = json.dumps(atc_dict)
+    row_dict["Campaign_Contributions_Purchases"] = json.dumps(purchase_dict)
+    row_dict["Customer_Info"] = json.dumps(row_dict.get("Customer_Info", {}))
+
+    row_dict["Updated_at"] = now
+    row_dict["Last_Visit"] = now
+    row_dict["Visitor_ID"] = visitor_id
+    row_dict["Customer_LTV"] = customer_ltv
+
+    # ----------------------------
+    # Track UNKNOWN_CAMPAIGN by Attribution_Type
+    # ----------------------------
+    utm_campaign = str(new_event.get("UTM_Campaign")).strip() or "MISSING_CAMPAIGN"
+    attribution_type = str(new_event.get("Attribution_Type", "UNKNOWN_ATTRIBUTION")).strip()
+
+    unknown_counts = ensure_dict(row.get("Unknown_Campaign_Attribution_Count", {}))
+
+    if utm_campaign == "MISSING_CAMPAIGN":
+        unknown_counts[attribution_type] = unknown_counts.get(attribution_type, 0) + 1
+
+    row_dict["Unknown_Campaign_Attribution_Count"] = json.dumps(unknown_counts)
+
+    # ----------------------------
+    # Upsert
+    # ----------------------------
+    df_to_upload = pd.DataFrame([row_dict])
+
+    upsert_partial(
+        df=df_to_upload,
+        table_name="Customer_Tracking",
+        pk="Customer_ID"
+    )
+
+    return True
+

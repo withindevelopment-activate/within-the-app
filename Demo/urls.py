@@ -59,4 +59,7 @@ urlpatterns = [
     path("events-table/", views.events_table_view, name="events_table"),
     # path("campaigns/overview/", views.campaigns_overview, name="campaigns_overview"),
 
+    ### The tracked customers
+    path("view_tracked_customers/", views.view_tracked_customers, name="view_tracked_customers"),
+
 ]
