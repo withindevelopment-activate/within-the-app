@@ -5433,9 +5433,7 @@ def view_tracked_customers(request):
 
 
 def update_tracked_customers(new_event):
-    import json
-    import pandas as pd
-
+    import uuid
     print("=== START update_tracked_customers ===")
     print("Incoming event:", new_event)
 
@@ -5451,32 +5449,24 @@ def update_tracked_customers(new_event):
 
     def extract_order_total(details):
         import ast
-
         try:
-            # Ensure details is a dict (since incoming is string)
             if isinstance(details, str):
                 details = ast.literal_eval(details)
-
             if not isinstance(details, dict):
                 print("Details is not a dict")
                 return 0.0
-
             order = details.get("order", {})
             payment = order.get("payment", {})
             invoice = payment.get("invoice", [])
-
             print("Invoice section:", invoice)
-
             for item in invoice:
                 if item.get("code") == "sub_totals_after_vat":
                     val = item.get("value_string", "0")
                     total = float(val.split()[0])
                     print("Extracted order total:", total)
                     return total
-
         except Exception as e:
             print("Error extracting order total:", e)
-
         print("Falling back to 0.0")
         return 0.0
 
@@ -5485,12 +5475,48 @@ def update_tracked_customers(new_event):
     print("Event type:", event_type)
     print("Normalized details:", details)
 
+    # --- Handle customer identity ---
     customer_id = new_event.get("Customer_ID")
     visitor_id = str(new_event.get("Visitor_ID")).strip()
     session_id = str(new_event.get("Session_ID")).strip()
     sc_id = str(new_event.get("SleecID")).strip()
     now = get_uae_current_date()
-    print("Customer ID:", customer_id, "Visitor ID:", visitor_id, "Session ID:", session_id, "SleecID:", sc_id, "Timestamp:", now)
+
+    # If no Customer_ID, generate an anonymous one
+    is_anonymous = False
+    if not customer_id:
+        is_anonymous = True
+        details_customer = details.get("customer", {})
+        masked_email = details_customer.get("email")
+        masked_mobile = details_customer.get("mobile")
+        masked_name = details_customer.get("name")
+
+        pseudo_id_parts = []
+        if masked_name:
+            pseudo_id_parts.append(masked_name[:3])
+        elif masked_email:
+            local, _ = masked_email.split("@") if "@" in masked_email else (masked_email, "")
+            pseudo_id_parts.append(local[:3])
+        if masked_mobile and len(masked_mobile) >= 4:
+            pseudo_id_parts.append(masked_mobile[-4:])
+
+        if pseudo_id_parts:
+            customer_id = "anon_" + "_".join(pseudo_id_parts)
+        elif visitor_id:
+            customer_id = f"anon_visitor_{visitor_id}"
+        elif session_id:
+            customer_id = f"anon_session_{session_id}"
+        else:
+            customer_id = f"anon_uuid_{uuid.uuid4()}"
+
+    print(
+        "Customer ID:", customer_id,
+        "Visitor ID:", visitor_id,
+        "Session ID:", session_id,
+        "SleecID:", sc_id,
+        "Timestamp:", now,
+        "Anonymous:", is_anonymous
+    )
 
     if customer_id in customer_df["Customer_ID"].values:
         row_idx = customer_df.index[customer_df["Customer_ID"] == customer_id][0]
@@ -5498,13 +5524,18 @@ def update_tracked_customers(new_event):
         print("Existing customer found at index", row_idx)
     else:
         print("Creating new customer row")
+        customer_info = {
+            "name": new_event.get("Customer_Name"),
+            "email": new_event.get("Customer_Email"),
+            "mobile": new_event.get("Customer_Mobile"),
+        }
+        # Remove empty values
+        customer_info = {k: v for k, v in customer_info.items() if v}
+
         row = pd.Series({
             "Customer_ID": customer_id,
-            "Customer_Info": {
-                "name": new_event.get("Customer_Name"),
-                "email": new_event.get("Customer_Email"),
-                "mobile": new_event.get("Customer_Mobile"),
-            },
+            "Customer_Info": customer_info,
+            "Is_Anonymous": is_anonymous,
             "Visitor_ID": "",
             "Add_to_Cart": 0,
             "Purchases": 0,
@@ -5531,12 +5562,12 @@ def update_tracked_customers(new_event):
     if "pending" not in atc_dict:
         atc_dict = {"pending": {}, "history": {}}
 
-    #print("Sessions before update:", sessions)
+    # --- Update sessions / IDs ---
     sessions[session_id] = sessions.get(session_id, 0) + 1
     visitor_ids[visitor_id] = visitor_ids.get(visitor_id, 0) + 1
     sc_ids[sc_id] = sc_ids.get(sc_id, 0) + 1
-    #print("Sessions after update:", sessions)
 
+    # --- Event handling ---
     if event_type == "add_to_cart":
         print("Processing add_to_cart event")
         row["Add_to_Cart"] = int(row.get("Add_to_Cart", 0)) + 1
@@ -5558,6 +5589,7 @@ def update_tracked_customers(new_event):
         order_total = extract_order_total(details)
         purchase_campaign_key = extract_campaign_key(new_event)
 
+        # Process pending ATCs (25% credit)
         if atc_dict["pending"]:
             for camp, data in atc_dict["pending"].items():
                 credit = order_total * 0.25
@@ -5571,6 +5603,8 @@ def update_tracked_customers(new_event):
                 hist_entry["orders"].append({"timestamp": now, "credit": credit, "order_total": order_total})
                 atc_dict["history"][camp] = hist_entry
         atc_dict["pending"] = {}
+
+        # Add purchase revenue
         purchase_entry = purchase_dict.get(purchase_campaign_key, {
             "utm_source": str(new_event.get("UTM_Source")).strip(),
             "utm_campaign": str(new_event.get("UTM_Campaign")).strip() or "MISSING_CAMPAIGN",
@@ -5582,12 +5616,12 @@ def update_tracked_customers(new_event):
         purchase_dict[purchase_campaign_key] = purchase_entry
         print("Updated purchase dict:", purchase_dict)
 
-    # Customer LTV
+    # --- Customer LTV ---
     customer_ltv = sum(v.get("total_revenue", 0) for v in purchase_dict.values()) + \
                    sum(v.get("total_credit", 0) for v in atc_dict.get("history", {}).values())
     print("Customer LTV:", customer_ltv)
 
-    # Track UNKNOWN_CAMPAIGN by Attribution_Type
+    # --- Track UNKNOWN_CAMPAIGN by Attribution_Type ---
     utm_campaign = str(new_event.get("UTM_Campaign")).strip() or "MISSING_CAMPAIGN"
     attribution_type = str(new_event.get("Attribution_Type", "UNKNOWN_ATTRIBUTION")).strip()
     unknown_counts = ensure_dict(row.get("Unknown_Campaign_Attribution_Count", {}))
@@ -5595,6 +5629,7 @@ def update_tracked_customers(new_event):
         unknown_counts[attribution_type] = unknown_counts.get(attribution_type, 0) + 1
     print("Unknown Campaign Counts:", unknown_counts)
 
+    # --- Prepare row dict ---
     row_dict = row.to_dict()
     row_dict["Sessions"] = str(sessions)
     row_dict["Visitor_IDs"] = str(visitor_ids)
@@ -5607,11 +5642,12 @@ def update_tracked_customers(new_event):
     row_dict["Visitor_ID"] = visitor_id
     row_dict["Customer_LTV"] = customer_ltv
     row_dict["Unknown_Campaign_Attribution_Count"] = str(unknown_counts)
+    row_dict["Is_Anonymous"] = is_anonymous
 
+    # --- Upload ---
     df_to_upload = pd.DataFrame([row_dict])
     print("Uploading row_dict to Supabase:", row_dict)
-
     upsert_partial(df_to_upload, 'Customer_Tracking', 'Customer_ID')
+
     print("=== END update_tracked_customers ===\n")
     return True
-
