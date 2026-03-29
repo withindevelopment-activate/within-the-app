@@ -5450,17 +5450,34 @@ def update_tracked_customers(new_event):
         return key
 
     def extract_order_total(details):
+        import ast
+
         try:
+            # Ensure details is a dict (since incoming is string)
+            if isinstance(details, str):
+                details = ast.literal_eval(details)
+
+            if not isinstance(details, dict):
+                print("Details is not a dict")
+                return 0.0
+
             order = details.get("order", {})
-            products = order.get("products", [])
-            for p in products:
-                if p.get("code") == "sub_totals_after_vat":
-                    val = p.get("value_string", "0")
+            payment = order.get("payment", {})
+            invoice = payment.get("invoice", [])
+
+            print("Invoice section:", invoice)
+
+            for item in invoice:
+                if item.get("code") == "sub_totals_after_vat":
+                    val = item.get("value_string", "0")
                     total = float(val.split()[0])
                     print("Extracted order total:", total)
                     return total
+
         except Exception as e:
             print("Error extracting order total:", e)
+
+        print("Falling back to 0.0")
         return 0.0
 
     event_type = new_event.get("Event_Type")
