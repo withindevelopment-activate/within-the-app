@@ -5365,15 +5365,34 @@ def view_tracked_customers(request):
     # ----------------------------
     # Helper functions for formatting
     # ----------------------------
+    def parse_dict(value):
+        """
+        Ensure that the value is a dict, even if stored as a string.
+        """
+        if isinstance(value, dict):
+            return value
+        if pd.isna(value) or value in [None, ""]:
+            return {}
+        try:
+            # Try JSON first
+            return json.loads(value)
+        except Exception:
+            try:
+                # fallback: parse with ast.literal_eval
+                v = ast.literal_eval(value)
+                return v if isinstance(v, dict) else {}
+            except Exception:
+                return {}
+
     def format_customer_info(info):
-        if not info:
-            return ""
+        info = parse_dict(info)
         name = info.get("name", "")
         email = info.get("email", "")
         mobile = info.get("mobile", "")
         return f"{name}<br>{email}<br>{mobile}"
 
     def format_atc_dict(atc_dict):
+        atc_dict = parse_dict(atc_dict)
         if not atc_dict:
             return ""
         lines = []
@@ -5383,29 +5402,31 @@ def view_tracked_customers(request):
         if pending:
             lines.append("<b>Pending ATCs:</b>")
             for camp, data in pending.items():
+                data = parse_dict(data)
                 lines.append(f"{camp} — count: {data.get('count', 0)}")
         if history:
             lines.append("<b>ATC History:</b>")
             for camp, data in history.items():
+                data = parse_dict(data)
                 total = data.get("total_credit", 0)
                 orders = len(data.get("orders", []))
                 lines.append(f"{camp} — total_credit: {total} — orders: {orders}")
         return "<br>".join(lines)
 
     def format_purchase_dict(purchase_dict):
+        purchase_dict = parse_dict(purchase_dict)
         if not purchase_dict:
             return ""
         lines = []
         for camp, data in purchase_dict.items():
+            data = parse_dict(data)
             total = data.get("total_revenue", 0)
             orders = len(data.get("orders", []))
             lines.append(f"{camp} — total_revenue: {total} — orders: {orders}")
         return "<br>".join(lines)
 
     def format_unknown_campaigns(unknown_dict):
-        """
-        Format Unknown Campaign counts by Attribution_Type
-        """
+        unknown_dict = parse_dict(unknown_dict)
         if not unknown_dict:
             return ""
         lines = []
@@ -5417,7 +5438,6 @@ def view_tracked_customers(request):
     # Format the dict columns for display
     # ----------------------------
     display_df = tracked_customers.copy()
-
     display_df["Customer_Info"] = display_df["Customer_Info"].apply(format_customer_info)
     display_df["Campaign_Contributions_atcs"] = display_df["Campaign_Contributions_atcs"].apply(format_atc_dict)
     display_df["Campaign_Contributions_Purchases"] = display_df["Campaign_Contributions_Purchases"].apply(format_purchase_dict)
