@@ -5380,7 +5380,8 @@ def update_tracked_customers(new_event):
             "Visitor_IDs": {},
             "sc_IDs": {},
             "Unknown_Campaign_Attribution_Count": {},
-            "Campaign_Contributions_Per_Purchase": {}
+            "Campaign_Contributions_Per_Purchase": {},
+            "Which_Update": ""
         })
 
         customer_df = pd.concat([customer_df, pd.DataFrame([row])], ignore_index=True)
@@ -5472,6 +5473,7 @@ def update_tracked_customers(new_event):
     row_dict["Visitor_ID"] = visitor_id
     row_dict["Customer_LTV"] = customer_ltv
     row_dict["Is_Anonymous"] = is_anonymous
+    row_dict["Which_Update"] = "300326 1018PM"
 
     df_to_upload = pd.DataFrame([row_dict])
 
