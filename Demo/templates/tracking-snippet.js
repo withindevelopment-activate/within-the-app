@@ -366,12 +366,17 @@
 
     function getUTMParams() {
         const p = new URLSearchParams(window.location.search);
+
+        const formatValue = (val) => {
+            if (!val || typeof val !== 'string') return null;
+            return val.replace(/\+/g, ' ');
+        };
         return {
-            utm_source: p.get("utm_source"),
-            utm_medium: p.get("utm_medium"),
-            utm_campaign: p.get("utm_campaign"),
-            utm_term: p.get("utm_term"),
-            utm_content: p.get("utm_content"),
+            utm_source: formatValue(p.get("utm_source")),
+            utm_medium: formatValue(p.get("utm_medium")),
+            utm_campaign: formatValue(p.get("utm_campaign")),
+            utm_term: formatValue(p.get("utm_term")),
+            utm_content: formatValue(p.get("utm_content")),
         };
     }
 
