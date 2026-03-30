@@ -343,6 +343,59 @@
         };
     }
 
+    function setUTMCookie() {
+        const params = new URLSearchParams(window.location.search);
+        const utms = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"];
+        let cookieData = {};
+
+        utms.forEach(key => {
+            const value = params.get(key);
+            if (value) {
+                cookieData[key] = value.toLowerCase(); // Standardize to lowercase
+            }
+        });
+
+        // Only set the cookie if UTMs actually exist in the URL
+        if (Object.keys(cookieData).length > 0) {
+            const d = new Date();
+            d.setTime(d.getTime() + (30 * 24 * 60 * 60 * 1000)); // 30 days
+            const expires = "expires=" + d.toUTCString();
+            
+            // Save as a JSON string for easy retrieval later
+            document.cookie = "track_utms=" + JSON.stringify(cookieData) + ";" + expires + ";path=/;SameSite=Lax";
+        }
+    }
+
+    // Run this on every page load
+    setUTMCookie();
+
+    function getUTMFromCookie() {
+        const name = "track_utms=";
+        const decodedCookie = decodeURIComponent(document.cookie);
+        const ca = decodedCookie.split(';');
+        let savedData = null;
+
+        for (let i = 0; i < ca.length; i++) {
+            let c = ca[i].trim();
+            if (c.indexOf(name) == 0) {
+                try {
+                    savedData = JSON.parse(c.substring(name.length, c.length));
+                } catch (e) {
+                    savedData = null;
+                }
+            }
+        }
+
+        // Return the exact same structure as getUTMParams()
+        return {
+            utm_source: savedData?.utm_source || null,
+            utm_medium: savedData?.utm_medium || null,
+            utm_campaign: savedData?.utm_campaign || null,
+            utm_term: savedData?.utm_term || null,
+            utm_content: savedData?.utm_content || null,
+        };
+    }
+
     function inferSource(utm, referrer) {
         if (utm.utm_source) {
             return {
@@ -396,7 +449,9 @@
 
     // ------------------- First Touch Identification -------------------
     function identifyFirstTouch() {
-        const utm = getUTMParams();
+        const urlUtms = getUTMParams();
+        const cookieUtms = getUTMFromCookie();
+        const utm = urlUtms.utm_source ? urlUtms : cookieUtms;
         const referrer = document.referrer || null;
         const landingPath = location.pathname.toLowerCase();
 
@@ -435,7 +490,9 @@
 
     
     async function sendTrackingEvent(type, details = {}) {
-        const utm = getUTMParams();
+        const urlUtms = getUTMParams();
+        const cookieUtms = getUTMFromCookie();
+        const utm = urlUtms.utm_source ? urlUtms : cookieUtms;
         const referrer = document.referrer || null;
 
         const inferred = inferSource(utm, referrer);
