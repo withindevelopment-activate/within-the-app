@@ -55,9 +55,26 @@
     function extractAnalyticsCookies() {
         const cookies = getAllCookies();
 
+        // Define the list of keys we are already handling explicitly
+        const specifiedKeys = [
+            "visitor_id", "custom_visitor_id", "ajs_anonymous_id",
+            "_ga", "_fbp", "_fbc", "_ttp", "_scid",
+            "ttcsid", "_sctr", "_mz_utm","track_utms"
+        ];
+
         const posthogKey = Object.keys(cookies).find(k =>
             k.startsWith("ph_") && k.endsWith("_posthog")
         );
+        
+        if (posthogKey) specifiedKeys.push(posthogKey);
+
+        // Filter the cookies to find the "leftovers"
+        const otherCookies = {};
+        Object.keys(cookies).forEach(key => {
+            if (!specifiedKeys.includes(key)) {
+                otherCookies[key] = cookies[key];
+            }
+        });
 
         const posthog = posthogKey ? parsePosthog(cookies[posthogKey]) : null;
 
@@ -92,7 +109,10 @@
             posthog_identity: {
                 device_id: posthog?.$device_id || null,
                 distinct_id: posthog?.distinct_id || null
-            }
+            },
+
+            // Any cookie not specified above ends up here
+            other: otherCookies
         };
     }
 
