@@ -81,12 +81,24 @@
         const mzutm = cookies["_mz_utm"]
             ? parseJSONCookie(cookies["_mz_utm"])
             : null;
+        
+        const trackutms = cookies["track_utms"]
+            ? parseJSONCookie(cookies["track_utms"])
+            : null;
 
         return {
             visitor_ids: {
                 visitor_id: cookies["visitor_id"] || null,
                 custom_visitor_id: cookies["custom_visitor_id"] || null,
                 segment_anonymous_id: cookies["ajs_anonymous_id"] || null
+            },
+
+            track_utms: {
+                utm_source: trackutms?.utm_source || null,
+                utm_medium: trackutms?.utm_medium || null,
+                utm_campaign: trackutms?.utm_campaign || null,
+                utm_term: trackutms?.utm_term || null,
+                utm_content: trackutms?.utm_content || null,
             },
 
             analytics_ids: {
