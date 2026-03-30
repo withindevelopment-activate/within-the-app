@@ -3035,7 +3035,10 @@ def save_tracking(request):
 
         
         #### Section to get the best utms for this source
-        history_rows = get_history_rows(session_id, visitor_id, mobile, sleec_id)
+        safe_sleec_id = sleec_id or ""
+        safe_mobile = mobile or ""
+        history_rows = get_history_rows(session_id, visitor_id, safe_mobile, safe_sleec_id)
+        #history_rows = get_history_rows(session_id, visitor_id, mobile, sleec_id)
         ## Avoid dupes
         history_rows = list({json.dumps(r): r for r in history_rows}.values())
 
