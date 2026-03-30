@@ -510,6 +510,7 @@
 
     
     async function sendTrackingEvent(type, details = {}) {
+        setUTMCookie();
         const urlUtms = getUTMParams();
         const cookieUtms = getUTMFromCookie();
         const utm = urlUtms.utm_source ? urlUtms : cookieUtms;
