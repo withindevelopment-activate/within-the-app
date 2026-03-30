@@ -5259,7 +5259,6 @@ def update_tracked_customers(new_event):
     print("Incoming event:", new_event)
 
     customer_df = fetch_data_from_supabase_specific("Customer_Tracking_duplicate")
-    print("Fetched customer_df:", customer_df.shape)
 
     # -------------------------------
     # Helpers
@@ -5313,6 +5312,8 @@ def update_tracked_customers(new_event):
 
     event_type = new_event.get("Event_Type")
     details = normalize_details(new_event.get("Event_Details"))
+    print("Event type:", event_type)
+    print("Normalized details:", details)
 
     customer_id = new_event.get("Customer_ID")
 
@@ -5331,6 +5332,7 @@ def update_tracked_customers(new_event):
 
     # =====================================================
     # Identity Resolution (Vectorized)
+    
 
     mask = pd.Series(False, index=customer_df.index)
 
