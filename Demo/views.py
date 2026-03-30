@@ -5497,7 +5497,7 @@ def update_tracked_customers(new_event):
     print("Normalized details:", details)
 
     # --- Handle customer identity ---
-    customer_id = str(new_event.get("Customer_ID") or "").strip()
+    customer_id = new_event.get("Customer_ID")
     visitor_id = str(new_event.get("Visitor_ID")).strip()
     session_id = str(new_event.get("Session_ID")).strip()
     sc_id = str(new_event.get("SleecID")).strip()
@@ -5507,28 +5507,26 @@ def update_tracked_customers(new_event):
     is_anonymous = False
     if not customer_id:
         is_anonymous = True
-        details_customer = details.get("customer", {})
-        masked_email = details_customer.get("email")
-        masked_mobile = details_customer.get("mobile")
-        masked_name = details_customer.get("name")
 
-        pseudo_id_parts = []
-        if masked_name:
-            pseudo_id_parts.append(masked_name[:3])
-        elif masked_email:
-            local, _ = masked_email.split("@") if "@" in masked_email else (masked_email, "")
-            pseudo_id_parts.append(local[:3])
-        if masked_mobile and len(masked_mobile) >= 4:
-            pseudo_id_parts.append(masked_mobile[-4:])
+        # Try to find existing anonymous ID for this visitor
+        anon_match = customer_df[
+            customer_df["Visitor_ID"] == visitor_id
+        ]
 
-        if pseudo_id_parts:
-            customer_id = "anon_" + "_".join(pseudo_id_parts)
-        elif visitor_id:
-            customer_id = f"anon_visitor_{visitor_id}"
-        elif session_id:
-            customer_id = f"anon_session_{session_id}"
+        if not anon_match.empty:
+            customer_id = int(anon_match.iloc[0]["Customer_ID"])
+            print("Reusing existing anonymous customer ID:", customer_id)
+
         else:
-            customer_id = f"anon_uuid_{uuid.uuid4()}"
+            # Generate new negative ID
+            min_id = customer_df["Customer_ID"].min()
+
+            if pd.isna(min_id) or min_id >= 0:
+                customer_id = -1
+            else:
+                customer_id = int(min_id) - 1
+
+            print("Generated new anonymous customer ID:", customer_id)
 
     print(
         "Customer ID:", customer_id,
@@ -5539,10 +5537,8 @@ def update_tracked_customers(new_event):
         "Anonymous:", is_anonymous
     )
 
-    if str(customer_id) in customer_df["Customer_ID"].astype(str).values:
-        row_idx = customer_df.index[
-            customer_df["Customer_ID"].astype(str) == str(customer_id)
-        ][0]
+    if customer_id in customer_df["Customer_ID"].values:
+        row_idx = customer_df.index[customer_df["Customer_ID"] == customer_id][0]
         row = customer_df.loc[row_idx].copy()
         print("Existing customer found at index", row_idx)
     else:
