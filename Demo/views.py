@@ -2179,12 +2179,16 @@ def normalize_event_details(d):
 
 def is_duplicate_event(event_type, identity_type, identity_value):
     """
-    Fast DB dupe check by calling either the Order_ID or the Cart_ID based on 'Event_Type'
+    Fast DB dupe check by calling either the Order_ID (only for purchases).
     """
+    # Only dedupe purchases
+    if event_type != "purchase":
+        return False
+
     if not identity_type or not identity_value:
         return False
 
-    #col = "Order_ID" if identity_type == "order_id" else "Cart_ID"
+    # For purchase events, check order_id
     col = "Order_ID"
 
     res = (
@@ -2289,8 +2293,8 @@ def save_tracking(request):
         if identity_type:
             dprint(f"[EVENT IDENTITY] {identity_type}={identity_value}")
 
-            if str(identity_type).strip() == 'purchase' and is_duplicate_event(event_type, identity_type, identity_value):
-                dprint(f"[DUPLICATE EVENT] SKIPPING PURCHASE {identity_value}")
+            if is_duplicate_event(event_type, identity_type, identity_value):
+                dprint("[DUPLICATE EVENT] skipping insert")
                 return JsonResponse({"status": "duplicate_skipped"})
 
         
