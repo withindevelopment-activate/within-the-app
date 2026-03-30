@@ -5444,10 +5444,11 @@ def view_tracked_customers(request):
     display_df["Unknown_Campaign_Attribution_Count"] = display_df["Unknown_Campaign_Attribution_Count"].apply(format_unknown_campaigns)
 
     # ----------------------------
-    # Return for template
-    # ----------------------------
+    # Orient
+    data = display_df.to_dict(orient="records")
+
     return render(request, "Demo/tracked_customers.html", {
-        "data": display_df,
+        "data": data,
     })
 
 
@@ -5496,7 +5497,7 @@ def update_tracked_customers(new_event):
     print("Normalized details:", details)
 
     # --- Handle customer identity ---
-    customer_id = new_event.get("Customer_ID")
+    customer_id = str(new_event.get("Customer_ID") or "").strip()
     visitor_id = str(new_event.get("Visitor_ID")).strip()
     session_id = str(new_event.get("Session_ID")).strip()
     sc_id = str(new_event.get("SleecID")).strip()
@@ -5538,8 +5539,10 @@ def update_tracked_customers(new_event):
         "Anonymous:", is_anonymous
     )
 
-    if customer_id in customer_df["Customer_ID"].values:
-        row_idx = customer_df.index[customer_df["Customer_ID"] == customer_id][0]
+    if str(customer_id) in customer_df["Customer_ID"].astype(str).values:
+        row_idx = customer_df.index[
+            customer_df["Customer_ID"].astype(str) == str(customer_id)
+        ][0]
         row = customer_df.loc[row_idx].copy()
         print("Existing customer found at index", row_idx)
     else:
