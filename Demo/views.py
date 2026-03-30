@@ -5179,78 +5179,63 @@ def view_tracked_customers(request):
     including UNKNOWN_CAMPAIGN counts by Attribution_Type.
     """
 
-    tracked_customers = fetch_data_from_supabase_specific("Customer_Tracking")
+    tracked_customers = fetch_data_from_supabase_specific("Customer_Tracking_duplicate")
 
     # ----------------------------
     # Helper functions for formatting
     # ----------------------------
-    def parse_dict(value):
-        """
-        Ensure that the value is a dict, even if stored as a string.
-        """
-        if isinstance(value, dict):
-            return value
-        if pd.isna(value) or value in [None, ""]:
-            return {}
-        try:
-            # Try JSON first
-            return json.loads(value)
-        except Exception:
-            try:
-                # fallback: parse with ast.literal_eval
-                v = ast.literal_eval(value)
-                return v if isinstance(v, dict) else {}
-            except Exception:
-                return {}
+    def safe_dict(d):
+        """Ensure we always have a dict (JSONB comes as dict, None becomes {})."""
+        if isinstance(d, dict):
+            return d
+        return {}
 
     def format_customer_info(info):
-        info = parse_dict(info)
+        info = safe_dict(info)
         name = info.get("name", "")
         email = info.get("email", "")
         mobile = info.get("mobile", "")
         return f"{name}<br>{email}<br>{mobile}"
 
     def format_atc_dict(atc_dict):
-        atc_dict = parse_dict(atc_dict)
+        atc_dict = safe_dict(atc_dict)
         if not atc_dict:
             return ""
         lines = []
-        pending = atc_dict.get("pending", {})
-        history = atc_dict.get("history", {})
+        pending = safe_dict(atc_dict.get("pending"))
+        history = safe_dict(atc_dict.get("history"))
 
         if pending:
             lines.append("<b>Pending ATCs:</b>")
             for camp, data in pending.items():
-                data = parse_dict(data)
+                data = safe_dict(data)
                 lines.append(f"{camp} — count: {data.get('count', 0)}")
         if history:
             lines.append("<b>ATC History:</b>")
             for camp, data in history.items():
-                data = parse_dict(data)
+                data = safe_dict(data)
                 total = data.get("total_credit", 0)
                 orders = len(data.get("orders", []))
                 lines.append(f"{camp} — total_credit: {total} — orders: {orders}")
         return "<br>".join(lines)
 
     def format_purchase_dict(purchase_dict):
-        purchase_dict = parse_dict(purchase_dict)
+        purchase_dict = safe_dict(purchase_dict)
         if not purchase_dict:
             return ""
         lines = []
         for camp, data in purchase_dict.items():
-            data = parse_dict(data)
+            data = safe_dict(data)
             total = data.get("total_revenue", 0)
             orders = len(data.get("orders", []))
             lines.append(f"{camp} — total_revenue: {total} — orders: {orders}")
         return "<br>".join(lines)
 
     def format_unknown_campaigns(unknown_dict):
-        unknown_dict = parse_dict(unknown_dict)
+        unknown_dict = safe_dict(unknown_dict)
         if not unknown_dict:
             return ""
-        lines = []
-        for attr_type, count in unknown_dict.items():
-            lines.append(f"{attr_type} — {count}")
+        lines = [f"{attr_type} — {count}" for attr_type, count in unknown_dict.items()]
         return "<br>".join(lines)
 
     # ----------------------------
@@ -5266,94 +5251,151 @@ def view_tracked_customers(request):
     # Orient
     data = display_df.to_dict(orient="records")
 
-    return render(request, "Demo/tracked_customers.html", {
-        "data": data,
-    })
-
+    return render(request, "Demo/tracked_customers.html", {"data": data})
 
 
 def update_tracked_customers(new_event):
-    import uuid
     print("=== START update_tracked_customers ===")
     print("Incoming event:", new_event)
 
-    customer_df = fetch_data_from_supabase_specific("Customer_Tracking")
+    customer_df = fetch_data_from_supabase_specific("Customer_Tracking_duplicate")
     print("Fetched customer_df:", customer_df.shape)
+
+    # -------------------------------
+    # Helpers
 
     def extract_campaign_key(event):
         source = str(event.get("UTM_Source")).strip() or "UNKNOWN_SOURCE"
         campaign = str(event.get("UTM_Campaign")).strip() or "MISSING_CAMPAIGN"
-        key = f"{source}__{campaign}"
-        print("Extracted campaign key:", key)
-        return key
+        return f"{source}__{campaign}"
 
     def extract_order_id(details):
+
         try:
             if isinstance(details, str):
-                import ast
                 details = ast.literal_eval(details)
 
             if not isinstance(details, dict):
                 return None
 
-            order = details.get("order", {})
-            return order.get("id")
+            return details.get("order", {}).get("id")
 
         except Exception as e:
             print("Error extracting order id:", e)
             return None
 
+
     def extract_order_total(details):
-        import ast
+
         try:
+
             if isinstance(details, str):
                 details = ast.literal_eval(details)
+
             if not isinstance(details, dict):
-                print("Details is not a dict")
                 return 0.0
-            order = details.get("order", {})
-            payment = order.get("payment", {})
-            invoice = payment.get("invoice", [])
-            print("Invoice section:", invoice)
+
+            invoice = details.get("order", {}).get("payment", {}).get("invoice", [])
+
             for item in invoice:
+
                 if item.get("code") == "sub_totals_after_vat":
-                    val = item.get("value_string", "0")
-                    total = float(val.split()[0])
-                    print("Extracted order total:", total)
-                    return total
+                    return round(float(item.get("value", 0)), 2)
+
         except Exception as e:
             print("Error extracting order total:", e)
-        print("Falling back to 0.0")
+
         return 0.0
+
+
+    # -------------------------------
+    # Event Prep
 
     event_type = new_event.get("Event_Type")
     details = normalize_details(new_event.get("Event_Details"))
-    print("Event type:", event_type)
-    print("Normalized details:", details)
 
-    # --- Handle customer identity ---
     customer_id = new_event.get("Customer_ID")
+
     visitor_id = str(new_event.get("Visitor_ID")).strip()
     session_id = str(new_event.get("Session_ID")).strip()
     sc_id = str(new_event.get("SleecID")).strip()
+
     now = get_uae_current_date()
 
-    # If no Customer_ID, generate an anonymous one
+    print(
+        "Customer ID:", customer_id,
+        "Visitor:", visitor_id,
+        "Session:", session_id,
+        "SC:", sc_id
+    )
+
+    # =====================================================
+    # Identity Resolution (Vectorized)
+
+    mask = pd.Series(False, index=customer_df.index)
+
+    if visitor_id and "Visitor_IDs" in customer_df.columns:
+        mask |= customer_df["Visitor_IDs"].apply(
+            lambda d: visitor_id in (d or {})
+        )
+
+    if session_id and "Sessions" in customer_df.columns:
+        mask |= customer_df["Sessions"].apply(
+            lambda d: session_id in (d or {})
+        )
+
+    if sc_id and "sc_IDs" in customer_df.columns:
+        mask |= customer_df["sc_IDs"].apply(
+            lambda d: sc_id in (d or {})
+        )
+
+    matched_rows = customer_df[mask]
+
+    matched_row_idx = None
+
+    if not matched_rows.empty:
+        known = matched_rows[matched_rows["Is_Anonymous"] == False]
+        if not known.empty:
+            matched_row_idx = known.index[0]
+        else:
+            matched_row_idx = matched_rows.index[0]
+
+    # =====================================================
+    # Anonymous >> Known merge
+
+    if matched_row_idx is not None and customer_id:
+
+        existing_row = customer_df.loc[matched_row_idx]
+
+        if existing_row["Is_Anonymous"]:
+
+            print(
+                "Merging anonymous customer",
+                existing_row["Customer_ID"],
+                "into",
+                customer_id
+            )
+
+            customer_df.loc[matched_row_idx, "Customer_ID"] = customer_id
+            customer_df.loc[matched_row_idx, "Is_Anonymous"] = False
+
+
+    # =====================================================
+    # Determine customer row
+
     is_anonymous = False
+
     if not customer_id:
+
         is_anonymous = True
 
-        # Try to find existing anonymous ID for this visitor
-        anon_match = customer_df[
-            customer_df["Visitor_ID"] == visitor_id
-        ]
+        if matched_row_idx is not None:
 
-        if not anon_match.empty:
-            customer_id = int(anon_match.iloc[0]["Customer_ID"])
-            print("Reusing existing anonymous customer ID:", customer_id)
+            customer_id = int(customer_df.loc[matched_row_idx]["Customer_ID"])
+            print("Reusing anonymous id:", customer_id)
 
         else:
-            # Generate new negative ID
+
             min_id = customer_df["Customer_ID"].min()
 
             if pd.isna(min_id) or min_id >= 0:
@@ -5361,32 +5403,36 @@ def update_tracked_customers(new_event):
             else:
                 customer_id = int(min_id) - 1
 
-            print("Generated new anonymous customer ID:", customer_id)
+            print("Generated new anonymous ID:", customer_id)
 
-    print(
-        "Customer ID:", customer_id,
-        "Visitor ID:", visitor_id,
-        "Session ID:", session_id,
-        "SleecID:", sc_id,
-        "Timestamp:", now,
-        "Anonymous:", is_anonymous
-    )
+
+    # =====================================================
+    # Load or create row
 
     if customer_id in customer_df["Customer_ID"].values:
-        row_idx = customer_df.index[customer_df["Customer_ID"] == customer_id][0]
+
+        row_idx = customer_df.index[
+            customer_df["Customer_ID"] == customer_id
+        ][0]
+
         row = customer_df.loc[row_idx].copy()
-        print("Existing customer found at index", row_idx)
+
+        print("Existing customer row found:", row_idx)
+
     else:
+
         print("Creating new customer row")
+
         customer_info = {
             "name": new_event.get("Customer_Name"),
             "email": new_event.get("Customer_Email"),
             "mobile": new_event.get("Customer_Mobile"),
         }
-        # Remove empty values
+
         customer_info = {k: v for k, v in customer_info.items() if v}
 
         row = pd.Series({
+
             "Customer_ID": customer_id,
             "Customer_Info": customer_info,
             "Is_Anonymous": is_anonymous,
@@ -5395,7 +5441,12 @@ def update_tracked_customers(new_event):
             "Purchases": 0,
             "Sessions": {},
             "Updated_at": now,
-            "Distinct_ID": int(get_next_id_from_supabase_compatible_all(name="Customer_Tracking", column="Distinct_ID")),
+            "Distinct_ID": int(
+                get_next_id_from_supabase_compatible_all(
+                    name="Customer_Tracking_duplicate",
+                    column="Distinct_ID"
+                )
+            ),
             "Last_Visit": now,
             "Last_ID_Map": {},
             "Distinct_Checkpoint": 0,
@@ -5403,107 +5454,165 @@ def update_tracked_customers(new_event):
             "Campaign_Contributions_atcs": {"pending": {}, "history": {}},
             "Visitor_IDs": {},
             "sc_IDs": {},
-            "Unknown_Campaign_Attribution_Count": {}
+            "Unknown_Campaign_Attribution_Count": {},
+            "Campaign_Contributions_Per_Purchase": {}
         })
-        customer_df = pd.concat([customer_df, pd.DataFrame([row])], ignore_index=True)
+
+        customer_df = pd.concat(
+            [customer_df, pd.DataFrame([row])],
+            ignore_index=True
+        )
+
         row_idx = customer_df.index[-1]
+
+
+    # -------------------------------
+    # Load dict fields
 
     sessions = ensure_dict(row.get("Sessions"))
     visitor_ids = ensure_dict(row.get("Visitor_IDs"))
     sc_ids = ensure_dict(row.get("sc_IDs"))
+
     atc_dict = ensure_dict(row.get("Campaign_Contributions_atcs"))
     purchase_dict = ensure_dict(row.get("Campaign_Contributions_Purchases"))
+    per_purchase_dict = ensure_dict(row.get("Campaign_Contributions_Per_Purchase"))
+
     if "pending" not in atc_dict:
         atc_dict = {"pending": {}, "history": {}}
 
-    # --- Update sessions / IDs ---
-    sessions[session_id] = sessions.get(session_id, 0) + 1
-    visitor_ids[visitor_id] = visitor_ids.get(visitor_id, 0) + 1
-    sc_ids[sc_id] = sc_ids.get(sc_id, 0) + 1
 
-    # --- Event handling ---
+    # -------------------------------
+    # Update identity maps
+
+    if session_id:
+        sessions[session_id] = sessions.get(session_id, 0) + 1
+
+    if visitor_id:
+        visitor_ids[visitor_id] = visitor_ids.get(visitor_id, 0) + 1
+
+    if sc_id:
+        sc_ids[sc_id] = sc_ids.get(sc_id, 0) + 1
+
+
+    # =====================================================
+    # EVENT HANDLING
+
     if event_type == "add_to_cart":
-        print("Processing add_to_cart event")
+
         row["Add_to_Cart"] = int(row.get("Add_to_Cart", 0)) + 1
+
         campaign_key = extract_campaign_key(new_event)
+
         atc_entry = atc_dict["pending"].get(campaign_key, {
-            "utm_source": str(new_event.get("UTM_Source")).strip(),
-            "utm_campaign": str(new_event.get("UTM_Campaign")).strip() or "MISSING_CAMPAIGN",
+
+            "utm_source": new_event.get("UTM_Source"),
+            "utm_campaign": new_event.get("UTM_Campaign") or "MISSING_CAMPAIGN",
             "events": [],
             "count": 0
+
         })
-        atc_entry["events"].append({"timestamp": now, "details": details})
+
+        atc_entry["events"].append({
+            "timestamp": now,
+            "details": details
+        })
+
         atc_entry["count"] += 1
         atc_dict["pending"][campaign_key] = atc_entry
-        print("Updated ATC pending dict:", atc_dict["pending"])
+
 
     elif event_type == "purchase":
-        print("Processing purchase event")
+
         row["Purchases"] = int(row.get("Purchases", 0)) + 1
+
         order_total = extract_order_total(details)
         order_id = extract_order_id(details)
-        print("Order ID:", order_id)
+
         purchase_campaign_key = extract_campaign_key(new_event)
 
-        # Process pending ATCs (25% credit)
-        if atc_dict["pending"]:
-            for camp, data in atc_dict["pending"].items():
-                credit = order_total * 0.25
-                hist_entry = atc_dict["history"].get(camp, {
-                    "utm_source": str(data.get("utm_source")).strip(),
-                    "utm_campaign": str(data.get("utm_campaign")).strip(),
-                    "total_credit": 0,
-                    "orders": []
-                })
-                hist_entry["total_credit"] += credit
-                hist_entry["orders"].append({"order_id": order_id, "timestamp": now, "credit": credit, "order_total": order_total})
-                atc_dict["history"][camp] = hist_entry
+        purchase_entry = {
+            "timestamp": now,
+            "order_total": order_total,
+            "campaigns": {}
+        }
+
+        remaining_credit = order_total
+
+        for camp, data in atc_dict["pending"].items():
+
+            if camp == purchase_campaign_key:
+                continue
+
+            credit = order_total * 0.25
+            remaining_credit -= credit
+
+            purchase_entry["campaigns"][camp] = {
+                "type": "atc",
+                "credit": credit
+            }
+
+        purchase_entry["campaigns"][purchase_campaign_key] = {
+            "type": "purchase",
+            "credit": remaining_credit
+        }
+
+        per_purchase_dict[str(order_id)] = purchase_entry
+
         atc_dict["pending"] = {}
 
-        # Add purchase revenue
-        purchase_entry = purchase_dict.get(purchase_campaign_key, {
+        purchase_entry_existing = purchase_dict.get(purchase_campaign_key, {
+
             "utm_source": str(new_event.get("UTM_Source")).strip(),
             "utm_campaign": str(new_event.get("UTM_Campaign")).strip() or "MISSING_CAMPAIGN",
             "total_revenue": 0,
             "orders": []
+
         })
-        purchase_entry["total_revenue"] += order_total
-        purchase_entry["orders"].append({"order_id": order_id, "timestamp": now, "revenue": order_total})
-        purchase_dict[purchase_campaign_key] = purchase_entry
-        print("Updated purchase dict:", purchase_dict)
 
-    # --- Customer LTV ---
-    customer_ltv = sum(v.get("total_revenue", 0) for v in purchase_dict.values()) + \
-                   sum(v.get("total_credit", 0) for v in atc_dict.get("history", {}).values())
-    print("Customer LTV:", customer_ltv)
+        purchase_entry_existing["total_revenue"] += order_total
 
-    # --- Track UNKNOWN_CAMPAIGN by Attribution_Type ---
-    utm_campaign = str(new_event.get("UTM_Campaign")).strip() or "MISSING_CAMPAIGN"
-    attribution_type = str(new_event.get("Attribution_Type", "UNKNOWN_ATTRIBUTION")).strip()
-    unknown_counts = ensure_dict(row.get("Unknown_Campaign_Attribution_Count", {}))
-    if utm_campaign == "MISSING_CAMPAIGN":
-        unknown_counts[attribution_type] = unknown_counts.get(attribution_type, 0) + 1
-    print("Unknown Campaign Counts:", unknown_counts)
+        purchase_entry_existing["orders"].append({
+            "order_id": order_id,
+            "timestamp": now,
+            "revenue": order_total
+        })
 
-    # --- Prepare row dict ---
+        purchase_dict[purchase_campaign_key] = purchase_entry_existing
+
+
+    # =====================================================
+    # LTV
+
+    customer_ltv = (
+        sum(v.get("total_revenue", 0) for v in purchase_dict.values())
+        + sum(v.get("total_credit", 0) for v in atc_dict.get("history", {}).values())
+    )
+
+
+    # =====================================================
+    # Prepare row
+
     row_dict = row.to_dict()
-    row_dict["Sessions"] = str(sessions)
-    row_dict["Visitor_IDs"] = str(visitor_ids)
-    row_dict["sc_IDs"] = str(sc_ids)
-    row_dict["Campaign_Contributions_atcs"] = str(atc_dict)
-    row_dict["Campaign_Contributions_Purchases"] = str(purchase_dict)
-    row_dict["Customer_Info"] = str(row_dict.get("Customer_Info", {}))
+
+    row_dict["Sessions"] = sessions
+    row_dict["Visitor_IDs"] = visitor_ids
+    row_dict["sc_IDs"] = sc_ids
+    row_dict["Campaign_Contributions_atcs"] = atc_dict
+    row_dict["Campaign_Contributions_Per_Purchase"] = per_purchase_dict
+    row_dict["Campaign_Contributions_Purchases"] = purchase_dict
+    row_dict["Customer_Info"] = row_dict.get("Customer_Info", {})
     row_dict["Updated_at"] = now
     row_dict["Last_Visit"] = now
     row_dict["Visitor_ID"] = visitor_id
     row_dict["Customer_LTV"] = customer_ltv
-    row_dict["Unknown_Campaign_Attribution_Count"] = str(unknown_counts)
     row_dict["Is_Anonymous"] = is_anonymous
 
-    # --- Upload ---
     df_to_upload = pd.DataFrame([row_dict])
-    print("Uploading row_dict to Supabase:", row_dict)
-    upsert_partial(df_to_upload, 'Customer_Tracking', 'Customer_ID')
+
+    print("Uploading row:", row_dict)
+
+    upsert_partial(df_to_upload, "Customer_Tracking_duplicate", "Customer_ID")
 
     print("=== END update_tracked_customers ===\n")
+
     return True
