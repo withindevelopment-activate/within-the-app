@@ -5468,6 +5468,22 @@ def update_tracked_customers(new_event):
         print("Extracted campaign key:", key)
         return key
 
+    def extract_order_id(details):
+        try:
+            if isinstance(details, str):
+                import ast
+                details = ast.literal_eval(details)
+
+            if not isinstance(details, dict):
+                return None
+
+            order = details.get("order", {})
+            return order.get("id")
+
+        except Exception as e:
+            print("Error extracting order id:", e)
+            return None
+
     def extract_order_total(details):
         import ast
         try:
@@ -5606,6 +5622,8 @@ def update_tracked_customers(new_event):
         print("Processing purchase event")
         row["Purchases"] = int(row.get("Purchases", 0)) + 1
         order_total = extract_order_total(details)
+        order_id = extract_order_id(details)
+        print("Order ID:", order_id)
         purchase_campaign_key = extract_campaign_key(new_event)
 
         # Process pending ATCs (25% credit)
@@ -5619,7 +5637,7 @@ def update_tracked_customers(new_event):
                     "orders": []
                 })
                 hist_entry["total_credit"] += credit
-                hist_entry["orders"].append({"timestamp": now, "credit": credit, "order_total": order_total})
+                hist_entry["orders"].append({"order_id": order_id, "timestamp": now, "credit": credit, "order_total": order_total})
                 atc_dict["history"][camp] = hist_entry
         atc_dict["pending"] = {}
 
@@ -5631,7 +5649,7 @@ def update_tracked_customers(new_event):
             "orders": []
         })
         purchase_entry["total_revenue"] += order_total
-        purchase_entry["orders"].append({"timestamp": now, "revenue": order_total})
+        purchase_entry["orders"].append({"order_id": order_id, "timestamp": now, "revenue": order_total})
         purchase_dict[purchase_campaign_key] = purchase_entry
         print("Updated purchase dict:", purchase_dict)
 
