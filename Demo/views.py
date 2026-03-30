@@ -2873,7 +2873,8 @@ def save_tracking(request):
         # event_type == purchase
         # final_source still weak
         # first page / referrer is deep inside store (not homepage) -- without this condition.
-        # fingerprint_id exists (even if from another visitor_id) -- instead of fingerprint we'll be looking at our sleecid        
+        # fingerprint_id exists (even if from another visitor_id) -- instead of fingerprint we'll be looking at our sleecid  
+        sleec_id = str(data.get('device_id') or "").strip()      
         if event_type == "purchase" and final_source in weak_sources:
 
             print("[FINGERPRINT CHECK] purchase + weak source + deep store entry")
@@ -3035,8 +3036,6 @@ def save_tracking(request):
 
         
         #### Section to get the best utms for this source
-        safe_sleec_id = sleec_id or ""
-        safe_mobile = mobile or ""
         history_rows = get_history_rows(session_id, visitor_id, safe_mobile, safe_sleec_id)
         #history_rows = get_history_rows(session_id, visitor_id, mobile, sleec_id)
         ## Avoid dupes
