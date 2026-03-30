@@ -418,13 +418,17 @@
             }
         }
 
-        // Return the exact same structure as getUTMParams()
+        const formatValue = (val) => {
+            if (!val || typeof val !== 'string') return null;
+            return val.replace(/\+/g, ' ');
+        };
+
         return {
-            utm_source: savedData?.utm_source || null,
-            utm_medium: savedData?.utm_medium || null,
-            utm_campaign: savedData?.utm_campaign || null,
-            utm_term: savedData?.utm_term || null,
-            utm_content: savedData?.utm_content || null,
+            utm_source: formatValue(savedData?.utm_source),
+            utm_medium: formatValue(savedData?.utm_medium),
+            utm_campaign: formatValue(savedData?.utm_campaign),
+            utm_term: formatValue(savedData?.utm_term),
+            utm_content: formatValue(savedData?.utm_content),
         };
     }
 
