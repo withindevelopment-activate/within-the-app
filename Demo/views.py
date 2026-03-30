@@ -5434,10 +5434,9 @@ def update_tracked_customers(new_event):
             if camp == purchase_campaign_key:
                 continue
             credit = order_total * 0.25
-            remaining_credit -= credit
             purchase_entry["campaigns"][camp] = {"type": "atc", "credit": credit}
 
-        purchase_entry["campaigns"][purchase_campaign_key] = {"type": "purchase", "credit": remaining_credit}
+        purchase_entry["campaigns"][purchase_campaign_key] = {"type": "purchase", "credit": order_total}
         per_purchase_dict[str(order_id)] = purchase_entry
         atc_dict["pending"] = {}
 
@@ -5450,6 +5449,14 @@ def update_tracked_customers(new_event):
         purchase_entry_existing["total_revenue"] += order_total
         purchase_entry_existing["orders"].append({"order_id": order_id, "timestamp": now, "revenue": order_total})
         purchase_dict[purchase_campaign_key] = purchase_entry_existing
+
+    # --- Track UNKNOWN_CAMPAIGN by Attribution_Type ---
+    utm_campaign = str(new_event.get("UTM_Campaign")).strip() or "MISSING_CAMPAIGN"
+    attribution_type = str(new_event.get("Attribution_Type", "UNKNOWN_ATTRIBUTION")).strip()
+    unknown_counts = ensure_dict(row.get("Unknown_Campaign_Attribution_Count", {}))
+    if utm_campaign == "MISSING_CAMPAIGN":
+        unknown_counts[attribution_type] = unknown_counts.get(attribution_type, 0) + 1
+    print("Unknown Campaign Counts:", unknown_counts)
 
     # -------------------------------
     # Compute LTV
@@ -5473,7 +5480,7 @@ def update_tracked_customers(new_event):
     row_dict["Visitor_ID"] = visitor_id
     row_dict["Customer_LTV"] = customer_ltv
     row_dict["Is_Anonymous"] = is_anonymous
-    row_dict["Which_Update"] = "300326 1018PM"
+    row_dict["Which_Update"] = "300326 1109PM"
 
     df_to_upload = pd.DataFrame([row_dict])
 
