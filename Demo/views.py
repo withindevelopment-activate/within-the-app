@@ -2184,7 +2184,8 @@ def is_duplicate_event(event_type, identity_type, identity_value):
     if not identity_type or not identity_value:
         return False
 
-    col = "Order_ID" if identity_type == "order_id" else "Cart_ID"
+    #col = "Order_ID" if identity_type == "order_id" else "Cart_ID"
+    col = "Order_ID"
 
     res = (
         supabase.table("Tracking_Visitors_duplicate")
@@ -2288,8 +2289,8 @@ def save_tracking(request):
         if identity_type:
             dprint(f"[EVENT IDENTITY] {identity_type}={identity_value}")
 
-            if is_duplicate_event(event_type, identity_type, identity_value):
-                dprint("[DUPLICATE EVENT] skipping insert")
+            if str(identity_type).strip() == 'purchase' and is_duplicate_event(event_type, identity_type, identity_value):
+                dprint(f"[DUPLICATE EVENT] SKIPPING PURCHASE {identity_value}")
                 return JsonResponse({"status": "duplicate_skipped"})
 
         
