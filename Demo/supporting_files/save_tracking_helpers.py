@@ -247,40 +247,38 @@ def recover_utms(final_source, incoming_utms, all_rows):
 
 
 def get_history_rows(session_id=None, visitor_id=None, mobile=None, sleec_id=None):
+    """
+    Fetch historical tracking rows from Tracking_Visitors_duplicate.
+    Queries each filter separately to fully use indexes, then merges results.
+    """
+    filters_map = {
+        "Session_ID": session_id,
+        "Visitor_ID": visitor_id,
+        "Customer_Mobile": mobile,
+        "SleecID": sleec_id
+    }
 
-    filters = []
+    results = []
 
-    if session_id:
-        filters.append(f"Session_ID.eq.{session_id}")
+    # Query each filter separately to leverage indexes
+    for col, val in filters_map.items():
+        if val:
+            try:
+                res = supabase.table("Tracking_Visitors_duplicate") \
+                    .select(
+                        "Distinct_ID, Session_ID, Visitor_ID, Customer_Mobile, SleecID, "
+                        "UTM_Source, UTM_Medium, UTM_Campaign, UTM_Term, UTM_Content, "
+                        "Timezone, Screen_Resolution"
+                    ) \
+                    .eq(col, val) \
+                    .execute()
+                
+                if res.data:
+                    results.extend(res.data)
+            except Exception as e:
+                print(f"[UTM HISTORY FETCH ERROR] {col}", e)
 
-    if visitor_id:
-        filters.append(f"Visitor_ID.eq.{visitor_id}")
-
-    if mobile:
-        filters.append(f"Customer_Mobile.eq.{mobile}")
-
-    if sleec_id:
-        filters.append(f"SleecID.eq.{sleec_id}")
-
-    if not filters:
-        return []
-
-    try:
-
-        query = ",".join(filters)
-
-        res = (
-            supabase.table("Tracking_Visitors_duplicate")
-            .select("Session_ID, Visitor_ID, Customer_Mobile, SleecID, UTM_Source, UTM_Medium, UTM_Campaign, UTM_Term, UTM_Content, Timezone, Screen_Resolution" )
-            .or_(query)
-            .execute()
-        )
-
-        return res.data or []
-
-    except Exception as e:
-        print("[UTM HISTORY FETCH ERROR]", e)
-        return []
+    return results
 
 
 def backfill_missing_utms(
