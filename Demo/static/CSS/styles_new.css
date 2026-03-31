@@ -709,4 +709,58 @@ body {
     }
     .modal-buttons {
       margin-top: 10px;
-    }
+}
+
+
+.order-box{
+border:1px solid #ddd;
+border-radius:6px;
+padding:8px;
+margin-bottom:8px;
+background:#fafafa;
+}
+
+.order-header{
+font-weight:600;
+margin-bottom:6px;
+}
+
+.campaign-row{
+display:grid;
+grid-template-columns:220px 1fr 80px;
+align-items:center;
+gap:8px;
+margin-bottom:4px;
+font-size:13px;
+}
+
+.credit-bar{
+background:#eee;
+height:8px;
+border-radius:5px;
+overflow:hidden;
+}
+
+.credit-fill{
+height:100%;
+background:#4CAF50;
+}
+
+.credit-value{
+font-size:12px;
+text-align:right;
+}
+
+.unknown-social{
+background:#fff3cd;
+border-left:3px solid #f39c12;
+padding-left:4px;
+}
+
+.alert-warning{
+background:#fff3cd;
+padding:10px;
+margin-bottom:15px;
+border-radius:6px;
+font-weight:500;
+}

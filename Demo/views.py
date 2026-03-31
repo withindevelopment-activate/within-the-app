@@ -5819,10 +5819,9 @@ def view_tracked_customers(request):
     tracked_customers = fetch_data_from_supabase_specific("Customer_Tracking_duplicate")
 
     # ----------------------------
-    # Helper functions for formatting
-    # ----------------------------
+    # Helper functions
+
     def safe_dict(d):
-        """Ensure we always have a dict (JSONB comes as dict, None becomes {})."""
         if isinstance(d, dict):
             return d
         return {}
@@ -5838,6 +5837,7 @@ def view_tracked_customers(request):
         atc_dict = safe_dict(atc_dict)
         if not atc_dict:
             return ""
+
         lines = []
         pending = safe_dict(atc_dict.get("pending"))
         history = safe_dict(atc_dict.get("history"))
@@ -5846,49 +5846,154 @@ def view_tracked_customers(request):
             lines.append("<b>Pending ATCs:</b>")
             for camp, data in pending.items():
                 data = safe_dict(data)
-                lines.append(f"{camp} — count: {data.get('count', 0)}")
+                lines.append(f"{camp} — count: {data.get('count',0)}")
+
         if history:
             lines.append("<b>ATC History:</b>")
             for camp, data in history.items():
                 data = safe_dict(data)
-                total = data.get("total_credit", 0)
-                orders = len(data.get("orders", []))
+                total = data.get("total_credit",0)
+                orders = len(data.get("orders",[]))
                 lines.append(f"{camp} — total_credit: {total} — orders: {orders}")
+
         return "<br>".join(lines)
 
     def format_purchase_dict(purchase_dict):
         purchase_dict = safe_dict(purchase_dict)
         if not purchase_dict:
             return ""
+
         lines = []
         for camp, data in purchase_dict.items():
             data = safe_dict(data)
-            total = data.get("total_revenue", 0)
-            orders = len(data.get("orders", []))
+            total = data.get("total_revenue",0)
+            orders = len(data.get("orders",[]))
             lines.append(f"{camp} — total_revenue: {total} — orders: {orders}")
+
         return "<br>".join(lines)
 
-    def format_unknown_campaigns(unknown_dict):
-        unknown_dict = safe_dict(unknown_dict)
-        if not unknown_dict:
+    # ----------------------------
+    # Per-purchase attribution formatter
+    # ----------------------------
+
+    def format_per_purchase(per_purchase_dict):
+
+        per_purchase_dict = safe_dict(per_purchase_dict)
+        if not per_purchase_dict:
             return ""
-        lines = [f"{attr_type} — {count}" for attr_type, count in unknown_dict.items()]
-        return "<br>".join(lines)
+
+        html = []
+
+        for order_id, order_data in per_purchase_dict.items():
+
+            order_data = safe_dict(order_data)
+            order_total = order_data.get("order_total",0)
+            campaigns = safe_dict(order_data.get("campaigns"))
+
+            html.append(f"<div class='order-box'>")
+            html.append(f"<div class='order-header'>Order {order_id} — {order_total}</div>")
+
+            for key, camp_data in campaigns.items():
+
+                camp_data = safe_dict(camp_data)
+
+                if "__" in key:
+                    source, campaign = key.split("__",1)
+                else:
+                    source, campaign = key, ""
+
+                credit = camp_data.get("credit",0)
+
+                percent = 0
+                if order_total:
+                    percent = round((credit/order_total)*100)
+
+                highlight = ""
+                if "missing_campaign" in campaign.lower() and source != "direct":
+                    highlight = "unknown-social"
+
+                html.append(f"""
+                <div class='campaign-row {highlight}'>
+                    <div class='campaign-label'>
+                        <b>{source}</b> — {campaign}
+                    </div>
+
+                    <div class='credit-bar'>
+                        <div class='credit-fill' style='width:{percent}%'></div>
+                    </div>
+
+                    <div class='credit-value'>
+                        {credit} ({percent}%)
+                    </div>
+                </div>
+                """)
+
+            html.append("</div>")
+
+        return "".join(html)
 
     # ----------------------------
-    # Format the dict columns for display
+    # Count unknown social orders
     # ----------------------------
+
+    def count_unknown_social_orders(df):
+
+        social_sources = {
+            "instagram","facebook","tiktok","snapchat",
+            "reddit","pinterest","linkedin","x"
+        }
+
+        count = 0
+
+        for row in df["Campaign_Contributions_Per_Purchase"]:
+
+            row = safe_dict(row)
+
+            for order in row.values():
+
+                campaigns = safe_dict(order.get("campaigns"))
+
+                for key in campaigns.keys():
+
+                    if "__" in key:
+                        source, campaign = key.split("__",1)
+                    else:
+                        source, campaign = key, ""
+
+                    if (
+                        source in social_sources
+                        and "missing_campaign" in campaign.lower()
+                    ):
+                        count += 1
+                        break
+
+        return count
+
+    unknown_social_orders = count_unknown_social_orders(tracked_customers)
+
+    # ----------------------------
+    # Format dataframe
+    # ----------------------------
+
     display_df = tracked_customers.copy()
+
     display_df["Customer_Info"] = display_df["Customer_Info"].apply(format_customer_info)
     display_df["Campaign_Contributions_atcs"] = display_df["Campaign_Contributions_atcs"].apply(format_atc_dict)
     display_df["Campaign_Contributions_Purchases"] = display_df["Campaign_Contributions_Purchases"].apply(format_purchase_dict)
-    display_df["Unknown_Campaign_Attribution_Count"] = display_df["Unknown_Campaign_Attribution_Count"].apply(format_unknown_campaigns)
 
-    # ----------------------------
-    # Orient
+    display_df["Campaign_Contributions_Per_Purchase"] = \
+        display_df["Campaign_Contributions_Per_Purchase"].apply(format_per_purchase)
+
     data = display_df.to_dict(orient="records")
 
-    return render(request, "Demo/tracked_customers.html", {"data": data})
+    return render(
+        request,
+        "Demo/tracked_customers.html",
+        {
+            "data": data,
+            "unknown_social_orders": unknown_social_orders
+        }
+    )
 
 
 def update_tracked_customers(new_event):

@@ -3,6 +3,11 @@
 {% block title %} Tracked Customers - Purchases {% endblock title %}
 
 {% block content %}
+<div class="alert-warning">
+Unknown campaign orders from social media:
+<b>{{ unknown_social_orders }}</b>
+</div>
+<br><br>
 <div class="data-wrap">
   <div class="data-viewport">
     <div class="data-scroller" role="region" aria-label="Scrollable data table" tabindex="0">
@@ -13,10 +18,11 @@
             <th>Customer_Info</th>
             <th>Add_to_Cart</th>
             <th>Purchases</th>
-            <th>Last_Visit</th>
+            <th>Order Attribution</th>
             <th>Campaign_ATC_Contributions</th>
             <th>Campaign_Purchase_Contributions</th>
             <th>Customer_LTV</th>
+            <th>Last_Visit</th>
           </tr>
         </thead>
         <tbody>
@@ -26,10 +32,11 @@
             <td>{{ row.Customer_Info|safe }}</td>
             <td>{{ row.Add_to_Cart|default:"0" }}</td>
             <td>{{ row.Purchases|default:"0" }}</td>
-            <td>{{ row.Updated_at|default:"N/A" }}</td>
+            <td>{{ row.Campaign_Contributions_Per_Purchase|safe }}</td>
             <td>{{ row.Campaign_Contributions_atcs|safe }}</td>
             <td>{{ row.Campaign_Contributions_Purchases|safe }}</td>
             <td>{{ row.Customer_LTV|default:"0" }}</td>
+            <td>{{ row.Updated_at|default:"N/A" }}</td>
           </tr>
           {% empty %}
           <tr>
