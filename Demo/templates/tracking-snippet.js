@@ -365,7 +365,10 @@
     }
 
     function getUTMParams() {
-        const p = new URLSearchParams(window.location.search);
+        const up = new URLSearchParams(window.location.search);
+        const ur = new URLSearchParams(document.referrer ? new URL(document.referrer).search : '');
+
+        const p = up? up : ur;
 
         const formatValue = (val) => {
             if (!val || typeof val !== 'string') return null;
