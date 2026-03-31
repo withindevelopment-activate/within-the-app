@@ -53,7 +53,6 @@ def recover_utms(final_source, incoming_utms, all_rows):
 
     for i, r in enumerate(all_rows):
 
-        print(f"\nRow {i} BEFORE CLEAN:", r)
 
         r["UTM_Source"] = (r.get("UTM_Source") or "").strip().lower()
         r["UTM_Medium"] = (r.get("UTM_Medium") or "").strip()
@@ -61,7 +60,6 @@ def recover_utms(final_source, incoming_utms, all_rows):
         r["UTM_Term"] = (r.get("UTM_Term") or "").strip()
         r["UTM_Content"] = (r.get("UTM_Content") or "").strip()
 
-        print(f"Row {i} AFTER CLEAN:", r)
 
     utm_medium, utm_campaign, utm_term, utm_content = incoming_utms
 

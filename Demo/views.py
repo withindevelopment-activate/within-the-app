@@ -3438,7 +3438,8 @@ def save_tracking(request):
         # Clean UTMs once
         for r in history_rows:
             clean_utm(r)
-            print("CEALNED HISTORY ROWS")
+        
+        print("CEALNED HISTORY ROWS")
 
         # ---------------------- SESSION LOGIC ----------------------
 
@@ -6167,12 +6168,12 @@ def update_tracked_customers(new_event):
         row["Purchases"] = int(row.get("Purchases", 0)) + 1
         order_total = extract_order_total(details)
         order_id = extract_order_id(details)
-        purchase_campaign_key = extract_campaign_key(new_event)
+        purchase_campaign_key = extract_campaign_key(new_event).lower()
         purchase_entry = {"timestamp": now, "order_total": order_total, "campaigns": {}}
         remaining_credit = order_total
 
         for camp, data in atc_dict["pending"].items():
-            if camp == purchase_campaign_key:
+            if camp.lower() == purchase_campaign_key:
                 continue
             credit = order_total * 0.25
             purchase_entry["campaigns"][camp] = {"type": "atc", "credit": credit}
