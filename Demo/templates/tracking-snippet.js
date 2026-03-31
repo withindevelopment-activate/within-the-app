@@ -1,9 +1,9 @@
-(function () {
-    var fpScript = document.createElement("script");
-    fpScript.src = "https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs@3/dist/fp.min.js";
-    fpScript.async = true;
-    document.head.appendChild(fpScript);
-})();
+// (function () {
+//     var fpScript = document.createElement("script");
+//     fpScript.src = "https://cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs@3/dist/fp.min.js";
+//     fpScript.async = true;
+//     document.head.appendChild(fpScript);
+// })();
 
 (function () {
     // ------------------- Helpers -------------------
@@ -321,30 +321,30 @@
         appendSleeid(platformIdentity.device_id);
     }
     // ------------------- Fingerprint Identifiers -------------------
-    let fingerprintPromise = null;
+    // let fingerprintPromise = null;
 
-    function getFingerprint() {
-        if (fingerprintPromise) return fingerprintPromise;
+    // function getFingerprint() {
+    //     if (fingerprintPromise) return fingerprintPromise;
 
-        fingerprintPromise = new Promise((resolve) => {
-            if (!window.FingerprintJS) {
-                resolve(null);
-                return;
-            }
+    //     fingerprintPromise = new Promise((resolve) => {
+    //         if (!window.FingerprintJS) {
+    //             resolve(null);
+    //             return;
+    //         }
 
-            FingerprintJS.load()
-                .then(fp => fp.get())
-                .then(result => {
-                    resolve({
-                        visitor_id: result.visitorId,
-                        confidence: result.confidence?.score || null
-                    });
-                })
-                .catch(() => resolve(null));
-        });
+    //         FingerprintJS.load()
+    //             .then(fp => fp.get())
+    //             .then(result => {
+    //                 resolve({
+    //                     visitor_id: result.visitorId,
+    //                     confidence: result.confidence?.score || null
+    //                 });
+    //             })
+    //             .catch(() => resolve(null));
+    //     });
 
-        return fingerprintPromise;
-    }
+    //     return fingerprintPromise;
+    // }
     // ------------------- Fingerprint End -------------------
 
     function getOrCreateCookie(name, days = 365) {
@@ -542,7 +542,7 @@
     const BACKEND_URL = "https://testing-within.onrender.com";
 
     
-    async function sendTrackingEvent(type, details = {}) {
+    function sendTrackingEvent(type, details = {}) {
         setUTMCookie();
         const urlUtms = getUTMParams();
         const cookieUtms = getUTMFromCookie();
@@ -552,7 +552,7 @@
         const inferred = inferSource(utm, referrer);
         const firstTouchContext = identifyFirstTouch();
 
-        const fingerprint = await getFingerprint(); 
+        // const fingerprint = await getFingerprint(); 
 
         const platformIdentity = getOrCreateDeviceIdentity() || {};
         const cookieIntel = extractAnalyticsCookies();
@@ -568,8 +568,8 @@
             event_type: type,
             event_details: details,
 
-            fingerprint_id: fingerprint?.visitor_id || null,
-            fingerprint_confidence: fingerprint?.confidence || null,
+            // fingerprint_id: fingerprint?.visitor_id || null,
+            // fingerprint_confidence: fingerprint?.confidence || null,
 
             device_id: platformIdentity.device_id,
             sleecid: platformIdentity.device_id,
