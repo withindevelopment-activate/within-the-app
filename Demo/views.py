@@ -3607,113 +3607,71 @@ def save_tracking(request):
         # --------------------------------------------------
         # SLEECID / FINGERPRINT RESCUE BLOCK (OPTIMIZED)
         # --------------------------------------------------
-        
-
         if event_type == "purchase" and final_source in weak_sources:
 
             dprint("[FINGERPRINT CHECK] purchase + weak source")
 
-            # Resolve SleecID from history rows if missing
+            # Ensure we have sleec_id from event or history
             if not sleec_id:
+                sleec_id = next((r.get("SleecID") for r in history_rows if r.get("SleecID")), None)
 
-                for r in history_rows:
-                    if r.get("SleecID"):
-                        sleec_id = r["SleecID"]
-                        break
+            if not sleec_id:
+                dprint("[SLEECID CHECK] no SleecID found")
+            else:
+                dprint(f"[SLEECID FOUND] {sleec_id} >> processing")
 
-            if sleec_id:
-
+                # ------------------- Step 1: Prefix extraction -------------------
                 prefix_to_source = {
-                    "insta": "instagram",
-                    "fb": "facebook",
-                    "tiktok": "tiktok",
-                    "snap": "snapchat",
-                    "google": "google",
-                    "x": "x",
-                    "li": "linkedin",
-                    "pin": "pinterest",
-                    "rdt": "reddit",
-                    "wa": "whatsapp",
-                    "tg": "telegram",
-                    "web": "web",
+                    "insta": "instagram", "fb": "facebook", "tiktok": "tiktok", "snap": "snapchat",
+                    "google": "google", "x": "x", "li": "linkedin", "pin": "pinterest",
+                    "rdt": "reddit", "wa": "whatsapp", "tg": "telegram", "web": "web",
                 }
 
                 try:
-
                     source_key = sleec_id.split("_", 1)[0].lower()
                     extracted_source = prefix_to_source.get(source_key)
-
                     if extracted_source:
-
                         dprint(f"[SLEECID PREFIX] extracted source -- {extracted_source}")
                         final_source = pick_stronger_source(final_source, extracted_source)
-
                 except Exception as e:
                     dprint(f"[SLEECID PREFIX ERROR] {e}")
 
-                dprint(f"[SLEECID FOUND] {sleec_id} >> checking history")
+                # ------------------- Step 2: Fetch all rows with this SleecID -------------------
+                sleec_rows = fetch_data_from_supabase_specific("Tracking_Visitors_duplicate", 
+                                                               filters = {
+                                                               "SleecID": ('eq', sleec_id)}
+                                                                    )
+                sleec_rows = [clean_utm(r) for r in sleec_rows]
 
-                # -----------------------------------------
-                # Get rows with same SleecID
-                # -----------------------------------------
-                rows = [r for r in history_rows if r.get("SleecID") == sleec_id]
-
-                # -----------------------------------------
-                # Filter rows by device match
-                # -----------------------------------------
-
+                # ------------------- Step 3: Device filtering -------------------
                 current_timezone = str(client_info.get("timezone")).strip()
                 current_resolution = str(client_info.get("screen_resolution")).strip()
 
-                device_matched_rows = []
-
-                for r in rows:
-
-                    if (
-                        r.get("Timezone") == current_timezone
-                        and r.get("Screen_Resolution") == current_resolution
-                    ):
-                        device_matched_rows.append(r)
-
-                # fallback if none matched
+                device_matched_rows = [
+                    r for r in sleec_rows
+                    if r.get("Timezone") == current_timezone and r.get("Screen_Resolution") == current_resolution
+                ]
                 if not device_matched_rows:
-                    dprint("[SLEECID] no device match, using raw sleec rows")
-                    device_matched_rows = rows
+                    dprint("[SLEECID] no device match, using all sleec rows")
+                    device_matched_rows = sleec_rows
 
-                # -----------------------------------------
-                # Find strongest source
-                # -----------------------------------------
-
+                # ------------------- Step 4: Pick strongest source -------------------
                 strongest_scid_source = final_source
-
                 for row in device_matched_rows:
-
-                    existing = (row.get("UTM_Source") or "").strip().lower()
-
+                    existing = (row.get("UTM_Source") or "").lower()
                     if source_weight(existing) > source_weight(strongest_scid_source):
                         strongest_scid_source = existing
 
-                # -----------------------------------------
-                # Apply rescue if stronger
-                # -----------------------------------------
-
-                if (
-                    strongest_scid_source != final_source
-                    and strongest_scid_source not in weak_sources
-                ):
-
+                # ------------------- Step 5: Apply rescue if stronger -------------------
+                if strongest_scid_source != final_source and strongest_scid_source not in weak_sources:
                     final_source = strongest_scid_source
                     attribution_type = "scID_rescued_purchase"
-
                     dprint(f"[FINGERPRINT RESCUED] final_source -- {final_source}")
 
                     supabase.table("Tracking_Visitors_duplicate") \
                         .update({"UTM_Source": final_source}) \
                         .eq("SleecID", sleec_id) \
                         .execute()
-
-            else:
-                dprint("[SLEECID CHECK] no Sleecid found")
 
         
         #### Section to get the best utms for this source
