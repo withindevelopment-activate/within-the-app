@@ -271,7 +271,7 @@ def get_history_rows(session_id=None, visitor_id=None, mobile=None, sleec_id=Non
 
         res = (
             supabase.table("Tracking_Visitors_duplicate")
-            .select("UTM_Source, UTM_Medium, UTM_Campaign, UTM_Term, UTM_Content")
+            .select("Session_ID, Visitor_ID, Customer_Mobile, SleecID, UTM_Source, UTM_Medium, UTM_Campaign, UTM_Term, UTM_Content, Timezone, Screen_Resolution" )
             .or_(query)
             .execute()
         )

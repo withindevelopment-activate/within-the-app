@@ -3422,41 +3422,32 @@ def save_tracking(request):
                         strongest_row = r
             return strongest_source, strongest_row
 
-        # ---------------------- FETCH ALL ROWS ONCE ----------------------
-        query_filters = []
+        # ---------------------- FETCH ALL ROWS ONCE --- LET'S GET THE HISTORY ROWS ----------------------
 
-        if session_id:
-            query_filters.append(("Session_ID", session_id))
-        if visitor_id:
-            query_filters.append(("Visitor_ID", visitor_id))
-        if session_customer_info.get("Customer_Mobile"):
-            query_filters.append(("Customer_Mobile", session_customer_info["Customer_Mobile"]))
+        mobile = str(
+            session_customer_info.get("Customer_Mobile")
+            or event_details.get("Customer_Mobile")
+            or ""
+        ).strip()
 
-        # Perform a single fetch for all relevant rows
-        all_rows = []
-        for field, value in query_filters:
-            res = (
-                supabase.table("Tracking_Visitors_duplicate")
-                .select("Session_ID, Visitor_ID, Customer_Mobile, UTM_Source, UTM_Medium, UTM_Campaign, UTM_Term, UTM_Content, Attribution_Type")
-                .eq(field, value)
-                .execute()
-            )
-            all_rows.extend(res.data or [])
+        history_rows = get_history_rows(session_id, visitor_id, mobile, sleec_id)
 
-        # Clean all UTMs
-        for r in all_rows:
+        # Clean UTMs once
+        for r in history_rows:
             clean_utm(r)
 
         # ---------------------- SESSION LOGIC ----------------------
-        session_rows = [r for r in all_rows if r.get("Session_ID") == session_id]
+
+        session_rows = [r for r in history_rows if r.get("Session_ID") == session_id]
+
         if session_rows:
-            # Pick the strongest row based on the sorting logic
+
             row = sorted(
                 session_rows,
                 key=lambda r: (
                     r.get("UTM_Source") in ["", "unknown"],
                     not bool(r.get("UTM_Campaign")),
-                    -sum(bool(r.get(f"UTM_{f}")) for f in ["Medium","Term","Content"])
+                    -sum(bool(r.get(f"UTM_{f}")) for f in ["Medium", "Term", "Content"])
                 )
             )[0]
 
@@ -3469,10 +3460,18 @@ def save_tracking(request):
             allow_upgrade = recorded_source in weak_sources
 
             # CASE 1: Weak vs Weak & explicit Google override
-            if final_source in weak_sources and recorded_source in weak_sources and has_explicit_google(session_rows) and final_source != "google":
+            if (
+                final_source in weak_sources
+                and recorded_source in weak_sources
+                and has_explicit_google(session_rows)
+                and final_source != "google"
+            ):
+
                 final_source = "google"
                 attribution_type = "session_explicit_google_override"
+
                 google_rows = [r for r in session_rows if r["UTM_Source"] == "google"]
+
                 if google_rows:
                     best_google = richest_utm_row(google_rows)
                     utm_medium = best_google.get("UTM_Medium")
@@ -3480,26 +3479,41 @@ def save_tracking(request):
                     utm_term = best_google.get("UTM_Term")
                     utm_content = best_google.get("UTM_Content")
 
-            # CASE 2: Recorded is stronger
+            # CASE 2: Recorded stronger
             elif source_weight(recorded_source) > source_weight(final_source):
+
                 final_source = recorded_source
                 attribution_type = "session_persisted_took_session_source"
+
                 utm_medium = recorded_medium
                 utm_campaign = recorded_campaign
                 utm_term = recorded_term
                 utm_content = recorded_content
 
-            # CASE 3: Upgrade with incoming stronger
-            elif allow_upgrade and source_weight(final_source) > source_weight(recorded_source) and final_source not in weak_sources:
-                attribution_type = "session_upgraded_with_incoming_stronger"
-                # Only update if source changed
-                if recorded_source != final_source:
-                    supabase.table("Tracking_Visitors_duplicate").update({"UTM_Source": final_source}).eq("Session_ID", session_id).execute()
+            # CASE 3: Upgrade with stronger incoming
+            elif (
+                allow_upgrade
+                and source_weight(final_source) > source_weight(recorded_source)
+                and final_source not in weak_sources
+            ):
 
+                attribution_type = "session_upgraded_with_incoming_stronger"
+
+                if recorded_source != final_source:
+
+                    supabase.table("Tracking_Visitors_duplicate") \
+                        .update({"UTM_Source": final_source}) \
+                        .eq("Session_ID", session_id) \
+                        .execute()
+                    
         # ---------------------- VISITOR LOGIC ----------------------
-        visitor_rows = [r for r in all_rows if r.get("Visitor_ID") == visitor_id]
+
+        visitor_rows = [r for r in history_rows if r.get("Visitor_ID") == visitor_id]
+
         if visitor_id and final_source in weak_sources and visitor_rows:
+
             strongest_source, strongest_row = strongest_source_row(visitor_rows, final_source)
+
             if strongest_row:
                 utm_medium = strongest_row.get("UTM_Medium")
                 utm_campaign = strongest_row.get("UTM_Campaign")
@@ -3507,10 +3521,18 @@ def save_tracking(request):
                 utm_content = strongest_row.get("UTM_Content")
 
             # Explicit Google promotion
-            if final_source in weak_sources and strongest_source in weak_sources and has_explicit_google(visitor_rows) and strongest_source != "google":
+            if (
+                final_source in weak_sources
+                and strongest_source in weak_sources
+                and has_explicit_google(visitor_rows)
+                and strongest_source != "google"
+            ):
+
                 final_source = "google"
                 attribution_type = "visitor_explicit_google_override"
+
                 google_rows = [r for r in visitor_rows if r["UTM_Source"] == "google"]
+
                 if google_rows:
                     best_google = richest_utm_row(google_rows)
                     utm_medium = best_google.get("UTM_Medium")
@@ -3518,18 +3540,24 @@ def save_tracking(request):
                     utm_term = best_google.get("UTM_Term")
                     utm_content = best_google.get("UTM_Content")
 
-            # Update only if stronger and not weak
             if strongest_source not in weak_sources and strongest_source != final_source:
+
                 final_source = strongest_source
                 attribution_type = "visitor_id_updated_source"
-                supabase.table("Tracking_Visitors_duplicate").update({"UTM_Source": final_source}).eq("Visitor_ID", visitor_id).execute()
+
+                supabase.table("Tracking_Visitors_duplicate") \
+                    .update({"UTM_Source": final_source}) \
+                    .eq("Visitor_ID", visitor_id) \
+                    .execute()
 
         # ---------------------- MOBILE LOGIC ----------------------
-        mobile = str(session_customer_info.get("Customer_Mobile") or event_details.get("Customer_Mobile") or "").strip()
-        mobile_rows = [r for r in all_rows if r.get("Customer_Mobile") == mobile]
+
+        mobile_rows = [r for r in history_rows if r.get("Customer_Mobile") == mobile]
 
         if final_source in weak_sources and mobile and mobile_rows:
+
             strongest_source, strongest_row = strongest_source_row(mobile_rows, final_source)
+
             if strongest_row:
                 utm_medium = strongest_row.get("UTM_Medium")
                 utm_campaign = strongest_row.get("UTM_Campaign")
@@ -3537,10 +3565,18 @@ def save_tracking(request):
                 utm_content = strongest_row.get("UTM_Content")
 
             # Explicit Google promotion
-            if final_source in weak_sources and strongest_source in weak_sources and has_explicit_google(mobile_rows) and strongest_source != "google":
+            if (
+                final_source in weak_sources
+                and strongest_source in weak_sources
+                and has_explicit_google(mobile_rows)
+                and strongest_source != "google"
+            ):
+
                 final_source = "google"
                 attribution_type = "mobile_explicit_google_override"
+
                 google_rows = [r for r in mobile_rows if r["UTM_Source"] == "google"]
+
                 if google_rows:
                     best_google = richest_utm_row(google_rows)
                     utm_medium = best_google.get("UTM_Medium")
@@ -3549,9 +3585,14 @@ def save_tracking(request):
                     utm_content = best_google.get("UTM_Content")
 
             if strongest_source not in weak_sources and strongest_source != final_source:
+
                 final_source = strongest_source
                 attribution_type = "mobile_unified"
-                supabase.table("Tracking_Visitors_duplicate").update({"UTM_Source": final_source}).eq("Customer_Mobile", mobile).execute()
+
+                supabase.table("Tracking_Visitors_duplicate") \
+                    .update({"UTM_Source": final_source}) \
+                    .eq("Customer_Mobile", mobile) \
+                    .execute()
 
         session_customer_info["Customer_Mobile"] = mobile
 
@@ -3565,59 +3606,20 @@ def save_tracking(request):
         # --------------------------------------------------
         # SLEECID / FINGERPRINT RESCUE BLOCK (OPTIMIZED)
         # --------------------------------------------------
-
         sleec_id = str(data.get("device_id") or "").strip()
 
         if event_type == "purchase" and final_source in weak_sources:
 
-            print("[FINGERPRINT CHECK] purchase + weak source + deep store entry")
+            dprint("[FINGERPRINT CHECK] purchase + weak source")
 
-            # ---------------------------
-            # Try resolving SleecID
-            # ---------------------------
+            # Resolve SleecID from history rows if missing
             if not sleec_id:
 
-                # Fetch possible rows once instead of 3 separate queries
-                sleec_lookup_rows = []
-
-                if session_id:
-                    res = (
-                        supabase.table("Tracking_Visitors_duplicate")
-                        .select("SleecID")
-                        .eq("Session_ID", session_id)
-                        .limit(5)
-                        .execute()
-                    )
-                    sleec_lookup_rows.extend(res.data or [])
-
-                if not sleec_id and visitor_id:
-                    res = (
-                        supabase.table("Tracking_Visitors_duplicate")
-                        .select("SleecID")
-                        .eq("Visitor_ID", visitor_id)
-                        .limit(5)
-                        .execute()
-                    )
-                    sleec_lookup_rows.extend(res.data or [])
-
-                if not sleec_id and mobile:
-                    res = (
-                        supabase.table("Tracking_Visitors_duplicate")
-                        .select("SleecID")
-                        .eq("Customer_Mobile", mobile)
-                        .limit(5)
-                        .execute()
-                    )
-                    sleec_lookup_rows.extend(res.data or [])
-
-                for r in sleec_lookup_rows:
+                for r in history_rows:
                     if r.get("SleecID"):
                         sleec_id = r["SleecID"]
                         break
 
-            # ---------------------------
-            # Resolve source via SleecID
-            # ---------------------------
             if sleec_id:
 
                 prefix_to_source = {
@@ -3636,10 +3638,12 @@ def save_tracking(request):
                 }
 
                 try:
+
                     source_key = sleec_id.split("_", 1)[0].lower()
                     extracted_source = prefix_to_source.get(source_key)
 
                     if extracted_source:
+
                         dprint(f"[SLEECID PREFIX] extracted source -- {extracted_source}")
                         final_source = pick_stronger_source(final_source, extracted_source)
 
@@ -3648,86 +3652,70 @@ def save_tracking(request):
 
                 dprint(f"[SLEECID FOUND] {sleec_id} >> checking history")
 
-                # ---------------------------
-                # Fetch SleecID history
-                # ---------------------------
-                res = (
-                    supabase.table("Tracking_Visitors_duplicate")
-                    .select(
-                        "UTM_Source, UTM_Medium, UTM_Campaign, UTM_Term, UTM_Content"
-                    )
-                    .eq("SleecID", sleec_id)
-                    .execute()
-                )
+                # -----------------------------------------
+                # Get rows with same SleecID
+                # -----------------------------------------
+                rows = [r for r in history_rows if r.get("SleecID") == sleec_id]
 
-                rows = res.data or []
+                # -----------------------------------------
+                # Filter rows by device match
+                # -----------------------------------------
 
-                strongest_scid_source = final_source
-                strongest_row_scid = None
-                max_utm_score = -1
+                current_timezone = str(client_info.get("timezone")).strip()
+                current_resolution = str(client_info.get("screen_resolution")).strip()
 
-                for row in rows:
+                device_matched_rows = []
 
-                    # Clean
-                    row_source = (row.get("UTM_Source") or "").strip().lower()
-                    row_medium = (row.get("UTM_Medium") or "").strip()
-                    row_campaign = (row.get("UTM_Campaign") or "").strip()
-                    row_term = (row.get("UTM_Term") or "").strip()
-                    row_content = (row.get("UTM_Content") or "").strip()
-
-                    existing = row_source or "unknown"
-
-                    utm_score = sum(
-                        bool(x)
-                        for x in [row_medium, row_campaign, row_term, row_content]
-                    )
-
-                    # Stronger source wins
-                    if source_weight(existing) > source_weight(strongest_scid_source):
-
-                        strongest_scid_source = existing
-                        strongest_row_scid = row
-                        max_utm_score = utm_score
-
-                    # Same source weight → richer UTMs
-                    elif source_weight(existing) == source_weight(strongest_scid_source):
-
-                        if utm_score > max_utm_score:
-                            strongest_row_scid = row
-                            max_utm_score = utm_score
-
-                # ---------------------------
-                # Apply strongest UTMs
-                # ---------------------------
-                if strongest_row_scid:
-
-                    utm_medium = (strongest_row_scid.get("UTM_Medium") or "").strip()
-                    utm_campaign = (strongest_row_scid.get("UTM_Campaign") or "").strip()
-                    utm_term = (strongest_row_scid.get("UTM_Term") or "").strip()
-                    utm_content = (strongest_row_scid.get("UTM_Content") or "").strip()
+                for r in rows:
 
                     if (
-                        strongest_scid_source != final_source
-                        and strongest_scid_source not in weak_sources
+                        r.get("Timezone") == current_timezone
+                        and r.get("Screen_Resolution") == current_resolution
                     ):
+                        device_matched_rows.append(r)
 
-                        final_source = strongest_scid_source
-                        attribution_type = "scID_rescued_purchase"
+                # fallback if none matched
+                if not device_matched_rows:
+                    dprint("[SLEECID] no device match, using raw sleec rows")
+                    device_matched_rows = rows
 
-                        dprint(f"[FINGERPRINT RESCUED] final_source -- {final_source}")
+                # -----------------------------------------
+                # Find strongest source
+                # -----------------------------------------
 
-                        # Update only if actually different
-                        supabase.table("Tracking_Visitors_duplicate") \
-                            .update({"UTM_Source": final_source}) \
-                            .eq("SleecID", sleec_id) \
-                            .execute()
+                strongest_scid_source = final_source
+
+                for row in device_matched_rows:
+
+                    existing = (row.get("UTM_Source") or "").strip().lower()
+
+                    if source_weight(existing) > source_weight(strongest_scid_source):
+                        strongest_scid_source = existing
+
+                # -----------------------------------------
+                # Apply rescue if stronger
+                # -----------------------------------------
+
+                if (
+                    strongest_scid_source != final_source
+                    and strongest_scid_source not in weak_sources
+                ):
+
+                    final_source = strongest_scid_source
+                    attribution_type = "scID_rescued_purchase"
+
+                    dprint(f"[FINGERPRINT RESCUED] final_source -- {final_source}")
+
+                    supabase.table("Tracking_Visitors_duplicate") \
+                        .update({"UTM_Source": final_source}) \
+                        .eq("SleecID", sleec_id) \
+                        .execute()
 
             else:
                 dprint("[SLEECID CHECK] no Sleecid found")
 
         
         #### Section to get the best utms for this source
-        history_rows = get_history_rows(session_id, visitor_id, mobile, sleec_id)
         #history_rows = get_history_rows(session_id, visitor_id, mobile, sleec_id)
         ## Avoid dupes
         #history_rows = list({json.dumps(r): r for r in history_rows}.values())
