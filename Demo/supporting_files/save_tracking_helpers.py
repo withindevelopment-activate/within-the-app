@@ -39,45 +39,114 @@ def recover_utms(final_source, incoming_utms, all_rows):
     Recover richest UTMs matching final_source from historical rows.
     """
 
-    ## Clean all the rows
-    for r in all_rows:
+    print("\n==============================")
+    print("[RECOVER UTMS START]")
+    print("Final Source:", final_source)
+    print("Incoming UTMs:", incoming_utms)
+    print("Total historical rows:", len(all_rows))
+    print("==============================")
+
+    # -----------------------------
+    # Clean all rows
+    # -----------------------------
+    print("\n[CLEANING HISTORICAL ROWS]")
+
+    for i, r in enumerate(all_rows):
+
+        print(f"\nRow {i} BEFORE CLEAN:", r)
+
         r["UTM_Source"] = (r.get("UTM_Source") or "").strip().lower()
         r["UTM_Medium"] = (r.get("UTM_Medium") or "").strip()
         r["UTM_Campaign"] = (r.get("UTM_Campaign") or "").strip()
         r["UTM_Term"] = (r.get("UTM_Term") or "").strip()
         r["UTM_Content"] = (r.get("UTM_Content") or "").strip()
 
+        print(f"Row {i} AFTER CLEAN:", r)
+
     utm_medium, utm_campaign, utm_term, utm_content = incoming_utms
 
-    # If frontend UTMs exist >> never override
+    print("\n[FRONTEND UTM CHECK]")
+    print("utm_medium:", utm_medium)
+    print("utm_campaign:", utm_campaign)
+    print("utm_term:", utm_term)
+    print("utm_content:", utm_content)
+
+    # -----------------------------
+    # If frontend UTMs exist
+    # -----------------------------
     if any([utm_medium, utm_campaign, utm_term, utm_content]):
+        print("\n[FRONTEND UTMS PRESENT — SKIPPING RECOVERY]")
         return utm_medium, utm_campaign, utm_term, utm_content
+
+    print("\n[NO FRONTEND UTMS — STARTING RECOVERY]")
 
     candidates = []
 
-    for row in all_rows:
+    # -----------------------------
+    # Scan historical rows
+    # -----------------------------
+    for i, row in enumerate(all_rows):
+
+        print("\n----------------------------")
+        print(f"[ROW {i}] RAW:", row)
 
         row = clean_utm_row(row)
 
+        print(f"[ROW {i}] CLEANED:", row)
+
         if row["UTM_Source"] != final_source:
+            print(
+                f"[ROW {i}] SOURCE MISMATCH:",
+                row["UTM_Source"], "!=" , final_source
+            )
             continue
+
+        print(f"[ROW {i}] SOURCE MATCH")
 
         score = utm_richness_score(row)
 
-        if score > 0:
-            candidates.append((score, row))
+        print(f"[ROW {i}] RICHNESS SCORE:", score)
 
+        if score > 0:
+            print(f"[ROW {i}] ADDED AS CANDIDATE")
+            candidates.append((score, row))
+        else:
+            print(f"[ROW {i}] SCORE TOO LOW — SKIPPED")
+
+    # -----------------------------
+    # No candidates
+    # -----------------------------
     if not candidates:
+        print("\n[NO VALID CANDIDATES FOUND]")
+        print("Returning original incoming UTMs")
         return utm_medium, utm_campaign, utm_term, utm_content
+
+    # -----------------------------
+    # Choose best candidate
+    # -----------------------------
+    print("\n[CANDIDATES FOUND]")
+    for score, row in candidates:
+        print("Score:", score, "| Row:", row)
 
     best = sorted(candidates, key=lambda x: -x[0])[0][1]
 
-    return (
+    print("\n[BEST CANDIDATE SELECTED]")
+    print(best)
+
+    result = (
         best["UTM_Medium"],
         best["UTM_Campaign"],
         best["UTM_Term"],
         best["UTM_Content"]
     )
+
+    print("\n[FINAL RECOVERED UTMS]")
+    print(result)
+
+    print("\n[RECOVER UTMS END]")
+    print("==============================\n")
+
+    return result
 
 
 '''def backfill_missing_utms(final_source, utm_medium, utm_campaign, utm_term, utm_content, visitor_id=None, session_id=None, mobile=None, sleec_id=None):

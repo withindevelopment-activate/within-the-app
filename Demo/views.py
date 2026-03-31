@@ -3730,7 +3730,7 @@ def save_tracking(request):
         history_rows = get_history_rows(session_id, visitor_id, mobile, sleec_id)
         #history_rows = get_history_rows(session_id, visitor_id, mobile, sleec_id)
         ## Avoid dupes
-        history_rows = list({json.dumps(r): r for r in history_rows}.values())
+        #history_rows = list({json.dumps(r): r for r in history_rows}.values())
 
         ### Get the UTMS
         # --------------------------------------------------
@@ -3742,7 +3742,7 @@ def save_tracking(request):
             history_rows
         )
 
-        dprint(f"[UTM RECOVERY RESULT] medium={utm_medium} campaign={utm_campaign} term={utm_term} content={utm_content}")
+        dprint(f"[UTM RECOVERY RESULT] final_source={final_source} medium={utm_medium} campaign={utm_campaign} term={utm_term} content={utm_content}")
 
         #### Backpropagation
         # ----------------------------------------------
