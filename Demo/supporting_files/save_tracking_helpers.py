@@ -80,7 +80,7 @@ def recover_utms(final_source, incoming_utms, all_rows):
     )
 
 
-def backfill_missing_utms(final_source, utm_medium, utm_campaign, utm_term, utm_content, visitor_id=None, session_id=None, mobile=None, sleec_id=None):
+'''def backfill_missing_utms(final_source, utm_medium, utm_campaign, utm_term, utm_content, visitor_id=None, session_id=None, mobile=None, sleec_id=None):
     payload = {
         "UTM_Medium": utm_medium,
         "UTM_Campaign": utm_campaign,
@@ -128,9 +128,9 @@ def backfill_missing_utms(final_source, utm_medium, utm_campaign, utm_term, utm_
                 .execute()
 
     except Exception as e:
-        print("[UTM BACKFILL ERROR]", e)
+        print("[UTM BACKFILL ERROR]", e)'''
 
-def get_history_rows(session_id=None, visitor_id=None, mobile=None, sleec_id=None):
+'''def get_history_rows(session_id=None, visitor_id=None, mobile=None, sleec_id=None):
     ## Initialize an empty list
     ##
     history_rows = []
@@ -174,7 +174,105 @@ def get_history_rows(session_id=None, visitor_id=None, mobile=None, sleec_id=Non
     
     except Exception as e:
         print(f"[UTM HISTORY FETCH ERROR] {e}")
+        return []'''
+
+
+def get_history_rows(session_id=None, visitor_id=None, mobile=None, sleec_id=None):
+
+    filters = []
+
+    if session_id:
+        filters.append(f"Session_ID.eq.{session_id}")
+
+    if visitor_id:
+        filters.append(f"Visitor_ID.eq.{visitor_id}")
+
+    if mobile:
+        filters.append(f"Customer_Mobile.eq.{mobile}")
+
+    if sleec_id:
+        filters.append(f"SleecID.eq.{sleec_id}")
+
+    if not filters:
         return []
+
+    try:
+
+        query = ",".join(filters)
+
+        res = (
+            supabase.table("Tracking_Visitors_duplicate")
+            .select("UTM_Source, UTM_Medium, UTM_Campaign, UTM_Term, UTM_Content")
+            .or_(query)
+            .execute()
+        )
+
+        return res.data or []
+
+    except Exception as e:
+        print("[UTM HISTORY FETCH ERROR]", e)
+        return []
+
+
+def backfill_missing_utms(
+    final_source,
+    utm_medium,
+    utm_campaign,
+    utm_term,
+    utm_content,
+    visitor_id=None,
+    session_id=None,
+    mobile=None,
+    sleec_id=None
+):
+
+    if not any([utm_medium, utm_campaign, utm_term, utm_content]):
+        return
+
+    payload = {
+        "UTM_Medium": utm_medium,
+        "UTM_Campaign": utm_campaign,
+        "UTM_Term": utm_term,
+        "UTM_Content": utm_content,
+        "Last_Updated": get_uae_current_date()
+    }
+
+    try:
+
+        if session_id:
+            supabase.table("Tracking_Visitors_duplicate") \
+                .update(payload) \
+                .eq("Session_ID", session_id) \
+                .eq("UTM_Source", final_source) \
+                .is_("UTM_Campaign", None) \
+                .execute()
+
+        if visitor_id:
+            supabase.table("Tracking_Visitors_duplicate") \
+                .update(payload) \
+                .eq("Visitor_ID", visitor_id) \
+                .eq("UTM_Source", final_source) \
+                .is_("UTM_Campaign", None) \
+                .execute()
+
+        if mobile:
+            supabase.table("Tracking_Visitors_duplicate") \
+                .update(payload) \
+                .eq("Customer_Mobile", mobile) \
+                .eq("UTM_Source", final_source) \
+                .is_("UTM_Campaign", None) \
+                .execute()
+
+        if sleec_id:
+            supabase.table("Tracking_Visitors_duplicate") \
+                .update(payload) \
+                .eq("SleecID", sleec_id) \
+                .eq("UTM_Source", final_source) \
+                .is_("UTM_Campaign", None) \
+                .execute()
+
+    except Exception as e:
+        print("[UTM BACKFILL ERROR]", e)
 
 
 

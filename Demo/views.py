@@ -2236,7 +2236,7 @@ def build_update_payload(source, medium, campaign, term, content, attribution):
     
 @csrf_exempt
 @require_POST
-def save_tracking(request):
+def save_tracking_1(request):
     """
     - This function takes in the incoming source, makes sure that it is an actual direct, 
       if the incoming source is deemed 'unknown' it attempts to extract the source from 
@@ -3036,6 +3036,692 @@ def save_tracking(request):
                             .eq("SleecID", sleec_id) \
                             .execute()
                         
+            else:
+                dprint("[SLEECID CHECK] no Sleecid found")
+
+        
+        #### Section to get the best utms for this source
+        history_rows = get_history_rows(session_id, visitor_id, mobile, sleec_id)
+        #history_rows = get_history_rows(session_id, visitor_id, mobile, sleec_id)
+        ## Avoid dupes
+        history_rows = list({json.dumps(r): r for r in history_rows}.values())
+
+        ### Get the UTMS
+        # --------------------------------------------------
+        # FINAL UTM RECOVERY SWEEP ++ backpropagate 
+
+        utm_medium, utm_campaign, utm_term, utm_content = recover_utms(
+            final_source,
+            (utm_medium, utm_campaign, utm_term, utm_content),
+            history_rows
+        )
+
+        dprint(f"[UTM RECOVERY RESULT] medium={utm_medium} campaign={utm_campaign} term={utm_term} content={utm_content}")
+
+        #### Backpropagation
+        # ----------------------------------------------
+        # FINAL UTM RESOLUTION + PROPAGATION
+        response = backfill_missing_utms(final_source, utm_medium, utm_campaign, utm_term, utm_content, visitor_id, session_id, mobile, sleec_id)
+
+        ########################## Preparing to upsert the entry --- 
+        ip = get_client_ip(request)
+        ip_hash = generate_ip_hash(ip)
+
+        ### Finding the best UTMs for the said source -- get all the history rows
+        # --------------------------------------------------
+        # Collect all history rows once for UTM recovery
+
+        # Build tracking row
+        tracking_entry = {
+            "Distinct_ID": int(get_next_id_from_supabase_compatible_all(name="Tracking_Visitors_duplicate", column="Distinct_ID")),
+            "Visitor_ID": visitor_id,
+            "Cookie_ID" : cookie_id,
+            "Session_ID": session_id,
+            "Client_IP": ip_hash,
+            "Event_Type": event_type,
+            "Event_Details": str(event_details),
+            "Page_URL": page_url,
+            "Referrer_Platform": referrer,
+            "Visited_at": get_uae_current_date(),
+
+            "UTM_Source": final_source,
+            "UTM_Medium": utm_medium,
+            "UTM_Campaign": utm_campaign,
+            "UTM_Term": utm_term,
+            "UTM_Content": utm_content,
+
+            "Attribution_Type": attribution_type,
+            "First_Touch_Source": "PLACEHOLDER",
+            "First_Touch_Medium": "PLACEHOLDER",
+            "First_Touch_Timestamp": "PLACEHOLDER",
+            "Last_Touch_Source": final_source,
+            "Assisted_Sources": "PLACEHOLDER",
+
+            "User_Agent": agent,
+            "Language": client_info.get("language"),
+            "Timezone": client_info.get("timezone"),
+            "Platform": client_info.get("platform"),
+            "Screen_Resolution": client_info.get("screen_resolution"),
+            "Device_Memory": client_info.get("device_memory"),
+            "Last_Updated": get_uae_current_date(),
+            "RAW_UTM_SOURCE": raw_utm_source,
+            "Which_Update": "300326",
+            "Order_ID": "",
+            "Cart_ID": "",
+            "FT_Referrer_Link": ft_referrer,
+            "FT_Extract_Source":ft_ref_source,
+            "FT_Source": ft_source,
+            "FT_Page_URL": ft_page_url,
+            "ft_is_product_landing": ft_is_product_landing,
+            "ft_is_social_referrer": ft_is_social_referrer,
+            "ft_is_search_referrer": ft_is_search_referrer,
+
+            #Fingerprint JS
+            'Fingerprint_ID': str(data.get('fingerprint_id')).strip(),
+            'Fingerprint_Confidence': data.get('fingerprint_confidence'),
+
+            #Device ID
+            #'Device_ID': str(data.get('device_id')).strip(),
+            'SleecID': str(data.get('device_id')).strip(),
+            'Meta_ID': str(data.get('meta_device_id')).strip(),
+            'Titkok_ID': str(data.get('tiktok_device_id')).strip(),
+            'Snapchat_ID': str(data.get('snapchat_device_id')).strip(),
+            'Google_ID': str(data.get('google_device_id')).strip(),
+
+            **session_customer_info
+        }
+
+        # Attach identity columns
+        if event_type == "purchase":
+            tracking_entry["Order_ID"] = identity_value
+
+        if event_type == "add_to_cart":
+            tracking_entry["Cart_ID"] = identity_value
+
+        dprint(f"[INSERT PAYLOAD PREVIEW] {tracking_entry}")
+
+        ## Update the customers_db
+        events_list = ['purchase', 'add_to_cart']
+        if event_type in events_list:
+            response = update_tracked_customers(tracking_entry)
+            if response:
+                print(f"UPDATED THE CUSTOMER DB for Customer_ID: {tracking_entry.get('Customer_ID')} Event_Type: {event_type}")
+
+        batch_insert_to_supabase(pd.DataFrame([tracking_entry]), "Tracking_Visitors_duplicate")
+
+        # --------------------------------------------------
+        '''# Backfill ONLY non-social sources across same mobile
+        if session_customer_info.get("Customer_Mobile"):
+            dprint(f"[BACKFILL] non-social >> {final_source}")
+            supabase.table("Tracking_Visitors_duplicate").update({"UTM_Source": final_source}).eq("Customer_Mobile", session_customer_info["Customer_Mobile"]).execute()'''
+
+        dprint("========== END save_tracking (SUCCESS) ==========")
+        return JsonResponse({"status": "success"})
+
+    except Exception as e:
+        dprint(f"[CRASH] save_tracking failed: {e}")
+        traceback.print_exc()
+        return JsonResponse({"status": "error"}, status=500)
+
+
+
+@csrf_exempt
+@require_POST
+def save_tracking(request):
+    """
+    - This function takes in the incoming source, makes sure that it is an actual direct, 
+      if the incoming source is deemed 'unknown' it attempts to extract the source from 
+      the UA, the page URL or the referrer URL.
+    - When processing sources, it gives the visitor_id priority, looks for the incoming session 
+      if visitor_id found in history, takes in session-level source if session is found for the said visitor_id. 
+      If no session match found for the said visitor_id but visitor_id is found it takes in the source 
+      with the greatest weight and gives it to the said entry.
+      Incoming utms are utms are either explicitly found in the frontend or are mapped utms found in the page url or referrer platform, I should just take the incoming utms keeping that in mind, that in no way shape or form i could get them from any other data for the entry becasue i have that processed in the frontend.
+    """
+
+    def dprint(msg):
+        print(f"[SAVE_TRACKING] {msg}")
+
+    dprint("========== START save_tracking ==========")
+
+    try:
+        # --------------------------------------------------
+        # Get the data incoming from the tracking-snippet.
+        try:
+            raw_body = request.body.decode("utf-8")
+            dprint(f"[RAW PAYLOAD] {raw_body[:600]}")
+            data = json.loads(raw_body)
+        except Exception as e:
+            dprint(f"[FATAL] JSON parse failed: {e}")
+            return JsonResponse({"status": "error"}, status=400)
+
+        # --------------------------------------------------
+        # Helper with cleaning the dicts
+        def clean_dict(d):
+            cleaned = {k: (v.strip() if isinstance(v, str) else v) for k, v in (d or {}).items()}
+            dprint(f"[CLEAN_DICT] input={d} → output={cleaned}")
+            return cleaned
+
+        # --------------------------------------------------
+        # Extract raw inputs (NO LOGIC YET)
+        visitor_id = str(data.get("visitor_id") or "").strip()
+        session_id = str(data.get("session_id") or "").strip()
+        event_type = str(data.get("event_type") or "").strip()
+        cookie_id = str(data.get("cookie_id") or "").strip()
+
+        dprint(f"[IDS] visitor_id={visitor_id} | session_id={session_id} | event_type={event_type}")
+
+        event_details = clean_dict(data.get("event_details"))
+        # --------------------------------------------------
+        # Normalize + clean event_details
+        event_details = normalize_event_details(event_details)
+        dprint(f"[EVENT_DETAILS] normalized keys={list(event_details.keys())}")
+
+        # --------------------------------------------------
+        # Extract event identity + dupe check
+        identity_type, identity_value = extract_event_identity(event_type, event_details)
+
+        if identity_type:
+            dprint(f"[EVENT IDENTITY] {identity_type}={identity_value}")
+
+            if is_duplicate_event(event_type, identity_type, identity_value):
+                dprint("[DUPLICATE EVENT] skipping insert")
+                return JsonResponse({"status": "duplicate_skipped"})
+
+        
+        utm_params = clean_dict(data.get("utm_params"))
+        traffic_source = clean_dict(data.get("traffic_source"))
+        visitor_info = clean_dict(data.get("visitor_info"))
+        client_info = clean_dict(data.get("client_info"))
+
+        ###
+        ## Normalize the utm_medium such that it's consistent
+        utm_medium_raw = str(utm_params.get("utm_medium") or "").strip().lower()
+        if utm_medium_raw == "social media":
+            utm_medium = "Social Media"
+        else:
+            utm_medium = utm_medium_raw
+
+        ### Other utm parameters -- basically these are the main ones we got associated with the incoming source --
+        utm_campaign = str(utm_params.get("utm_campaign") or "").strip()
+        utm_term = str(utm_params.get("utm_term") or "").strip()
+        utm_content = str(utm_params.get("utm_content") or "").strip()
+
+        # --------------------------------------------------
+        # Extract extra customer data
+        session_customer_info = {}
+        for key in ["Customer_ID", "Customer_Name", "Customer_Email", "Customer_Mobile"]:
+            if visitor_info.get(key) is not None:
+                session_customer_info[key] = visitor_info[key]
+                dprint(f"[CUSTOMER FIELD] {key}={visitor_info.get(key)}")
+
+        page_url = str(data.get("page_url") or "").strip()
+        store_url = str(data.get("store_url") or "").strip()
+        referrer = str(data.get("referrer") or "").strip()
+        agent = str(client_info.get("user_agent") or "").strip().lower()
+
+        dprint(f"[CONTEXT] page_url={page_url}")
+        dprint(f"[CONTEXT] referrer={referrer}")
+        dprint(f"[CONTEXT] user_agent={agent}")
+
+        # --------------------------------------------------
+        # Kill crawlers
+        crawlers = ["googlebot", "bingbot", "crawler", "adsbot", "ahrefs"]
+        if any(bot in agent for bot in crawlers):
+            dprint("[SKIPPED] crawler detected")
+            return JsonResponse({"status": "skipped"})
+
+        # --------------------------------------------------
+        ### LOG THE RAW UTM 
+        raw_utm_source = str(utm_params.get("utm_source") or "").strip().lower()
+        if raw_utm_source.replace("_", " ") in ["content creator", "content creators"]:
+            raw_utm_source = "content creators"
+        dprint(f"[RAW UTM SOURCE] {raw_utm_source or 'none'}")
+
+        # ------------------------------------------
+
+        first_touch_context = clean_dict(data.get("first_touch_context") or {})
+
+        ft_source = (first_touch_context.get("source") or "unknown").strip().lower()
+        ft_medium = (first_touch_context.get("medium") or "none").strip().lower()
+        ft_referrer = (first_touch_context.get("referrer_url") or "").strip().lower()
+        ft_is_social_referrer = first_touch_context.get("is_social_referrer", False)
+        ft_is_search_referrer = first_touch_context.get("is_search_referrer", False)
+        ft_page_url = (first_touch_context.get("landing_url") or "").strip().lower()
+        ft_is_product_landing = first_touch_context.get("is_product_landing", False)
+
+
+        # Intialize a list to store possible candidates to act as the incoming source (NO DECISIONS YET)
+        candidates = []
+
+        # Explicit UTM (strongest)
+        if raw_utm_source:
+            candidates.append({"source": raw_utm_source, "type": "explicit_utm"})
+
+        # Referrer inference (outweighs UA) -- with existential checks to prevent errors
+        ref_source = None
+        if referrer or page_url:
+            ref_source = detect_source_from_url_or_domain(referrer) or detect_source_from_url_or_domain(page_url)
+            ### I want to have the exact result from the referrer to confirm the visitor_id condition below.
+            #referrer_source = detect_source_from_url_or_domain(referrer)
+        if ref_source:
+            candidates.append({"source": ref_source.lower(), "type": "inferred_referrer"})
+
+        # User agent inference -- with existential checks to prevent errors
+        ua_source = None
+        if agent:
+            ua_source = detect_source_from_user_agent(agent)
+        if ua_source:
+            candidates.append({"source": ua_source.lower(), "type": "inferred_user_agent"})
+
+        # First-touch candidate (competes normally, no bonus)
+        #ft_source = first_touch.get("source")
+        if ft_source and ft_source != "unknown":
+            candidates.append({
+                "source": ft_source.lower(),
+                "type": "first_touch",
+                "referrer": ft_referrer,
+                "page_url": ft_page_url
+            })
+
+        # Get the source from the ft_referrer as well.
+        #ft_referrer = first_touch.get("referrer_url")
+        ft_ref_source = None
+        if ft_referrer:
+            ft_ref_source = detect_source_from_url_or_domain(ft_referrer)
+            if ft_ref_source:
+                candidates.append({
+                    "source": ft_ref_source.lower(),
+                    "type": "first_touch_referrer",
+                    "referrer": ft_referrer
+                })
+
+        # Traffic source fallback (weakest)
+        traffic_fallback = str((traffic_source.get("source") or "")).strip().lower()
+        if traffic_fallback:
+            candidates.append({"source": traffic_fallback, "type": "traffic_source"})
+
+        if not candidates:
+            candidates.append({"source": "unknown", "type": "unknown"})
+
+        # --------------------------------------------------
+        # PICK STRONGEST CANDIDATE FROM THE LIST -- 
+        winner = candidates[0]
+        for c in candidates[1:]:
+            if source_weight(c["source"]) > source_weight(winner["source"]):
+                winner = c
+
+        incoming_source = winner["source"]
+        attribution_type = winner["type"]
+
+        dprint(f"[SOURCE WINNER] {incoming_source} ({attribution_type})")
+
+        #### Initializing the final source to equal the incoming
+        # Default final_source to incoming_source
+        final_source = incoming_source
+
+        ### Inialize a list of weak sources -- 
+        weak_sources = ['unknown', 'google', 'direct', 'referral']
+
+        # --------------------------------------------------
+        # DIRECT CONFIRMATION
+        if incoming_source == "direct":
+            is_homepage = page_url and store_url and page_url.rstrip("/") == store_url.rstrip("/")
+            dprint(f"[DIRECT CHECK] homepage={is_homepage} referrer={referrer}")
+
+            if not referrer and is_homepage:
+                #incoming_source = "direct"
+                attribution_type = "direct_confirmed"
+                dprint("[DIRECT CONFIRMED] incoming_source set to 'direct'")
+            else:
+                #incoming_source = "unknown"
+                attribution_type = "direct_landing"
+                dprint("[DIRECT LANDING] incoming_source kept as 'direct'")
+            
+            # Resyncing final_source after direct confirmation -- we did this again here because not all sources == 'direct'
+            final_source = 'direct' if is_homepage and not referrer else final_source
+
+        # --------------------------------------------------
+        ### THE BLOCK TO DECIDE ON WHETHER INCOMING SOURCE IS UPDATED OR NOT
+        # ---------------------- HELPERS ----------------------
+        def clean_utm(row):
+            """Normalize UTM fields for consistency."""
+            for f in ["Source", "Medium", "Campaign", "Term", "Content"]:
+                val = row.get(f"UTM_{f}")
+                row[f"UTM_{f}"] = (val or "").strip()
+            row["UTM_Source"] = row["UTM_Source"].lower()
+            return row
+
+        def richest_utm_row(rows):
+            """Return the row with the most non-empty UTMs."""
+            best_row = None
+            max_count = -1
+            for r in rows:
+                count = sum(bool(r.get(f"UTM_{f}")) for f in ["Medium","Campaign","Term","Content"])
+                if count > max_count:
+                    best_row = r
+                    max_count = count
+            return best_row
+
+        def strongest_source_row(rows, current_source):
+            """Return the strongest source and richest UTMs row."""
+            strongest_source = current_source
+            strongest_row = None
+            for r in rows:
+                existing = r["UTM_Source"] or "unknown"
+                row_utm_count = sum(bool(r.get(f"UTM_{f}")) for f in ["Medium","Campaign","Term","Content"])
+                if source_weight(existing) > source_weight(strongest_source):
+                    strongest_source = existing
+                    strongest_row = r
+                elif source_weight(existing) == source_weight(strongest_source):
+                    if strongest_row:
+                        existing_count = sum(bool(strongest_row.get(f"UTM_{f}")) for f in ["Medium","Campaign","Term","Content"])
+                    else:
+                        existing_count = 0
+                    if row_utm_count > existing_count:
+                        strongest_row = r
+            return strongest_source, strongest_row
+
+        # ---------------------- FETCH ALL ROWS ONCE ----------------------
+        query_filters = []
+
+        if session_id:
+            query_filters.append(("Session_ID", session_id))
+        if visitor_id:
+            query_filters.append(("Visitor_ID", visitor_id))
+        if session_customer_info.get("Customer_Mobile"):
+            query_filters.append(("Customer_Mobile", session_customer_info["Customer_Mobile"]))
+
+        # Perform a single fetch for all relevant rows
+        all_rows = []
+        for field, value in query_filters:
+            res = (
+                supabase.table("Tracking_Visitors_duplicate")
+                .select("Session_ID, Visitor_ID, Customer_Mobile, UTM_Source, UTM_Medium, UTM_Campaign, UTM_Term, UTM_Content, Attribution_Type")
+                .eq(field, value)
+                .execute()
+            )
+            all_rows.extend(res.data or [])
+
+        # Clean all UTMs
+        for r in all_rows:
+            clean_utm(r)
+
+        # ---------------------- SESSION LOGIC ----------------------
+        session_rows = [r for r in all_rows if r.get("Session_ID") == session_id]
+        if session_rows:
+            # Pick the strongest row based on the sorting logic
+            row = sorted(
+                session_rows,
+                key=lambda r: (
+                    r.get("UTM_Source") in ["", "unknown"],
+                    not bool(r.get("UTM_Campaign")),
+                    -sum(bool(r.get(f"UTM_{f}")) for f in ["Medium","Term","Content"])
+                )
+            )[0]
+
+            recorded_source = row.get("UTM_Source") or "unknown"
+            recorded_medium = row.get("UTM_Medium")
+            recorded_campaign = row.get("UTM_Campaign")
+            recorded_term = row.get("UTM_Term")
+            recorded_content = row.get("UTM_Content")
+
+            allow_upgrade = recorded_source in weak_sources
+
+            # CASE 1: Weak vs Weak & explicit Google override
+            if final_source in weak_sources and recorded_source in weak_sources and has_explicit_google(session_rows) and final_source != "google":
+                final_source = "google"
+                attribution_type = "session_explicit_google_override"
+                google_rows = [r for r in session_rows if r["UTM_Source"] == "google"]
+                if google_rows:
+                    best_google = richest_utm_row(google_rows)
+                    utm_medium = best_google.get("UTM_Medium")
+                    utm_campaign = best_google.get("UTM_Campaign")
+                    utm_term = best_google.get("UTM_Term")
+                    utm_content = best_google.get("UTM_Content")
+
+            # CASE 2: Recorded is stronger
+            elif source_weight(recorded_source) > source_weight(final_source):
+                final_source = recorded_source
+                attribution_type = "session_persisted_took_session_source"
+                utm_medium = recorded_medium
+                utm_campaign = recorded_campaign
+                utm_term = recorded_term
+                utm_content = recorded_content
+
+            # CASE 3: Upgrade with incoming stronger
+            elif allow_upgrade and source_weight(final_source) > source_weight(recorded_source) and final_source not in weak_sources:
+                attribution_type = "session_upgraded_with_incoming_stronger"
+                # Only update if source changed
+                if recorded_source != final_source:
+                    supabase.table("Tracking_Visitors_duplicate").update({"UTM_Source": final_source}).eq("Session_ID", session_id).execute()
+
+        # ---------------------- VISITOR LOGIC ----------------------
+        visitor_rows = [r for r in all_rows if r.get("Visitor_ID") == visitor_id]
+        if visitor_id and final_source in weak_sources and visitor_rows:
+            strongest_source, strongest_row = strongest_source_row(visitor_rows, final_source)
+            if strongest_row:
+                utm_medium = strongest_row.get("UTM_Medium")
+                utm_campaign = strongest_row.get("UTM_Campaign")
+                utm_term = strongest_row.get("UTM_Term")
+                utm_content = strongest_row.get("UTM_Content")
+
+            # Explicit Google promotion
+            if final_source in weak_sources and strongest_source in weak_sources and has_explicit_google(visitor_rows) and strongest_source != "google":
+                final_source = "google"
+                attribution_type = "visitor_explicit_google_override"
+                google_rows = [r for r in visitor_rows if r["UTM_Source"] == "google"]
+                if google_rows:
+                    best_google = richest_utm_row(google_rows)
+                    utm_medium = best_google.get("UTM_Medium")
+                    utm_campaign = best_google.get("UTM_Campaign")
+                    utm_term = best_google.get("UTM_Term")
+                    utm_content = best_google.get("UTM_Content")
+
+            # Update only if stronger and not weak
+            if strongest_source not in weak_sources and strongest_source != final_source:
+                final_source = strongest_source
+                attribution_type = "visitor_id_updated_source"
+                supabase.table("Tracking_Visitors_duplicate").update({"UTM_Source": final_source}).eq("Visitor_ID", visitor_id).execute()
+
+        # ---------------------- MOBILE LOGIC ----------------------
+        mobile = str(session_customer_info.get("Customer_Mobile") or event_details.get("Customer_Mobile") or "").strip()
+        mobile_rows = [r for r in all_rows if r.get("Customer_Mobile") == mobile]
+
+        if final_source in weak_sources and mobile and mobile_rows:
+            strongest_source, strongest_row = strongest_source_row(mobile_rows, final_source)
+            if strongest_row:
+                utm_medium = strongest_row.get("UTM_Medium")
+                utm_campaign = strongest_row.get("UTM_Campaign")
+                utm_term = strongest_row.get("UTM_Term")
+                utm_content = strongest_row.get("UTM_Content")
+
+            # Explicit Google promotion
+            if final_source in weak_sources and strongest_source in weak_sources and has_explicit_google(mobile_rows) and strongest_source != "google":
+                final_source = "google"
+                attribution_type = "mobile_explicit_google_override"
+                google_rows = [r for r in mobile_rows if r["UTM_Source"] == "google"]
+                if google_rows:
+                    best_google = richest_utm_row(google_rows)
+                    utm_medium = best_google.get("UTM_Medium")
+                    utm_campaign = best_google.get("UTM_Campaign")
+                    utm_term = best_google.get("UTM_Term")
+                    utm_content = best_google.get("UTM_Content")
+
+            if strongest_source not in weak_sources and strongest_source != final_source:
+                final_source = strongest_source
+                attribution_type = "mobile_unified"
+                supabase.table("Tracking_Visitors_duplicate").update({"UTM_Source": final_source}).eq("Customer_Mobile", mobile).execute()
+
+        session_customer_info["Customer_Mobile"] = mobile
+
+        ############################ This section is for whenever the case is purchase and the first page recorded is directly from a product
+        # ==================== CASE 4: FINGERPRINT RESCUE (PURCHASE ONLY) ====================
+        # Conditions:
+        # event_type == purchase
+        # final_source still weak
+        # first page / referrer is deep inside store (not homepage) -- without this condition.
+        # fingerprint_id exists (even if from another visitor_id) -- instead of fingerprint we'll be looking at our sleecid  
+        # --------------------------------------------------
+        # SLEECID / FINGERPRINT RESCUE BLOCK (OPTIMIZED)
+        # --------------------------------------------------
+
+        sleec_id = str(data.get("device_id") or "").strip()
+
+        if event_type == "purchase" and final_source in weak_sources:
+
+            print("[FINGERPRINT CHECK] purchase + weak source + deep store entry")
+
+            # ---------------------------
+            # Try resolving SleecID
+            # ---------------------------
+            if not sleec_id:
+
+                # Fetch possible rows once instead of 3 separate queries
+                sleec_lookup_rows = []
+
+                if session_id:
+                    res = (
+                        supabase.table("Tracking_Visitors_duplicate")
+                        .select("SleecID")
+                        .eq("Session_ID", session_id)
+                        .limit(5)
+                        .execute()
+                    )
+                    sleec_lookup_rows.extend(res.data or [])
+
+                if not sleec_id and visitor_id:
+                    res = (
+                        supabase.table("Tracking_Visitors_duplicate")
+                        .select("SleecID")
+                        .eq("Visitor_ID", visitor_id)
+                        .limit(5)
+                        .execute()
+                    )
+                    sleec_lookup_rows.extend(res.data or [])
+
+                if not sleec_id and mobile:
+                    res = (
+                        supabase.table("Tracking_Visitors_duplicate")
+                        .select("SleecID")
+                        .eq("Customer_Mobile", mobile)
+                        .limit(5)
+                        .execute()
+                    )
+                    sleec_lookup_rows.extend(res.data or [])
+
+                for r in sleec_lookup_rows:
+                    if r.get("SleecID"):
+                        sleec_id = r["SleecID"]
+                        break
+
+            # ---------------------------
+            # Resolve source via SleecID
+            # ---------------------------
+            if sleec_id:
+
+                prefix_to_source = {
+                    "insta": "instagram",
+                    "fb": "facebook",
+                    "tiktok": "tiktok",
+                    "snap": "snapchat",
+                    "google": "google",
+                    "x": "x",
+                    "li": "linkedin",
+                    "pin": "pinterest",
+                    "rdt": "reddit",
+                    "wa": "whatsapp",
+                    "tg": "telegram",
+                    "web": "web",
+                }
+
+                try:
+                    source_key = sleec_id.split("_", 1)[0].lower()
+                    extracted_source = prefix_to_source.get(source_key)
+
+                    if extracted_source:
+                        dprint(f"[SLEECID PREFIX] extracted source -- {extracted_source}")
+                        final_source = pick_stronger_source(final_source, extracted_source)
+
+                except Exception as e:
+                    dprint(f"[SLEECID PREFIX ERROR] {e}")
+
+                dprint(f"[SLEECID FOUND] {sleec_id} >> checking history")
+
+                # ---------------------------
+                # Fetch SleecID history
+                # ---------------------------
+                res = (
+                    supabase.table("Tracking_Visitors_duplicate")
+                    .select(
+                        "UTM_Source, UTM_Medium, UTM_Campaign, UTM_Term, UTM_Content"
+                    )
+                    .eq("SleecID", sleec_id)
+                    .execute()
+                )
+
+                rows = res.data or []
+
+                strongest_scid_source = final_source
+                strongest_row_scid = None
+                max_utm_score = -1
+
+                for row in rows:
+
+                    # Clean
+                    row_source = (row.get("UTM_Source") or "").strip().lower()
+                    row_medium = (row.get("UTM_Medium") or "").strip()
+                    row_campaign = (row.get("UTM_Campaign") or "").strip()
+                    row_term = (row.get("UTM_Term") or "").strip()
+                    row_content = (row.get("UTM_Content") or "").strip()
+
+                    existing = row_source or "unknown"
+
+                    utm_score = sum(
+                        bool(x)
+                        for x in [row_medium, row_campaign, row_term, row_content]
+                    )
+
+                    # Stronger source wins
+                    if source_weight(existing) > source_weight(strongest_scid_source):
+
+                        strongest_scid_source = existing
+                        strongest_row_scid = row
+                        max_utm_score = utm_score
+
+                    # Same source weight → richer UTMs
+                    elif source_weight(existing) == source_weight(strongest_scid_source):
+
+                        if utm_score > max_utm_score:
+                            strongest_row_scid = row
+                            max_utm_score = utm_score
+
+                # ---------------------------
+                # Apply strongest UTMs
+                # ---------------------------
+                if strongest_row_scid:
+
+                    utm_medium = (strongest_row_scid.get("UTM_Medium") or "").strip()
+                    utm_campaign = (strongest_row_scid.get("UTM_Campaign") or "").strip()
+                    utm_term = (strongest_row_scid.get("UTM_Term") or "").strip()
+                    utm_content = (strongest_row_scid.get("UTM_Content") or "").strip()
+
+                    if (
+                        strongest_scid_source != final_source
+                        and strongest_scid_source not in weak_sources
+                    ):
+
+                        final_source = strongest_scid_source
+                        attribution_type = "scID_rescued_purchase"
+
+                        dprint(f"[FINGERPRINT RESCUED] final_source -- {final_source}")
+
+                        # Update only if actually different
+                        supabase.table("Tracking_Visitors_duplicate") \
+                            .update({"UTM_Source": final_source}) \
+                            .eq("SleecID", sleec_id) \
+                            .execute()
+
             else:
                 dprint("[SLEECID CHECK] no Sleecid found")
 
