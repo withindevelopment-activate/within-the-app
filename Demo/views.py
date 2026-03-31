@@ -3429,6 +3429,7 @@ def save_tracking(request):
             or event_details.get("Customer_Mobile")
             or ""
         ).strip()
+        sleec_id = str(data.get("device_id") or "").strip()
 
         history_rows = get_history_rows(session_id, visitor_id, mobile, sleec_id)
 
@@ -3606,7 +3607,7 @@ def save_tracking(request):
         # --------------------------------------------------
         # SLEECID / FINGERPRINT RESCUE BLOCK (OPTIMIZED)
         # --------------------------------------------------
-        sleec_id = str(data.get("device_id") or "").strip()
+        
 
         if event_type == "purchase" and final_source in weak_sources:
 
