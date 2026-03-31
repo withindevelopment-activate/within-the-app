@@ -3432,10 +3432,13 @@ def save_tracking(request):
         sleec_id = str(data.get("device_id") or "").strip()
 
         history_rows = get_history_rows(session_id, visitor_id, mobile, sleec_id)
+        print(f"[DEBUG] history_rows returned: {len(history_rows)} rows")
+
 
         # Clean UTMs once
         for r in history_rows:
             clean_utm(r)
+            print("CEALNED HISTORY ROWS")
 
         # ---------------------- SESSION LOGIC ----------------------
 
