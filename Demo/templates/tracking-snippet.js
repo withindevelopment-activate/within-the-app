@@ -366,14 +366,23 @@
 
     function getUTMParams() {
         const up = new URLSearchParams(window.location.search);
-        const ur = new URLSearchParams(document.referrer ? new URL(document.referrer).search : '');
+        
+        // Safely parse referrer search params
+        let ur;
+        try {
+            ur = new URLSearchParams(document.referrer ? new URL(document.referrer).search : '');
+        } catch (e) {
+            ur = new URLSearchParams(); // Fallback for invalid referrer URLs
+        }
 
-        const p = up? up : ur;
+        // Logic Fix: Fallback to 'ur' if 'up' is empty or missing utm_source
+        const p = up.get("utm_source") ? up : ur;
 
         const formatValue = (val) => {
-            if (!val || typeof val !== 'string') return null;
+            if (!val) return null;
             return val.replace(/\+/g, ' ');
         };
+
         return {
             utm_source: formatValue(p.get("utm_source")),
             utm_medium: formatValue(p.get("utm_medium")),
