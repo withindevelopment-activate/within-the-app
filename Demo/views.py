@@ -3791,7 +3791,7 @@ def save_tracking(request):
             "Device_Memory": client_info.get("device_memory"),
             "Last_Updated": get_uae_current_date(),
             "RAW_UTM_SOURCE": raw_utm_source,
-            "Which_Update": "300326",
+            "Which_Update": "310326",
             "Order_ID": "",
             "Cart_ID": "",
             "FT_Referrer_Link": ft_referrer,
