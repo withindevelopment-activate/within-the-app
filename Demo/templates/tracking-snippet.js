@@ -600,7 +600,13 @@
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload)
-        }).catch(() => {});
+        })
+        .then(res => {
+            console.log("Tracking response:", res.status);
+            return res.text();
+        })
+        .then(data => console.log("Response body:", data))
+        .catch(err => console.error("Tracking error:", err));
     }
 
 
