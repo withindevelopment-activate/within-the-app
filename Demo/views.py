@@ -3641,8 +3641,8 @@ def save_tracking(request):
                                                                filters = {
                                                                "SleecID": ('eq', sleec_id)}
                                                                     )
-                sleec_rows = [clean_utm(r) for r in sleec_rows]
 
+                sleec_rows = [clean_utm(r) for r in sleec_rows.to_dict(orient="records")]
                 # ------------------- Step 3: Device filtering -------------------
                 current_timezone = str(client_info.get("timezone")).strip()
                 current_resolution = str(client_info.get("screen_resolution")).strip()
@@ -3738,7 +3738,7 @@ def save_tracking(request):
             "Device_Memory": client_info.get("device_memory"),
             "Last_Updated": get_uae_current_date(),
             "RAW_UTM_SOURCE": raw_utm_source,
-            "Which_Update": "310326 1224PM",
+            "Which_Update": "310326 1244PM",
             "Order_ID": "",
             "Cart_ID": "",
             "FT_Referrer_Link": ft_referrer,
