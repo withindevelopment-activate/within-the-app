@@ -3510,6 +3510,7 @@ def save_tracking(request):
                 if recorded_source != final_source:
                     ## Add change to list of changes
                     pending_source_updates.append(("Session_ID", session_id))
+                    print("[SAVE TRACKING ADDED SESSION UPDATE TO PENDING LIST]")
 
                     '''supabase.table("Tracking_Visitors_duplicate") \
                         .update({"UTM_Source": final_source}) \
@@ -3561,6 +3562,7 @@ def save_tracking(request):
                     .execute()'''
                 ## add to list of pnding updates
                 pending_source_updates.append(("Visitor_ID", visitor_id))
+                print("[SAVE TRACKING ADDED VISITOR UPDATE TO PENDING LIST]")
 
         # ---------------------- MOBILE LOGIC ----------------------
 
@@ -3607,6 +3609,7 @@ def save_tracking(request):
                     .execute()'''
                 
                 pending_source_updates.append(("Customer_Mobile", mobile))
+                print("[SAVE TRACKING ADDED MOBILE UPDATE TO PENDING LIST]")
 
             session_customer_info["Customer_Mobile"] = mobile
 
@@ -3688,6 +3691,7 @@ def save_tracking(request):
 
                     ## Append chnages to pending changes
                     pending_source_updates.append(("SleecID", sleec_id))
+                    print("[SAVE TRACKING ADDED SLEECID UPDATE TO PENDING LIST]")
 
         
         #### Section to get the best utms for this source
@@ -3702,14 +3706,13 @@ def save_tracking(request):
         utm_medium, utm_campaign, utm_term, utm_content = recover_utms(
             final_source,
             (utm_medium, utm_campaign, utm_term, utm_content),
-            history_rows
+            history_rows, raw_utm_source
         )
 
         dprint(f"[UTM RECOVERY RESULT] final_source={final_source} medium={utm_medium} campaign={utm_campaign} term={utm_term} content={utm_content}")
 
         # ------------------------------------------
         # Only now apply the source updates -- after we have resolved the UTMs
-
         for col, val in pending_source_updates:
             try:
 
