@@ -394,25 +394,71 @@
 
     function setUTMCookie() {
         const params = new URLSearchParams(window.location.search);
+        const refParams = new URLSearchParams(document.referrer ? new URL(document.referrer).search : '');
         const utms = ["utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"];
-        let cookieData = {};
 
+        // ---------------------------
+        // 1. Get incoming UTMs
+        // ---------------------------
+        let incoming = {};
         utms.forEach(key => {
             const value = params.get(key);
+            const refValue = refParams.get(key);
             if (value) {
-                cookieData[key] = value.toLowerCase(); // Standardize to lowercase
+                incoming[key] = value.toLowerCase();
+            } else if (refValue) {
+                incoming[key] = refValue.toLowerCase();
             }
         });
 
-        // Only set the cookie if UTMs actually exist in the URL
-        if (Object.keys(cookieData).length > 0) {
-            const d = new Date();
-            d.setTime(d.getTime() + (30 * 24 * 60 * 60 * 1000)); // 30 days
-            const expires = "expires=" + d.toUTCString();
-            
-            // Save as a JSON string for easy retrieval later
-            document.cookie = "track_utms=" + JSON.stringify(cookieData) + ";" + expires + ";path=/;SameSite=Lax";
+        if (!incoming.utm_source) return; // nothing to process
+
+        // ---------------------------
+        // 2. Get existing cookie
+        // ---------------------------
+        const cookies = document.cookie.split("; ").reduce((acc, c) => {
+            const [k, v] = c.split("=");
+            acc[k] = decodeURIComponent(v);
+            return acc;
+        }, {});
+
+        let existing = null;
+
+        if (cookies["track_utms"]) {
+            try {
+                existing = JSON.parse(cookies["track_utms"]);
+            } catch {
+                existing = null;
+            }
         }
+
+        const existingSource = existing?.utm_source || null;
+        const incomingSource = incoming.utm_source;
+
+        // ---------------------------
+        // 3. Apply your logic
+        // ---------------------------
+        let shouldOverride = false;
+
+        if (!existingSource) {
+            shouldOverride = true;
+        } else if (existingSource === "google") {
+            shouldOverride = true;
+        } else if (existingSource !== "google" && incomingSource === "google") {
+            shouldOverride = false;
+        } else if (existingSource !== "google" && incomingSource !== "google") {
+            shouldOverride = true;
+        }
+
+        if (!shouldOverride) return;
+
+        // ---------------------------
+        // 4. Save cookie
+        // ---------------------------
+        const d = new Date();
+        d.setTime(d.getTime() + (30 * 24 * 60 * 60 * 1000));
+
+        document.cookie = `track_utms=${JSON.stringify(incoming)};expires=${d.toUTCString()};path=/;SameSite=Lax`;
     }
 
     // Run this on every page load
