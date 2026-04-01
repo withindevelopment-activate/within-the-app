@@ -3053,7 +3053,7 @@ def save_tracking_1(request):
         utm_medium, utm_campaign, utm_term, utm_content = recover_utms(
             final_source,
             (utm_medium, utm_campaign, utm_term, utm_content),
-            history_rows
+            history_rows, raw_utm_source
         )
 
         dprint(f"[UTM RECOVERY RESULT] medium={utm_medium} campaign={utm_campaign} term={utm_term} content={utm_content}")
@@ -3441,6 +3441,9 @@ def save_tracking(request):
         
         print("CEALNED HISTORY ROWS")
 
+        ## Initializing the list of updates to avoid utms mismatch upon premature source update
+        pending_source_updates = []
+
         # ---------------------- SESSION LOGIC ----------------------
 
         session_rows = [r for r in history_rows if r.get("Session_ID") == session_id]
@@ -3505,11 +3508,13 @@ def save_tracking(request):
                 attribution_type = "session_upgraded_with_incoming_stronger"
 
                 if recorded_source != final_source:
+                    ## Add change to list of changes
+                    pending_source_updates.append(("Session_ID", session_id))
 
-                    supabase.table("Tracking_Visitors_duplicate") \
+                    '''supabase.table("Tracking_Visitors_duplicate") \
                         .update({"UTM_Source": final_source}) \
                         .eq("Session_ID", session_id) \
-                        .execute()
+                        .execute()'''
                     
         # ---------------------- VISITOR LOGIC ----------------------
 
@@ -3550,10 +3555,12 @@ def save_tracking(request):
                 final_source = strongest_source
                 attribution_type = "visitor_id_updated_source"
 
-                supabase.table("Tracking_Visitors_duplicate") \
+                '''supabase.table("Tracking_Visitors_duplicate") \
                     .update({"UTM_Source": final_source}) \
                     .eq("Visitor_ID", visitor_id) \
-                    .execute()
+                    .execute()'''
+                ## add to list of pnding updates
+                pending_source_updates.append(("Visitor_ID", visitor_id))
 
         # ---------------------- MOBILE LOGIC ----------------------
 
@@ -3594,12 +3601,14 @@ def save_tracking(request):
                 final_source = strongest_source
                 attribution_type = "mobile_unified"
 
-                supabase.table("Tracking_Visitors_duplicate") \
+                '''supabase.table("Tracking_Visitors_duplicate") \
                     .update({"UTM_Source": final_source}) \
                     .eq("Customer_Mobile", mobile) \
-                    .execute()
+                    .execute()'''
+                
+                pending_source_updates.append(("Customer_Mobile", mobile))
 
-        session_customer_info["Customer_Mobile"] = mobile
+            session_customer_info["Customer_Mobile"] = mobile
 
         ############################ This section is for whenever the case is purchase and the first page recorded is directly from a product
         # ==================== CASE 4: FINGERPRINT RESCUE (PURCHASE ONLY) ====================
@@ -3672,10 +3681,13 @@ def save_tracking(request):
                     attribution_type = "scID_rescued_purchase"
                     dprint(f"[FINGERPRINT RESCUED] final_source -- {final_source}")
 
-                    supabase.table("Tracking_Visitors_duplicate") \
+                    '''supabase.table("Tracking_Visitors_duplicate") \
                         .update({"UTM_Source": final_source}) \
                         .eq("SleecID", sleec_id) \
-                        .execute()
+                        .execute()'''
+
+                    ## Append chnages to pending changes
+                    pending_source_updates.append(("SleecID", sleec_id))
 
         
         #### Section to get the best utms for this source
@@ -3695,6 +3707,21 @@ def save_tracking(request):
 
         dprint(f"[UTM RECOVERY RESULT] final_source={final_source} medium={utm_medium} campaign={utm_campaign} term={utm_term} content={utm_content}")
 
+        # ------------------------------------------
+        # Only now apply the source updates -- after we have resolved the UTMs
+
+        for col, val in pending_source_updates:
+            try:
+
+                supabase.table("Tracking_Visitors_duplicate") \
+                    .update({"UTM_Source": final_source}) \
+                    .eq(col, val) \
+                    .execute()
+                dprint(f"[UTM SOURCE RESULT]: UPDATED SOURCE FOR {col} WITH {val}")
+
+            except Exception as e:
+                print("[SOURCE UPDATE ERROR]", col, val, e)
+        
         #### Backpropagation
         # ----------------------------------------------
         # FINAL UTM RESOLUTION + PROPAGATION

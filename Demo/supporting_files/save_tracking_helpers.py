@@ -52,8 +52,6 @@ def recover_utms(final_source, incoming_utms, all_rows):
     print("\n[CLEANING HISTORICAL ROWS]")
 
     for i, r in enumerate(all_rows):
-
-
         r["UTM_Source"] = (r.get("UTM_Source") or "").strip().lower()
         r["UTM_Medium"] = (r.get("UTM_Medium") or "").strip()
         r["UTM_Campaign"] = (r.get("UTM_Campaign") or "").strip()
@@ -70,8 +68,7 @@ def recover_utms(final_source, incoming_utms, all_rows):
     print("utm_content:", utm_content)
 
     # -----------------------------
-    # If frontend UTMs exist
-    # -----------------------------
+    # If frontend UTMs exist and the incoming source from the frontend == the final source
     if any([utm_medium, utm_campaign, utm_term, utm_content]):
         print("\n[FRONTEND UTMS PRESENT — SKIPPING RECOVERY]")
         return utm_medium, utm_campaign, utm_term, utm_content
@@ -82,8 +79,10 @@ def recover_utms(final_source, incoming_utms, all_rows):
 
     # -----------------------------
     # Scan historical rows
-    # -----------------------------
-    for i, row in enumerate(all_rows):
+    ## Filter for the rows where the source == final source to prevent iterrating over unnecessary rows
+    source_rows = [r for r in all_rows if (r.get("UTM_Source") or "").lower() == final_source]
+
+    for i, row in enumerate(source_rows):
 
         print("\n----------------------------")
         print(f"[ROW {i}] RAW:", row)
@@ -113,7 +112,7 @@ def recover_utms(final_source, incoming_utms, all_rows):
 
     # -----------------------------
     # No candidates
-    # -----------------------------
+
     if not candidates:
         print("\n[NO VALID CANDIDATES FOUND]")
         print("Returning original incoming UTMs")
@@ -121,7 +120,7 @@ def recover_utms(final_source, incoming_utms, all_rows):
 
     # -----------------------------
     # Choose best candidate
-    # -----------------------------
+
     print("\n[CANDIDATES FOUND]")
     for score, row in candidates:
         print("Score:", score, "| Row:", row)
