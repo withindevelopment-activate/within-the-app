@@ -34,7 +34,7 @@ def utm_richness_score(row):
     ])
 
 
-def recover_utms(final_source, incoming_utms, all_rows):
+def recover_utms(final_source, incoming_utms, all_rows, incoming_source):
     """
     Recover richest UTMs matching final_source from historical rows.
     """
@@ -69,7 +69,7 @@ def recover_utms(final_source, incoming_utms, all_rows):
 
     # -----------------------------
     # If frontend UTMs exist and the incoming source from the frontend == the final source
-    if any([utm_medium, utm_campaign, utm_term, utm_content]):
+    if any([utm_medium, utm_campaign, utm_term, utm_content]) and incoming_source == final_source:
         print("\n[FRONTEND UTMS PRESENT — SKIPPING RECOVERY]")
         return utm_medium, utm_campaign, utm_term, utm_content
 
