@@ -5315,6 +5315,654 @@ def tiktok_campaigns(request):
         "status_filter": status_filter, 
     })
 
+def tiktok_campaign_builder(request):
+    access_token = request.session.get("tiktok_access_token")
+    advertiser_id = request.session.get("tiktok_advertiser_id")
+
+    headers = {"Access-Token": access_token}
+    pixel_url = f"{API_BASE}/pixel/list/"
+    identity_url = f"{API_BASE}/identity/get/"
+    pixel_event_url = f"{API_BASE}/pixel/instant_page/event/"
+
+    params_pixel = {
+        "advertiser_id": advertiser_id,
+    }
+
+    params_pixel_event = {
+        "advertiser_id": advertiser_id,
+        "objective_type":"CONVERSIONS",
+        "optimization_goal":"CONVERT"
+    }
+
+    resp_pixel = requests.get(pixel_url, headers=headers, params=params_pixel)
+    resp_identity = requests.get(identity_url, headers=headers, params=params_pixel)
+    resp_pixel_event = requests.get(pixel_event_url, headers=headers, params=params_pixel_event)
+    pixel_data = resp_pixel.json()
+    identity_data = resp_identity.json()
+    pixel_event_data = resp_pixel_event.json()
+
+    pixels = pixel_data["data"]["pixels"]
+    identities = identity_data["data"]["identity_list"]
+
+    pixels_list = []
+    identities_list = []
+
+    for pixel in pixels:
+        pixel_id = pixel["pixel_id"]
+        pixel_name = pixel["pixel_name"]
+        pixel_activity = pixel["activity_status"]
+        if pixel_id and pixel_name:
+            pixels_list.append({
+                "id": pixel_id,
+                "name": pixel_name,
+                "activity_status": pixel_activity
+            })
+
+    for identity in identities:
+        identity_id = identity["identity_id"]
+        identity_name = identity["display_name"]
+        identity_availablity = identity["available_status"]
+        if identity_id and identity_name:
+            identities_list.append({
+                "id": identity_id,
+                "name": identity_name,
+                "available_status": identity_availablity,
+                "identity_type": identity["identity_type"],
+                "identity_authorized_bc_id": identity["identity_authorized_bc_id"]
+            })
+
+    if not access_token:
+        return redirect("Demo:tiktok_login")
+
+    if not advertiser_id:
+        return redirect("Demo:tiktok_select_advertiser")
+
+    if not pixels_list:
+        messages.error(request, "there is no available pixels")
+    
+    if not identities_list:
+        messages.error(request, "there is no available identities")
+
+    context = {
+        "advertiser_id": advertiser_id,
+        "tiktok_pixels":pixels_list,
+        "tiktok_identities": identities_list
+    }
+
+    return render(request, "Demo/tiktok_campaign_builder.html", context)
+
+@csrf_exempt
+@require_POST
+def tiktok_create_campaign(request):
+    access_token = request.session.get("tiktok_access_token")
+    advertiser_id = request.session.get("tiktok_advertiser_id")
+
+    if not access_token or not advertiser_id:
+        return JsonResponse({"error": "Missing auth"}, status=401)
+
+    url = f"{API_BASE}/campaign/create/"
+
+    payload = {
+        "advertiser_id": advertiser_id,
+        "campaign_name": request.POST.get("campaign_name"),
+        "objective_type": request.POST.get("objective"),
+        "campaign_type": "REGULAR_CAMPAIGN",
+
+        # REQUIRED
+        "budget_optimize_on": request.POST.get("budget_optimize_on", False),
+
+        # Campaign Status Disabled for testing ######################################
+        "operation_status": "DISABLE"
+    }
+    if request.POST.get("campaign_budget_mode"):
+        payload["budget_mode"] = request.POST.get("campaign_budget_mode")
+    if request.POST.get("campaign_budget"):
+        payload["budget"] = float(request.POST.get("campaign_budget"))
+    if request.POST.get("app_promotion_type"):
+        payload["app_promotion_type"] = request.POST.get("app_promotion_type")
+    if request.POST.get("objective") in ["PRODUCT_SALES", "WEB_CONVERSIONS"]:
+        payload["virtual_objective_type"] = "SALES"
+    if request.POST.get("sales_destination"):
+        payload["sales_destination"] = request.POST.get("sales_destination")
+    if request.POST.get("is_search_campaign"):
+        payload["is_search_campaign"] = request.POST.get("is_search_campaign")
+    if request.POST.get("catalog_enabled"):
+        payload["catalog_enabled"] = request.POST.get("catalog_enabled")
+    
+    print("PayLoad : : : : : : ")
+    print(payload)
+
+    headers = {
+        "Access-Token": access_token,
+        "Content-Type": "application/json"
+    }
+
+    resp = requests.post(url, headers=headers, json=payload)
+    data = resp.json()
+
+    if data.get("code") != 0:
+        return JsonResponse(data, status=400)
+    
+    return JsonResponse({
+        "message": "Campaign created",
+        "campaign_id": data["data"]["campaign_id"]
+    })
+
+from django.core.cache import cache
+from django.views.decorators.http import require_GET
+
+@require_GET
+def get_tiktok_locations(request):
+    objective = request.GET.get('objective', 'WEB_CONVERSIONS')
+    advertiser_id = request.session.get("tiktok_advertiser_id")  # Pull from your profile/settings
+    access_token = request.session.get("tiktok_access_token")    # Pull from your encrypted credentials
+
+    cache_key = f"tt_regions_{objective}"
+    cached_data = cache.get(cache_key)
+
+    if cached_data:
+        return JsonResponse({'status': 'success', 'data': cached_data})
+    
+    url = "https://business-api.tiktok.com/open_api/v1.3/tool/region/"
+    params = {
+        "advertiser_id": advertiser_id,
+        "objective_type": objective,
+        "placements": json.dumps(["PLACEMENT_TIKTOK"]),
+        "level_range": "TO_PROVINCE", # Use TO_CITY for more granularity
+    }
+    
+    headers = {"Access-Token": access_token}
+    
+    try:
+        response = requests.get(url, params=params, headers=headers)
+        data = response.json()
+
+        if data.get("code") == 0:
+            # Use region_info instead of list
+            locations = data.get("data", {}).get("region_info", [])
+            cache.set(cache_key, locations, 86400)  # Cache 24 hours
+            return JsonResponse({'status': 'success', 'data': locations})
+        else:
+            return JsonResponse({'status': 'error', 'message': data.get('message')}, status=400)
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+
+from datetime import datetime
+
+def prepare_tiktok_schedule_data(post_data):
+    """
+    Processes POST data to return TikTok API-compliant schedule fields.
+    """
+    budget_mode = post_data.get('budget_mode')
+    start_time_raw = post_data.get('schedule_start_time')
+    end_time_toggle = post_data.get('end_time_toggle')
+    now_plus_buffer = datetime.now() + timedelta(minutes=1)
+    start_time_str = now_plus_buffer.strftime('%Y-%m-%d %H:%M:%S')
+    
+    # 1. Format Start Time (HTML5 'T' separator to TikTok Space)
+    # Example: '2026-03-28T17:00' -> '2026-03-28 17:00:00'
+    start_time = start_time_raw.replace('T', ' ') + ":00"
+
+    if not start_time_raw:
+        start_time = start_time_str  # Default to now + 1 minute if not provided
+    
+    payload = {
+        "schedule_start_time": start_time,
+    }
+
+    # 2. Apply TikTok Business Rules
+    # Rule: BUDGET_MODE_TOTAL *requires* an end date and SCHEDULE_START_END
+    if budget_mode == 'BUDGET_MODE_TOTAL' or end_time_toggle == 'set':
+        end_time_raw = post_data.get('schedule_end_time')
+        if end_time_raw:
+            payload["schedule_end_time"] = end_time_raw.replace('T', ' ') + ":00"
+            payload["schedule_type"] = "SCHEDULE_START_END"
+        else:
+            # Fallback/Error handling if UI validation failed
+            payload["schedule_type"] = "SCHEDULE_FROM_NOW"
+    else:
+        # BUDGET_MODE_DAY without a specific end date
+        payload["schedule_type"] = "SCHEDULE_FROM_NOW"
+
+    return payload
+
+def get_billing_event(optimization_goal):
+    """
+    Returns the required billing_event for a given optimization_goal.
+    Reference: TikTok API - Corresponding billing event
+    """
+    mapping = {
+        'INSTALL': 'OCPM',         # App Installs
+        'CLICK': 'CPC',           # Traffic / Lead Gen (Manual)
+        'REACH': 'CPM',           # Reach & Frequency
+        'ENGAGED_VIEW': 'CPV',    # Video Views (6s)
+        'ENGAGED_VIEW_FIFTEEN': 'CPV', # Video Views (15s)
+        'PAGE_VISIT': 'CPC',
+        'CONVERT':'OCPM',
+        'IN_APP_EVENT':'OCPM',
+        'TRAFFIC_LANDING_PAGE_VIEW':'OCPM',
+        'LEAD_GENERATION':'OCPM',
+        'CONVERSATION':'OCPM',
+        'FOLLOWERS':'OCPM',
+        'VALUE':'OCPM',
+        'AUTOMATIC_VALUE_OPTIMIZATION':'OCPM',
+        'PRODUCT_CLICK_IN_LIVE':'OCPM',
+        'MT_LIVE_ROOM':'OCPM',
+        'DESTINATION_VISIT':'OCPM',
+        'SHOW':'CPM',
+    }
+
+    return mapping.get(optimization_goal, 'CPM') # Default to CPM
+
+def prepare_optimization_payload(post_data):
+    # For your current setup, we assume Gross Revenue (VALUE)
+    # But you can make this dynamic based on a dropdown
+    opt_goal = post_data.get('optimization_goal', 'VALUE')
+    billing_evt = get_billing_event(opt_goal)
+    
+    payload = {
+        "optimization_goal": opt_goal,
+        "billing_event": billing_evt,
+    }
+
+    # Handle the November 2024 Pangle/Global App Bundle constraint
+    # If the user is doing App Promotion (INSTALL) with a secondary event,
+    # ensure placements only include PANGLE or GLOBAL_APP_BUNDLE.
+    if opt_goal == 'INSTALL' and post_data.get('secondary_optimization_event'):
+        payload["placements"] = ["PLACEMENT_PANGLE"] 
+        # Note: TikTok banned this on PLACEMENT_TIKTOK starting Nov 30, 2024.
+
+    return payload
+
+@csrf_exempt
+@require_POST
+def tiktok_create_adgroup(request):
+    access_token = request.session.get("tiktok_access_token")
+    advertiser_id = request.session.get("tiktok_advertiser_id")
+
+    schedule_fields = prepare_tiktok_schedule_data(request.POST)
+    optimization_payload = prepare_optimization_payload(request.POST)
+
+    if not access_token or not advertiser_id:
+        return JsonResponse({"error": "Missing auth"}, status=401)
+
+    url = f"{API_BASE}/adgroup/create/"
+
+    def get_list(field):
+        return request.POST.getlist(field)
+
+    def get_bool(field):
+        # .get() returns None if the checkbox was unchecked
+        val = request.POST.get(field) 
+        if val is None:
+            return False
+        # HTML checkboxes send "on" by default when checked
+        return val.lower() in ["true", "on", "1", "yes"]
+
+    # Instead of just getlist
+    raw_langs = request.POST.get("languages", "") # Get the string "en,ar"
+    languages_list = [l.strip() for l in raw_langs.split(",") if l.strip()]
+
+    # Now languages_list is ['en', 'ar']
+
+    targeting_data = {
+        "location_ids": request.POST.getlist("location_ids"), # List of IDs as strings
+        "gender": request.POST.get("gender", "GENDER_UNLIMITED"),
+        "age_groups": request.POST.getlist("age_groups"), # e.g. ["AGE_18_24", "AGE_25_34"]
+        "network_types": request.POST.getlist("network_types"), # e.g. ["WIFI", "2G"]
+        "languages": languages_list, # e.g. ["ar", "en"]
+        
+        # Device targeting
+        "operating_system": request.POST.get("operating_system", "OS_UNLIMITED"),
+        "connection_types": request.POST.getlist("connection_types"),
+    }
+
+    # Add Saved Audience only if provided (This overrides other manual settings)
+    saved_audience_id = request.POST.get("saved_audience_id")
+    if saved_audience_id:
+        targeting_data["saved_audience_id"] = saved_audience_id
+
+    # Handle Device Price (Only if set)
+    min_price = request.POST.get("device_price_min")
+    max_price = request.POST.get("device_price_max")
+    if min_price and max_price:
+        targeting_data["device_price"] = [int(min_price), int(max_price)]
+
+
+    payload = {
+        # CORE
+        "advertiser_id": advertiser_id,
+        "campaign_id": request.POST.get("campaign_id"),
+        "adgroup_name": request.POST.get("adgroup_name"),
+
+        # SYSTEM
+        "request_id": request.POST.get("request_id") or None,
+
+        # BUDGET
+        "budget_mode": "BUDGET_MODE_DAY",
+        "budget": float(request.POST.get("budget", 30)),
+
+        # DELIVERY
+        "placement_type": request.POST.get("placement_type", "PLACEMENT_TYPE_AUTOMATIC"),
+        "location_ids": get_list("location") or ["784"],
+
+        # OPTIMIZATION
+        "optimization_goal": request.POST.get("optimization_goal"),
+        "optimization_event": request.POST.get("optimization_event"),
+        "pixel_id":request.POST.get("pixel_id"),
+
+        "billing_event": "OCPM",
+        "bid_type": "BID_TYPE_NO_BID",
+
+        "pacing": "PACING_MODE_SMOOTH",
+
+        **schedule_fields,
+        **optimization_payload,
+
+        "comment_disabled": request.POST.get("comment_disabled",False),
+        "video_download_disabled": request.POST.get("video_download_disabled", False),
+        "share_disabled": request.POST.get("share_disabled", False),
+        
+        "targeting_type": "TARGETING_TYPE_NORMAL",
+        **targeting_data,
+    }
+
+    if request.POST.get("bid"):
+        payload["bid"] = float(request.POST.get("bid", 10))
+
+    if request.POST.get("optimization_goal") == "VALUE" and request.POST.get("roas_bid"):
+        payload["deep_bid_type"] = "VO_MIN_ROAS"
+        payload["roas_bid"] = float(request.POST.get("roas_bid", 1.0))
+        payload["bid_type"] = "BID_TYPE_NO_BID"
+    elif request.POST.get("optimization_goal") == "VALUE":
+        payload["deep_bid_type"] = "VO_HIGHEST_VALUE"
+        payload["bid_type"] = "BID_TYPE_NO_BID"
+    else:
+        payload["bid_type"] = request.POST.get("bid_type", "BID_TYPE_NO_BID")
+
+    # Get the placement type from the radio buttons
+    placement_type = request.POST.get('placement_type', 'PLACEMENT_TYPE_AUTOMATIC')
+
+    # Get the list of selected checkboxes (e.g., ['PLACEMENT_TIKTOK', 'PLACEMENT_PANGLE'])
+    selected_placements = request.POST.getlist('placements')
+
+    if placement_type == "PLACEMENT_TYPE_NORMAL":
+        payload["placements"] = selected_placements
+
+    if request.POST.get("pixel_id"):
+        payload["promotion_type"] = "WEBSITE"
+
+    # ------------------------
+    # 🎯 OBJECTIVE LOGIC
+    # ------------------------
+    objective = request.POST.get("objective")
+
+    if objective == "CONVERSIONS":
+        payload["pixel_id"] = request.POST.get("pixel_id")
+        payload["optimization_event"] = request.POST.get("conversion_event")
+
+    elif objective == "APP_INSTALL":
+        payload["app_id"] = request.POST.get("app_id")
+
+    elif objective == "LEAD_GENERATION":
+        payload["form_id"] = request.POST.get("form_id")
+        payload["promotion_target_type"] = request.POST.get("promotion_target_type")
+
+    # ------------------------
+    # 🛍 SHOPPING ADS
+    # ------------------------
+    if request.POST.get("shopping_ads_type"):
+        payload["shopping_ads_type"] = request.POST.get("shopping_ads_type")
+        payload["product_source"] = request.POST.get("product_source")
+
+        if request.POST.get("store_id"):
+            payload["store_id"] = request.POST.get("store_id")
+            payload["store_authorized_bc_id"] = request.POST.get("store_authorized_bc_id")
+
+        if request.POST.get("catalog_id"):
+            payload["catalog_id"] = request.POST.get("catalog_id")
+
+    # ------------------------
+    # 💬 MESSAGING / LEADS
+    # ------------------------
+    if request.POST.get("messaging_app_type"):
+        payload["messaging_app_type"] = request.POST.get("messaging_app_type")
+
+        if payload["messaging_app_type"] in ["MESSENGER", "LINE"]:
+            payload["messaging_app_account_id"] = request.POST.get("messaging_app_account_id")
+
+        if payload["messaging_app_type"] in ["WHATSAPP", "ZALO"]:
+            payload["phone_region_code"] = request.POST.get("phone_region_code")
+            payload["phone_number"] = request.POST.get("phone_number")
+
+    # ------------------------
+    # 🔍 SEARCH ADS
+    # ------------------------
+    if get_bool("is_search_campaign"):
+        keywords = request.POST.getlist("keywords[]")
+        payload["search_keywords"] = [
+            {
+                "keyword": k,
+                "match_type": request.POST.get("match_type", "EXACT"),
+            } for k in keywords if k
+        ]
+
+    # ------------------------
+    # 📍 PLACEMENTS
+    # ------------------------
+    if payload["placement_type"] == "PLACEMENT_TYPE_NORMAL":
+        payload["placements"] = get_list("placements")
+        payload["tiktok_subplacements"] = get_list("tiktok_subplacements")
+
+    if request.POST.get("search_result_enabled"):
+        payload["search_result_enabled"] = get_bool("search_result_enabled")
+
+    # ------------------------
+    # 👥 AUDIENCE
+    # ------------------------
+    if request.POST.get("saved_audience_id"):
+        payload["saved_audience_id"] = request.POST.get("saved_audience_id")
+
+    if get_list("blocked_pangle_app_ids"):
+        payload["blocked_pangle_app_ids"] = get_list("blocked_pangle_app_ids")
+
+    # ------------------------
+    # 🔁 RETARGETING
+    # ------------------------
+    if request.POST.get("shopping_ads_retargeting_type"):
+        payload["shopping_ads_retargeting_type"] = request.POST.get("shopping_ads_retargeting_type")
+
+    # ------------------------
+    # ⚙️ AD CONTROLS
+    # ------------------------
+    payload["comment_disabled"] = get_bool("comment_disabled")
+    payload["video_download_disabled"] = get_bool("video_download_disabled")
+    payload["share_disabled"] = get_bool("share_disabled")
+
+    # CLEAN NULLS
+    payload = {
+        k: v for k, v in payload.items() 
+        if v is not None and v != "" and (not isinstance(v, list) or len(v) > 0)
+    }
+    print("Final Ad Group Payload:" , payload)
+
+    headers = {
+        "Access-Token": access_token,
+        "Content-Type": "application/json"
+    }
+
+    print("header: ", headers)
+
+    resp = requests.post(url, headers=headers, json=payload)
+    data = resp.json()
+
+    if data.get("code") != 0:
+        return JsonResponse(data, status=400)
+
+    return JsonResponse({
+        "message": "Ad Group created",
+        "adgroup_id": data["data"]["adgroup_id"]
+    })
+
+@csrf_exempt
+@require_POST
+def tiktok_create_ad(request):
+    access_token = request.session.get("tiktok_access_token")
+    advertiser_id = request.session.get("tiktok_advertiser_id")
+
+    if not access_token or not advertiser_id:
+        return JsonResponse({"error": "Missing auth"}, status=401)
+
+    body = json.loads(request.body)
+
+    ad_format = body.get("ad_format")
+    identity_type = body.get("identity_type")
+    video_id = body.get("video_id")
+    tiktok_item_id = body.get("tiktok_item_id")
+
+    print("identity_type: ", identity_type)
+
+    # Validate video requirement
+    if ad_format == "SINGLE_VIDEO":
+        if identity_type == "CUSTOMIZED_USER" and not video_id:
+            return JsonResponse({"error": "video_id is required for CUSTOMIZED_USER"}, status=400)
+        if identity_type in ["TT_USER", "BC_AUTH_TT"] and not (video_id or tiktok_item_id):
+            return JsonResponse({"error": "video_id or tiktok_item_id required for TT_USER / BC_AUTH_TT"}, status=400)
+    else:
+        if video_id:
+            return JsonResponse({"error": "video_id not supported for SINGLE_IMAGE or CAROUSEL_ADS"}, status=400)
+
+    payload = {
+        "advertiser_id": advertiser_id,
+        "adgroup_id": body.get("adgroup_id"),
+        "creatives": body.get("creatives"),
+    }
+    print("Ad Payload before format-specific processing:", payload)
+
+    headers = {
+        "Access-Token": access_token,
+        "Content-Type": "application/json"
+    }
+
+    resp = requests.post(f"{API_BASE}/ad/create/", headers=headers, json=payload)
+    data = resp.json()
+    print("Create Ad response:", data)
+
+    if data.get("code") != 0:
+        return JsonResponse(data, status=400)
+
+    return JsonResponse({
+        "message": "Ad created",
+        "ad_ids": data["data"]["ad_ids"]
+    })
+
+import time
+
+@csrf_exempt
+@require_POST
+def upload_tiktok_image(request):
+    access_token = request.session.get("tiktok_access_token")
+    advertiser_id = request.session.get("tiktok_advertiser_id")
+
+    if not access_token or not advertiser_id:
+        return JsonResponse({"code": 401, "message": "Auth missing"}, status=401)
+
+    image_file = request.FILES.get('image_file')
+    if not image_file:
+        return JsonResponse({"code": 400, "message": "No image file provided"}, status=400)
+
+    url = f"{API_BASE}/file/image/ad/upload/"
+    
+    # MD5 calculation
+    md5_hash = hashlib.md5()
+    for chunk in image_file.chunks():
+        md5_hash.update(chunk)
+    image_signature = md5_hash.hexdigest()
+
+    image_file.seek(0)
+    
+    # 3. Separate Files from Data
+    files = {
+        'image_file': (image_file.name, image_file, image_file.content_type)
+    }
+    
+    data = {
+        'advertiser_id': advertiser_id,
+        'file_name': f"SC_{int(time.time())}_{image_file.name}"[:100],
+        'upload_type': 'UPLOAD_BY_FILE',
+        'image_signature': image_signature
+    }
+
+    headers = {"Access-Token": access_token}
+
+    # 4. Correct parameter usage
+    try:
+        response = requests.post(url, headers=headers, data=data, files=files)
+        response_data = response.json()
+        
+        # Close the connection logic: ensure we return immediately
+        return JsonResponse(response_data)
+            
+    except Exception as e:
+        return JsonResponse({'code': 500, 'message': str(e)}, status=500)
+
+import hashlib
+
+@csrf_exempt
+@require_POST
+def upload_tiktok_video(request):
+    access_token = request.session.get("tiktok_access_token")
+    advertiser_id = request.session.get("tiktok_advertiser_id")
+
+    if not access_token or not advertiser_id:
+        return JsonResponse({"code": 401, "message": "Auth missing"}, status=401)
+
+    video_file = request.FILES.get('video_file')
+    if not video_file:
+        return JsonResponse({"code": 400, "message": "No video file provided"}, status=400)
+
+    url = f"{API_BASE}/file/video/ad/upload/"
+    
+    # 1. Calculate MD5
+    md5_hash = hashlib.md5()
+    for chunk in video_file.chunks(1024 * 1024): # 1MB chunks
+        md5_hash.update(chunk)
+    video_signature = md5_hash.hexdigest()
+
+    # 2. Reset pointer (CRITICAL)
+    video_file.seek(0)
+    
+    # 3. Separate Files from Data
+    files = {
+        'video_file': (video_file.name, video_file, video_file.content_type)
+    }
+    
+    data = {
+        'advertiser_id': advertiser_id,
+        'file_name': f"SC_{int(time.time())}_{video_file.name}"[:100],
+        'upload_type': 'UPLOAD_BY_FILE',
+        'video_signature': video_signature,
+        'flaw_detect': 'true',
+        'auto_fix_enabled': 'true',
+        'auto_bind_enabled': 'true'
+    }
+
+    headers = {"Access-Token": access_token}
+
+    try:
+        response = requests.post(url, headers=headers, data=data, files=files)
+        response_data = response.json()
+        
+        # Close the connection logic: ensure we return immediately
+        return JsonResponse(response_data)
+        
+    except Exception as e:
+        return JsonResponse({'code': 500, 'message': str(e)}, status=500)
+    finally:
+        video_file.close()
+
+
 ################################################################################################
 ######################################## META's API ----
 # --- LOGIN VIEW ---

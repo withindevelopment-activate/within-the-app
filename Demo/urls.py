@@ -53,6 +53,15 @@ urlpatterns = [
     path("tiktok/campaigns/", views.tiktok_campaigns, name="tiktok_campaigns"),
     path("tiktok/select-advertiser/<str:advertiser_id>/", views.tiktok_select_advertiser, name="tiktok_select_advertiser"),
     path("tiktok/select-advertiser/", views.tiktok_select_advertiser, name="tiktok_select_advertiser"),
+    # TikTok API endpoints
+    path("tiktok/create-campaign/", views.tiktok_create_campaign, name="tiktok_create_campaign"),
+    path("tiktok/create-adgroup/", views.tiktok_create_adgroup, name="tiktok_create_adgroup"),
+    path("tiktok/create-ad/", views.tiktok_create_ad, name="tiktok_create_ad"),
+    path("tiktok/upload-video/", views.upload_tiktok_video, name="tiktok_upload_video"),
+    path("tiktok/upload-image/", views.upload_tiktok_image, name="tiktok_upload_image"),
+
+    # get TikTok Targeting Options
+    path('api/tiktok/locations/', views.get_tiktok_locations, name='tiktok_locations_api'),
 
 
     path("price-monitor/", views.view_price_monitor, name="price_monitor"),

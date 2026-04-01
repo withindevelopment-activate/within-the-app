@@ -3,8 +3,9 @@
 {% block content %}
 <div class="container py-4">
   <h2 class="mb-4">TikTok Campaigns</h2>
-  <div class="mb-3">
+  <div class="mb-3 d-flex justify-content-between">
     <a href="{% url 'Demo:tiktok_select_advertiser' %}" class="btn btn-secondary btn-sm">Change Advertiser</a>
+    <a href="{% url 'Demo:tiktok_create_campaign' %}" class="btn btn-primary btn-sm">Create Campaign</a>
   </div>
 
   <!-- Filter Form -->

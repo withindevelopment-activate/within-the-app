@@ -1,0 +1,1716 @@
+{% extends "Demo/base.html" %}
+
+{% block title %}Campagin builder{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">Create TikTok Campaign</h2>
+
+<!-- STEP NAV -->
+<ul class="nav nav-pills mb-4" id="stepsNav">
+  <li class="nav-item"><button class="nav-link active" data-step="1">Campaign</button></li>
+  <li class="nav-item"><button class="nav-link" data-step="2">Ad Group</button></li>
+  <li class="nav-item"><button class="nav-link" data-step="3">Creative</button></li>
+  <li class="nav-item"><button class="nav-link" data-step="4">Review</button></li>
+</ul>
+
+<form id="campaignForm">
+
+  <!-- STEP 1 -->
+  <div class="step" data-step="1">
+    <div class="card p-4">
+      <h5>Campaign</h5>
+      <input type="hidden" name="advertiser_id" value="{{ advertiser_id }}">
+      <input class="form-control mb-3" name="campaign_name" placeholder="Campaign Name" required>
+
+      <select class="form-select mb-3" name="objective" id="objectiveSelect">
+        <option value="">Select Objective</option>
+        <option value="APP_PROMOTION">App promotion</option>
+        <option value="TRAFFIC">Traffic</option>
+        <option value="ENGAGEMENT">Community interaction</option>
+        <option value="LEAD_GENERATION">Lead Generation</option>
+        <option value="REACH">Reach</option>
+        <option value="WEB_CONVERSIONS">Website conversions</option>
+        <option value="PRODUCT_SALES">Product sales</option>
+        <option value="VIDEO_VIEWS">Video Views</option>
+      </select>
+
+      <select class="form-select mb-3 d-none" name="app_promotion_type" id="app_promotion_type">
+        <option value="">Select Promotion Type</option>
+        <option value="APP_INSTALL">App Install</option>
+        <option value="APP_RETARGETING">App Retargeting</option>
+        <option value="APP_PREREGISTRATION">App Preregistration</option>
+      </select>
+
+      <div id="sales_destination" class="card p-3 d-none">
+        <select class="form-select mb-3" name="sales_destination">
+          <option value="">Select Sales Destination</option>
+          <option value="TIKTOK_SHOP">TikTok Shop</option>
+          <option value="WEBSITE">Website</option>
+          <option value="APP">App</option>
+          <option value="WEB_AND_APP">Website & App</option>
+        </select>
+
+        <div class="form-check form-switch">
+          <input class="form-check-input" name="is_search_campaign" type="checkbox" role="switch"
+            id="is_search_campaign">
+          <label class="form-check-label" for="switchCheckChecked">Search Campaign</label>
+        </div>
+
+        <div class="form-check form-switch">
+          <input class="form-check-input" name="catalog_enabled" type="checkbox" role="switch" id="catalog_enabled"
+            checked>
+          <label class="form-check-label" for="switchCheckChecked">Catalog Campaign</label>
+        </div>
+      </div>
+
+      <div class="form-check form-switch mb-3">
+        <input class="form-check-input" name="budget_optimize_on" type="checkbox" role="switch" id="budget_optimize_on"
+          checked>
+        <label class="form-check-label" for="budget_optimize_on">Campaign Budget Optimization (CBO)</label>
+      </div>
+
+      <div class="input-group mb-3" id="cbo_budget_wrapper">
+        <span class="input-group-text">Campaign Budget</span>
+        <select class="form-select" name="campaign_budget_mode">
+          <option value="BUDGET_MODE_INFINITE">All</option>
+          <option value="BUDGET_MODE_DAY">Daily</option>
+          <option value="BUDGET_MODE_TOTAL">Lifetime</option>
+        </select>
+        <input class="form-control w-50" name="campaign_budget" type="number" placeholder="Amount">
+      </div>
+
+      <div class="form-check form-switch d-none mb-2" id="no_cbo_toggle_wrapper">
+        <input class="form-check-input" type="checkbox" role="switch" id="budget_optimize_off">
+        <label class="form-check-label" for="budget_optimize_off">Set campaign budget</label>
+      </div>
+
+      <div class="input-group mb-3 d-none" id="no_cbo_budget_inputs">
+        <span class="input-group-text">Campaign Budget</span>
+        <select class="form-select" name="campaign_budget_mode">
+          <option value="BUDGET_MODE_INFINITE">All</option>
+          <option value="BUDGET_MODE_DAY">Daily</option>
+          <option value="BUDGET_MODE_TOTAL">Lifetime</option>
+        </select>
+        <input class="form-control w-50" name="campaign_budget" type="number" placeholder="Amount">
+      </div>
+
+    </div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="step d-none" data-step="2">
+    <div class="card p-4">
+      <h5>Ad Group</h5>
+
+      <input class="form-control mb-3" name="adgroup_name" placeholder="Ad Group Name">
+
+      <select class="form-select mb-3 d-none" name="shopping_ads_type">
+        <option value="">Select Shopping ads type</option>
+        <option value="VIDEO">Video Shopping Ads</option>
+        <option value="LIVE">Live Shopping Ads</option>
+        <option value="PRODUCT_SHOPPING_ADS">Product Shopping Ads</option>
+      </select>
+
+      <div id="conversionSection" class="d-none">
+
+        <label for="pixel_id">Data connection</label>
+        <select class="form-select mb-2" name="pixel_id">
+          <option value="">Select Pixel</option>
+          {% if tiktok_pixels %}
+          {% for pixel in tiktok_pixels %}
+          <option value="{{ pixel.id }}" {% if "INACTIVE" in pixel.activity_status %} disabled {% endif %}>
+            {{ pixel.name }} {% if "INACTIVE" in pixel.activity_status %}(Disabled){% endif %}
+          </option>
+          {% endfor %}
+          {% else %}
+          <option value="" disabled>No available pixels</option>
+          {% endif %}
+        </select>
+
+        <select class="form-select mb-2" name="optimization_event" id="optimization_event">
+          <option value="">Select optimization event</option>
+          <option value="ADD_BILLING">Add Payment Info</option>
+          <option value="INITIATE_ORDER">Initiate Checkout</option>
+          <option value="ON_WEB_ADD_TO_WISHLIST">Add to Wishlist</option>
+          <option value="ON_WEB_CART">Add to Cart</option>
+          <option value="ON_WEB_DETAIL">View Content</option>
+          <option value="ON_WEB_ORDER">Place an Order</option>
+          <option value="SHOPPING">Purchase</option>
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label d-block text-muted small uppercase">Placement Type</label>
+        <div class="btn-group w-100" role="group" aria-label="Placement Type Selection">
+
+          <input type="radio" class="btn-check" name="placement_type" id="placement_auto"
+            value="PLACEMENT_TYPE_AUTOMATIC" checked autocomplete="off">
+          <label class="btn btn-outline-primary" for="placement_auto">
+            <i class="bi bi-magic me-1"></i> Automatic
+          </label>
+
+          <input type="radio" class="btn-check" name="placement_type" id="placement_manual"
+            value="PLACEMENT_TYPE_NORMAL" autocomplete="off">
+          <label class="btn btn-outline-primary" for="placement_manual">
+            <i class="bi bi-sliders me-1"></i> Manual
+          </label>
+
+        </div>
+      </div>
+      <div id="manual_placement_options" class="card p-3 bg-light d-none mb-3">
+        <label class="form-label small fw-bold">Select Platforms</label>
+
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" name="placements" value="PLACEMENT_TIKTOK" id="plt_tiktok"
+            checked>
+          <label class="form-check-label" for="plt_tiktok">
+            TikTok <small class="text-muted d-block">Main feed and search results</small>
+          </label>
+        </div>
+
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" name="placements" value="PLACEMENT_PANGLE" id="plt_pangle">
+          <label class="form-check-label" for="plt_pangle">
+            Pangle <small class="text-muted d-block">Video ads on third-party apps</small>
+          </label>
+        </div>
+
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="placements" value="PLACEMENT_GLOBAL_APP_BUNDLE"
+            id="plt_global">
+          <label class="form-check-label" for="plt_global">
+            Global App Bundle <small class="text-muted d-block">News and entertainment apps</small>
+          </label>
+        </div>
+      </div>
+
+      <div class="mt-4">
+        <button class="btn btn-link p-0 text-decoration-none fw-bold mb-3" type="button" data-bs-toggle="collapse"
+          data-bs-target="#advancedSettings" aria-expanded="false" aria-controls="advancedSettings">
+          <i class="bi bi-chevron-right me-1"></i> Advanced Settings
+        </button>
+
+        <div class="collapse" id="advancedSettings">
+          <div class="card card-body bg-light border-0">
+
+            <div class="form-check form-switch mb-3">
+              <input class="form-check-input" type="checkbox" name="comment_disabled" id="comment_disabled">
+              <label class="form-check-label fw-bold" for="comment_disabled">Disable User Comments</label>
+              <div class="form-text">
+                We recommend keeping comments on to help your ads achieve more impressions.
+                You can hide, pin, and reply to comments later.
+              </div>
+            </div>
+
+            <div class="form-check form-switch mb-3">
+              <input class="form-check-input" type="checkbox" name="video_download_disabled"
+                id="video_download_disabled">
+              <label class="form-check-label fw-bold" for="video_download_disabled">Disable Video Download</label>
+              <div class="form-text">If disabled, users will not be able to save your ad video to their devices.</div>
+            </div>
+
+            <div class="form-check form-switch mb-3">
+              <input class="form-check-input" type="checkbox" name="share_disabled" id="share_disabled">
+              <label class="form-check-label fw-bold" for="share_disabled">Disable Video Sharing</label>
+              <div class="form-text">Prevents users from sharing your ad to third-party platforms.</div>
+            </div>
+
+            <hr>
+            <div id="pangle_block_section" class="d-none">
+              <label class="form-label fw-bold">Pangle Block List</label>
+              <select class="form-select" name="blocked_pangle_app_ids" multiple>
+                <option value="">Select a block list...</option>
+                <option value="12345">Standard Gaming Blocklist</option>
+                <option value="67890">Competitor Blocklist</option>
+              </select>
+              <div class="form-text">Prevent your ads from appearing on specific Pangle apps.</div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <div class="card p-4 mb-3">
+        <h5>Targeting</h5>
+
+        <div class="mb-3">
+          <label class="form-label fw-bold">Target Locations</label>
+          <div class="dropdown" id="locationDropdown">
+            <button
+              class="btn btn-white border w-100 text-start d-flex justify-content-between align-items-center dropdown-toggle"
+              type="button" id="multiSelectBtn" data-bs-toggle="dropdown" data-bs-auto-close="outside"
+              aria-expanded="false">
+              <span id="selectedCountText">Select Locations...</span>
+            </button>
+
+            <ul class="dropdown-menu w-100 shadow-sm p-0" style="max-height: 400px; overflow: hidden;">
+              <div class="p-2 border-bottom bg-light sticky-top">
+                <input type="text" id="locSearch" class="form-control form-control-sm mb-2"
+                  placeholder="Search cities or countries...">
+                <div class="form-check ms-1">
+                  <input class="form-check-input" type="checkbox" id="selectAll">
+                  <label class="form-check-label fw-bold" for="selectAll">Select All Visible</label>
+                </div>
+              </div>
+
+              <div id="checkboxContainer" style="max-height: 280px; overflow-y: auto;">
+                <li class="p-3 text-muted text-center" id="noDataMsg">Choose an objective/language first...</li>
+              </div>
+            </ul>
+          </div>
+          <input type="hidden" name="location_ids" id="id_locations">
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-bold">Response Languages</label>
+          <div class="dropdown">
+            <button
+              class="btn btn-white border w-100 text-start d-flex justify-content-between align-items-center dropdown-toggle"
+              type="button" id="langDropdownBtn" data-bs-toggle="dropdown" data-bs-auto-close="outside"
+              aria-expanded="false">
+              <span id="langSelectedText">Select Languages...</span>
+            </button>
+
+            <ul class="dropdown-menu w-100 shadow-sm" style="max-height: 350px; overflow-y: auto;">
+              <li class="px-3 py-2 border-bottom sticky-top bg-white">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="selectAllLangs">
+                  <label class="form-check-label fw-bold cursor-pointer" for="selectAllLangs">
+                    Select All
+                  </label>
+                </div>
+              </li>
+
+              <div id="langCheckboxContainer">
+                <li class="dropdown-item py-1">
+                  <div class="form-check">
+                    <input class="form-check-input lang-check" type="checkbox" value="en" id="lang_en"
+                      data-name="English" checked>
+                    <label class="form-check-label d-block cursor-pointer" for="lang_en">English (Default)</label>
+                  </div>
+                </li>
+                <li class="dropdown-item py-1">
+                  <div class="form-check">
+                    <input class="form-check-input lang-check" type="checkbox" value="ar" id="lang_ar"
+                      data-name="Arabic">
+                    <label class="form-check-label d-block cursor-pointer" for="lang_ar">Arabic</label>
+                  </div>
+                </li>
+                <li>
+                  <hr class="dropdown-divider">
+                </li>
+
+                <li class="dropdown-item py-1">
+                  <div class="form-check"><input class="form-check-input lang-check" type="checkbox" value="af"
+                      id="lang_af" data-name="Afrikaans"><label class="form-check-label d-block cursor-pointer"
+                      for="lang_af">Afrikaans</label></div>
+                </li>
+                <li class="dropdown-item py-1">
+                  <div class="form-check"><input class="form-check-input lang-check" type="checkbox" value="am"
+                      id="lang_am" data-name="Amharic"><label class="form-check-label d-block cursor-pointer"
+                      for="lang_am">Amharic</label></div>
+                </li>
+                <li class="dropdown-item py-1">
+                  <div class="form-check"><input class="form-check-input lang-check" type="checkbox" value="az"
+                      id="lang_az" data-name="Azerbaijani"><label class="form-check-label d-block cursor-pointer"
+                      for="lang_az">Azerbaijani</label></div>
+                </li>
+                <li class="dropdown-item py-1">
+                  <div class="form-check"><input class="form-check-input lang-check" type="checkbox" value="zu"
+                      id="lang_zu" data-name="Zulu"><label class="form-check-label d-block cursor-pointer"
+                      for="lang_zu">Zulu</label></div>
+                </li>
+              </div>
+            </ul>
+          </div>
+          <input type="hidden" name="languages" id="id_languages_hidden" value="en">
+          <div class="form-text">Choose languages for the location name translations.</div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label small fw-bold">Gender</label>
+          <div class="btn-group w-100">
+            <input type="radio" class="btn-check" name="gender" id="gen_all" value="GENDER_UNLIMITED" checked>
+            <label class="btn btn-outline-secondary" for="gen_all">All</label>
+            <input type="radio" class="btn-check" name="gender" id="gen_male" value="GENDER_MALE">
+            <label class="btn btn-outline-secondary" for="gen_male">Male</label>
+            <input type="radio" class="btn-check" name="gender" id="gen_female" value="GENDER_FEMALE">
+            <label class="btn btn-outline-secondary" for="gen_female">Female</label>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <div class="d-flex justify-content-start align-items-center mb-2">
+            <label class="form-label small fw-bold mb-0 me-3">Age Groups</label>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="selectAllAge">
+              <label class="form-check-label small text-muted" for="selectAllAge">All</label>
+            </div>
+          </div>
+          <div class="d-flex flex-wrap gap-2" id="ageGroupContainer">
+            <div class="form-check">
+              <input class="form-check-input age-check" type="checkbox" name="age_groups" value="AGE_18_24" id="age18">
+              <label class="form-check-label" for="age18">18-24</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input age-check" type="checkbox" name="age_groups" value="AGE_25_34" id="age25">
+              <label class="form-check-label" for="age25">25-34</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input age-check" type="checkbox" name="age_groups" value="AGE_35_44" id="age35">
+              <label class="form-check-label" for="age35">35-44</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input age-check" type="checkbox" name="age_groups" value="AGE_45_54" id="age45">
+              <label class="form-check-label" for="age45">45-54</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input age-check" type="checkbox" name="age_groups" value="AGE_55_100" id="age55">
+              <label class="form-check-label" for="age55">55-100</label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card p-4 mb-3 bg-light">
+        <h6>Device Settings</h6>
+
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label small">Operating System</label>
+            <select class="form-select" name="operating_system">
+              <option value="OS_UNLIMITED">All</option>
+              <option value="ANDROID">Android</option>
+              <option value="IOS">iOS</option>
+            </select>
+          </div>
+          <div class="col-md-6 mb-3">
+            <div class="d-flex justify-content-start align-items-center mb-2">
+              <label class="form-label small fw-bold mb-0 me-3">Network Types</label>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="selectAllNetworks">
+                <label class="form-check-label small text-muted" for="selectAllNetworks">All</label>
+              </div>
+            </div>
+            <div class="d-flex flex-wrap gap-2" id="networkTypesContainer">
+              <div class="form-check">
+                <input class="form-check-input network-check" type="checkbox" name="network_types" value="WIFI" id="network18">
+                <label class="form-check-label" for="network18">WIFI</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input network-check" type="checkbox" name="network_types" value="2G" id="network25">
+                <label class="form-check-label" for="network25">2G</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input network-check" type="checkbox" name="network_types" value="3G" id="network35">
+                <label class="form-check-label" for="network35">3G</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input network-check" type="checkbox" name="network_types" value="4G" id="network45">
+                <label class="form-check-label" for="network45">4G</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input network-check" type="checkbox" name="network_types" value="5G" id="network55">
+                <label class="form-check-label" for="network55">5G</label>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label small">Device Price Range (USD)</label>
+          <div class="input-group">
+            <input type="number" name="device_price_min" class="form-control" placeholder="Min">
+            <input type="number" name="device_price_max" class="form-control" placeholder="Max">
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-md-12 mb-3">
+          <label class="form-label">Budget (AED)</label>
+          <div class="input-group">
+            <span class="input-group-text">AED</span>
+            <select name="budget_mode" class="form-select" style="max-width: 150px;">
+              <option value="BUDGET_MODE_DAY">Daily</option>
+              <option value="BUDGET_MODE_TOTAL">Lifetime</option>
+            </select>
+            <input type="number" name="budget" id="id_budget" class="form-control w-75" placeholder="30.00" step="0.01">
+          </div>
+          <small class="text-muted">Minimum: 20.00 AED.</small>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-bold">Bid Strategy</label>
+          <select name="bid_type" class="form-select">
+            <option value="BID_TYPE_NO_BID">Lowest Cost (No Bid)</option>
+            <option value="BID_TYPE_CUSTOM">Manual Bid (Custom)</option>
+          </select>
+        </div>
+
+
+
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label">Start Time</label>
+            <input type="datetime-local" name="schedule_start_time" id="id_start_time" class="form-control">
+          </div>
+
+          <div class="col-md-6 mb-3">
+            <label class="form-label d-block">End Time</label>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" name="end_time_toggle" id="no_end_time" value="none" checked>
+              <label class="form-check-label" for="no_end_time">Run continuously</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" name="end_time_toggle" id="has_end_time" value="set">
+              <label class="form-check-label" for="has_end_time">Set end time</label>
+            </div>
+
+            <div id="end_time_container" class="mt-2 d-none">
+              <input type="datetime-local" name="schedule_end_time" id="id_end_time" class="form-control">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label d-block">Dayparting (Schedule)</label>
+        <div class="form-check form-check-inline">
+          <input class="form-check-input" type="radio" name="dayparting_type" id="all_day" value="all_day" checked>
+          <label class="form-check-label" for="all_day">All day</label>
+        </div>
+        <div class="form-check form-check-inline">
+          <input class="form-check-input" type="radio" name="dayparting_type" id="specific_time" value="specific">
+          <label class="form-check-label" for="specific_time">Select specific time</label>
+        </div>
+      </div>
+
+      <div class="card mb-4 border-0 shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title mb-4">Bidding and optimization</h5>
+
+          <div class="mb-3">
+            <label class="form-label">Optimization Goal</label>
+            <select name="optimization_goal" id="id_optimization_goal" class="form-select">
+              <option value="CONVERT">Conversions</option>
+              <option value="VALUE">Value</option>
+              <option value="CLICK">Clicks</option>
+            </select>
+          </div>
+
+          <div class="alert alert-info py-2 shadow-sm border-0">
+            <i class="bi bi-info-circle me-2"></i>
+            <strong>Billing Event:</strong> <span id="billing_event_display">CPM (Cost Per Mille)</span>
+          </div>
+
+          <script>
+            const optMapping = {
+              'VALUE': 'CPM (Cost Per Mille)',
+              'CONVERSIONS': 'CPM (Cost Per Mille)',
+              'CLICK': 'CPC (Cost Per Click)'
+            };
+
+            document.getElementById('id_optimization_goal').addEventListener('change', function () {
+              document.getElementById('billing_event_display').innerText = optMapping[this.value] || 'CPM';
+            });
+          </script>
+
+          <div id="roas_section_wrapper" class="mb-3">
+            <div class="form-check form-switch mb-2">
+              <input class="form-check-input" type="checkbox" name="use_roas" id="toggle_roas">
+              <label class="form-check-label" for="toggle_roas">Set Target ROAS (Optional)</label>
+            </div>
+
+            <div id="roas_input_container" class="input-group" style="display: none;">
+              <span class="input-group-text">Target ROAS</span>
+              <input type="number" name="roas_bid" id="id_roas_bid" class="form-control" placeholder="e.g. 2.5"
+                step="0.1">
+            </div>
+
+            <div class="form-text">Leave off to use the "Highest Value" bid strategy.</div>
+          </div>
+
+          <hr>
+
+          <h6 class="mb-3">Attribution settings</h6>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Click-through Window</label>
+              <select name="click_through_window" class="form-select">
+                <option value="1">1 Day</option>
+                <option value="7" selected>7 Days</option>
+                <option value="14">14 Days</option>
+                <option value="28">28 Days</option>
+              </select>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">View-through Window</label>
+              <select name="view_through_window" class="form-select">
+                <option value="0">Off</option>
+                <option value="1" selected>1 Day</option>
+                <option value="7">7 Days</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- APP -->
+      <div id="appSection" class="d-none">
+        <h6>App</h6>
+        <input class="form-control mb-2" name="app_id" placeholder="App ID">
+      </div>
+
+      <!-- LEAD -->
+      <div id="leadSection" class="d-none">
+        <h6>Lead Generation</h6>
+        <input class="form-control mb-2" name="form_id" placeholder="Form ID">
+
+        <select class="form-select mb-2" name="promotion_target_type">
+          <option value="INSTANT_PAGE">Instant Form</option>
+          <option value="EXTERNAL_WEBSITE">Website</option>
+        </select>
+      </div>
+
+      <!-- MESSAGING -->
+      <div id="messagingSection" class="d-none">
+        <h6>Messaging</h6>
+
+        <select class="form-select mb-2" id="messaging_app_type" name="messaging_app_type">
+          <option value="">Select App</option>
+          <option value="WHATSAPP">WhatsApp</option>
+          <option value="MESSENGER">Messenger</option>
+          <option value="LINE">LINE</option>
+        </select>
+
+        <input class="form-control mb-2 d-none" id="phoneInput" name="phone_number" placeholder="Phone Number">
+        <input class="form-control mb-2 d-none" id="messengerInput" name="messaging_app_account_id"
+          placeholder="Messenger/LINE ID">
+      </div>
+
+      <!-- SHOPPING -->
+      <div id="shoppingSection" class="d-none">
+        <h6>Shopping Ads</h6>
+
+        <select class="form-select mb-2" name="shopping_ads_type">
+          <option value="">Select Shopping Ad Type</option>
+          <option value="VIDEO">Video</option>
+          <option value="LIVE">Live</option>
+          <option value="PRODUCT_SHOPPING_ADS">Product Ads</option>
+        </select>
+
+        <select class="form-select mb-2" id="product_source" name="product_source">
+          <option value="">Select Product Source</option>
+          <option value="CATALOG">Catalog</option>
+          <option value="STORE">Store</option>
+          <option value="SHOWCASE">Showcase</option>
+        </select>
+
+        <input class="form-control mb-2 d-none" id="storeField" name="store_id" placeholder="Store ID">
+        <input class="form-control mb-2 d-none" id="catalogField" name="catalog_id" placeholder="Catalog ID">
+      </div>
+
+    </div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="step d-none" data-step="3">
+    <div class="card p-4">
+      <h5>Creative</h5>
+
+      <input class="form-control mb-2" name="ad_name" placeholder="Ad Name">
+
+      <!-- Identity -->
+      <select class="form-select mb-2" name="identity_id" id="identitySelect">
+        <option value="">Choose TikTok Identity</option>
+        {% if tiktok_identities %}
+        {% for identity in tiktok_identities %}
+        <option value="{{ identity.id }}" data-type="{{ identity.identity_type }}" {% if identity.identity_type == "BC_AUTH_TT" %} data-name="{{ identity.identity_authorized_bc_id }}" {% endif %} {% if identity.available_status != "AVAILABLE" %} disabled {% endif %}>
+          {{ identity.name }}
+          {% if identity.available_status != "AVAILABLE" %}[Unavailable]{% endif %}
+        </option>
+        {% endfor %}
+        {% else %}
+        <option value="" disabled>No available identities found</option>
+        {% endif %}
+      </select>
+
+      <div class="input-group mb-2">
+        <span class="input-group-text small">Type</span>
+        <input type="text" class="form-control bg-light" id="identityTypeDisplay" name="identity_type" readonly placeholder="Select an identity above">
+        <input type="text" class="form-control bg-light d-none" id="identityNameDisplay" name="identity_authorized_bc_id" readonly placeholder="Authorized Business Center ID">
+      </div>
+
+      <script>
+        document.getElementById('identitySelect').addEventListener('change', function() {
+            // Get the selected option
+            const selectedOption = this.options[this.selectedIndex];
+            
+            // Get the type from the data-type attribute we added in the template
+            const identityType = selectedOption.getAttribute('data-type') || "";
+            const identityName = selectedOption.getAttribute('data-name') || "";
+            
+            // Update the display input
+            document.getElementById('identityTypeDisplay').value = identityType;
+            document.getElementById('identityNameDisplay').value = identityName;
+
+        });
+      </script>
+
+      <!-- Ad Format -->
+      <select class="form-select mb-2" name="ad_format" id="adFormatSelect">
+        <option value="">Choose Ad Format</option>
+        <option value="SINGLE_VIDEO" selected>Single Video</option>
+        <option value="SINGLE_IMAGE">Single Image</option>
+      </select>
+      <div class="col-md-12" id="videoUploadSection">
+        <label class="form-label fw-bold">TikTok Video</label>
+        <input type="file" class="form-control" id="videoUpload" accept="video/*">
+        <label class="form-label fw-bold">Video Cover (thumbnail)</label>
+        <input type="file" class="form-control" id="imageUpload" accept="image/*">
+      
+        <div id="videoPreviewContainer" class="mt-3" style="display:none;">
+          <div class="ratio ratio-16x9 mb-2">
+            <video id="videoThumbnail" class="rounded border" controls></video>
+          </div>
+      
+          <div class="d-flex align-items-center mt-2">
+            <div id="videoSpinner" class="spinner-border spinner-border-sm text-primary me-2" role="status"
+              style="display:none;">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+            <small id="videoStatus" class="text-muted">Select a file to upload</small>
+          </div>
+        </div>
+      </div>
+      
+      <div class="col-md-12 d-none" id="imageUploadSection">
+        <label class="form-label fw-bold">TikTok Image</label>
+        <input type="file" class="form-control" id="imageUpload" accept="image/*">
+      
+        <div id="imagePreviewContainer" class="mt-3" style="display:none;">
+          <img id="imageThumbnail" class="img-thumbnail mb-2" style="max-height: 200px; width: auto;">
+      
+          <div class="d-flex align-items-center mt-2">
+            <div id="imageSpinner" class="spinner-border spinner-border-sm text-success me-2" role="status"
+              style="display:none;">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+            <small id="imageStatus" class="text-muted">Select a file to upload</small>
+          </div>
+        </div>
+      </div>
+
+      <script>
+        let uploadedVideoId = null;
+        let uploadedImageId = null;
+
+        // --- VIDEO AUTO-UPLOAD ---
+        document.getElementById('videoUpload').addEventListener('change', async function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            selectedVideoFile = file;
+
+
+            const container = document.getElementById('videoPreviewContainer');
+            const videoTag = document.getElementById('videoThumbnail');
+            const status = document.getElementById('videoStatus');
+            const spinner = document.getElementById('videoSpinner');
+            
+            // UI Setup
+            container.style.display = 'block';
+            
+            // Clear old memory-blob to prevent leaks
+            if (videoTag.src) URL.revokeObjectURL(videoTag.src);
+            videoTag.src = URL.createObjectURL(file);
+            
+            spinner.style.display = 'inline-block'; 
+            status.innerText = "Uploading to TikTok...";
+            status.className = "text-primary small";
+
+            try {
+                const resp = await uploadVideo(file);
+
+                // FIX: Accessing data as an array [0]
+                const responseData = Array.isArray(resp.data) ? resp.data[0] : resp.data;
+                const videoId = responseData?.video_id || resp.video_id;
+
+                if (resp.code === 0 && videoId) {
+                    uploadedVideoId = videoId;
+                    status.innerText = "Uploaded Successfully: ID " + uploadedVideoId;
+                    status.className = "text-success fw-bold small";
+                } else {
+                    // Handle cases where code is 0 but data is empty or malformed
+                    const errorMsg = resp.message || "Invalid API Response Structure";
+                    throw new Error(errorMsg);
+                }
+            } catch (err) {
+                status.innerText = "Upload Failed: " + err.message;
+                status.className = "text-danger small";
+            } finally {
+                spinner.style.display = 'none';
+                // Clear the input so the connection isn't held by the DOM
+                e.target.value = ''; 
+            }
+        });
+
+        // --- VIDEO AUTO-UPLOAD ---
+        document.getElementById('imageUpload').addEventListener('change', async function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            selectedImageFile = file;
+
+            const container = document.getElementById('imagePreviewContainer');
+            const imageTag = document.getElementById('imageThumbnail');
+            const status = document.getElementById('imageStatus');
+            const spinner = document.getElementById('imageSpinner');
+            
+            // UI Setup
+            container.style.display = 'block';
+            
+            // Clear old memory-blob to prevent leaks
+            if (imageTag.src) URL.revokeObjectURL(imageTag.src);
+            imageTag.src = URL.createObjectURL(file);
+            
+            spinner.style.display = 'inline-block'; 
+            status.innerText = "Uploading to TikTok...";
+            status.className = "text-primary small";
+
+            try {
+                const resp = await uploadImage(file);
+
+                const responseData = Array.isArray(resp.data) ? resp.data[0] : resp.data;
+                const imageId = responseData?.image_id || resp.image_id;
+
+                // TikTok API success is usually 'code': 0
+                if (resp.code === 0 && imageId) {
+                    // Save the ID and STOP
+                    uploadedImageId = imageId;
+                    
+                    status.innerText = "Uploaded Successfully: ID " + uploadedImageId;
+                    status.className = "text-success fw-bold small";
+                    
+                    // Success: the 'await' is finished, connection is effectively closed
+                } else {
+                    // If TikTok returns code != 0, resp.message might be "OK" 
+                    // even if the upload failed. We force a descriptive error.
+                    const errorMsg = resp.message || resp.display_message || "TikTok API Error";
+                    throw new Error(errorMsg === "OK" ? "TikTok rejected the file format" : errorMsg);
+                }
+            } catch (err) {
+                status.innerText = "Upload Failed: " + err.message;
+                status.className = "text-danger small";
+            } finally {
+                spinner.style.display = 'none';
+                // Clear the input so the connection isn't held by the DOM
+                e.target.value = ''; 
+            }
+        });
+
+        // --- UPDATED FETCH FUNCTIONS WITH SIGNAL ---
+
+        async function uploadVideo(file) {
+            const formData = new FormData();
+            formData.append("video_file", file);
+
+            const res = await fetch("/tiktok/upload-video/", {
+                method: "POST",
+                body: formData,
+            });
+
+            let data;
+            try {
+                data = await res.json();
+            } catch {
+                throw new Error("Invalid JSON response from server");
+            }
+
+            return data;
+        }
+
+        async function uploadImage(file) {
+            const formData = new FormData();
+            formData.append('image_file', file);
+
+            const res = await fetch('/tiktok/upload-image/', {
+                method: 'POST',
+                body: formData,
+            });
+
+            let data;
+            try {
+                data = await res.json();
+            } catch {
+                throw new Error("Invalid JSON response from server");
+            }
+
+            return data;
+        }
+      </script>
+      <!-- Content -->
+      <textarea class="form-control mb-2" name="ad_text" placeholder="Ad Text (max 100 chars)"></textarea>
+
+      <select class="form-select mb-2" name="call_to_action">
+        <option value="SHOP_NOW" selected>Shop Now</option>
+        <option value="LEARN_MORE">Learn More</option>
+        <option value="ORDER_NOW">Order now</option>
+        <option value="SIGN_UP">Sign Up</option>
+        <hr>
+        <option value="APPLY_NOW">Apply now</option>
+        <option value="BOOK_NOW">Book now</option>
+        <option value="CALL_NOW">Call now</option>
+        <option value="CHECK_AVAILABLILITY">Check availability</option>
+        <option value="CONTACT_US">Contact us</option>
+        <option value="DOWNLOAD_NOW">Download</option>
+        <option value="EXPERIENCE_NOW">Experience now</option>
+        <option value="GET_QUOTE">Get quote</option>
+        <option value="GET_SHOWTIMES">Get showtimes</option>
+        <option value="GET_TICKETS_NOW">Get tickets now</option>
+        <option value="INSTALL_NOW">Install now</option>
+        <option value="INTERESTED">Interested</option>
+        <option value="LISTEN_NOW">Listen now</option>
+        <option value="PLAY_GAME">Play game</option>
+        <option value="PREORDER_NOW">Pre-order now</option>
+        <option value="READ_MORE">Read more</option>
+        <option value="SEND_MESSAGE">Send message</option>
+        <option value="SUBSCRIBE">Subscribe</option>
+        <option value="VIEW_NOW">View now</option>
+      </select>
+
+      <div class="mt-3 p-3 border rounded bg-light">
+        <h6>Landing Page & UTM Builder</h6>
+        
+        <label class="small text-muted">Paste Base URL</label>
+        <input type="text" class="form-control mb-2" id="base_url" placeholder="https://sleepy-cloud.ae/search?q=mattress&utm_source=old_source">
+
+        <div class="row g-2">
+          <div class="col-md-3">
+            <label class="small text-muted">Campaign ID</label>
+            <input type="text" class="form-control form-control-sm utm-field" id="utm_campaign_id" placeholder="Campaign ID">
+          </div>
+          <div class="col-md-3">
+            <label class="small text-muted">Source</label>
+            <input type="text" class="form-control form-control-sm utm-field" id="utm_source" value="tiktok">
+          </div>
+          <div class="col-md-3">
+            <label class="small text-muted">Medium</label>
+            <input type="text" class="form-control form-control-sm utm-field" id="utm_medium" value="paid_social">
+          </div>
+          <div class="col-md-3">
+            <label class="small text-muted">Campaign</label>
+            <input type="text" class="form-control form-control-sm utm-field" id="utm_campaign" placeholder="Campaign Name">
+          </div>
+          <div class="col-md-3">
+            <label class="small text-muted">Campaign ID</label>
+            <input type="text" class="form-control form-control-sm utm-field" id="utm_campaign_id" placeholder="Campaign ID">
+          </div>
+          <div class="col-md-3">
+            <label class="small text-muted">Campaign Term</label>
+            <input type="text" class="form-control form-control-sm utm-field" id="utm_campaign_term" placeholder="Campaign Term">
+          </div>
+          <div class="col-md-3">
+            <label class="small text-muted">Campaign Content</label>
+            <input type="text" class="form-control form-control-sm utm-field" id="utm_campaign_content" placeholder="Campaign Content">
+          </div>
+        </div>
+
+        <div id="extra_params_container" class="mt-2 row g-2"></div>
+
+        <div class="mt-3">
+          <label class="small fw-bold">Final URL Preview:</label>
+          <div id="final_url_display" class="small text-break p-2 border bg-white rounded text-primary" style="min-height: 40px;"></div>
+          <input type="hidden" name="landing_page_url" id="id_landing_page_url">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 4 -->
+  <div class="step d-none" data-step="4">
+    <div class="card p-4">
+      <h5 class="mb-4">Review & Submit</h5>
+
+      <div class="row">
+        <div class="col-md-4 mb-4">
+          <h6 class="text-muted small text-uppercase fw-bold">Creative Preview</h6>
+          <div id="mediaPreviewContainer"
+            class="border rounded bg-light d-flex align-items-center justify-content-center"
+            style="min-height: 300px; overflow: hidden;">
+            <p class="text-muted">No media uploaded</p>
+          </div>
+        </div>
+
+        <div class="col-md-8">
+          <h6 class="text-muted small text-uppercase fw-bold">Campaign Structure</h6>
+          <div id="treeViewContainer" class="p-3 border rounded bg-white">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-4 d-flex justify-content-between">
+    <button type="button" class="btn btn-secondary" id="prevBtn">Back</button>
+    <button type="button" class="btn btn-primary" id="nextBtn">Next</button>
+  </div>
+</form>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const baseUrlInput = document.getElementById('base_url');
+    const extraContainer = document.getElementById('extra_params_container');
+    const finalUrlDisplay = document.getElementById('final_url_display');
+    const hiddenUrlInput = document.getElementById('id_landing_page_url');
+
+    // State to track non-UTM params (like 'q' or 'search')
+    let extraParams = {};
+
+    function updateUTMBuilder() {
+      let rawValue = baseUrlInput.value.trim();
+      if (!rawValue) return;
+
+      try {
+        // Ensure URL has a protocol
+        if (!rawValue.startsWith('http')) rawValue = 'https://' + rawValue;
+        const url = new URL(rawValue);
+
+        // 1. Extract and Fill UTM Fields
+        const params = url.searchParams;
+
+        const fields = {
+          'utm_campaign_id': document.getElementById('utm_campaign_id'),
+          'utm_source': document.getElementById('utm_source'),
+          'utm_medium': document.getElementById('utm_medium'),
+          'utm_campaign': document.getElementById('utm_campaign'),
+          'utm_term': document.getElementById('utm_term'),
+          'utm_content': document.getElementById('utm_content')
+        };
+
+        for (const [key, input] of Object.entries(fields)) {
+          if (params.has(key)) {
+            input.value = params.get(key);
+          } else if (key === 'utm_source' && !input.value) {
+            input.value = 'tiktok'; // Default if empty
+          }
+        }
+
+        // 2. Detect Search / Extra Parameters
+        extraContainer.innerHTML = '';
+        extraParams = {};
+
+        params.forEach((value, key) => {
+          if (!key.startsWith('utm_')) {
+            extraParams[key] = value;
+            createExtraField(key, value);
+          }
+        });
+
+        // 3. Strip query from base display to keep the logic clean
+        // We store the clean base (origin + pathname)
+        baseUrlInput.dataset.cleanBase = url.origin + url.pathname;
+
+        buildFinalURL();
+
+      } catch (e) {
+        finalUrlDisplay.innerText = "Invalid URL format";
+      }
+    }
+
+    function createExtraField(key, value) {
+      const div = document.createElement('div');
+      div.className = 'col-md-4';
+      div.innerHTML = `
+            <label class="small text-primary fw-bold">${key.toUpperCase()}</label>
+            <input type="text" class="form-control form-control-sm extra-utm-field" data-key="${key}" value="${value}">
+        `;
+      extraContainer.appendChild(div);
+
+      div.querySelector('input').addEventListener('input', function () {
+        extraParams[this.dataset.key] = this.value;
+        buildFinalURL();
+      });
+    }
+
+    function buildFinalURL() {
+      let base = baseUrlInput.dataset.cleanBase || baseUrlInput.value.split('?')[0];
+      if (!base) return;
+
+      try {
+        const finalUrl = new URL(base);
+
+        // Add standard UTMs
+        finalUrl.searchParams.set('utm_source', document.getElementById('utm_source').value || 'tiktok');
+        finalUrl.searchParams.set('utm_medium', document.getElementById('utm_medium').value);
+        finalUrl.searchParams.set('utm_campaign', document.getElementById('utm_campaign').value);
+
+        // Add Extras (Search, etc)
+        for (const [key, val] of Object.entries(extraParams)) {
+          if (val) finalUrl.searchParams.set(key, val);
+        }
+
+        const result = finalUrl.toString();
+        finalUrlDisplay.innerText = result;
+        hiddenUrlInput.value = result;
+      } catch (e) { }
+    }
+
+    // Listeners
+    baseUrlInput.addEventListener('paste', (e) => {
+      // Short timeout to let the paste finish
+      setTimeout(updateUTMBuilder, 100);
+    });
+
+    baseUrlInput.addEventListener('input', buildFinalURL);
+    document.querySelectorAll('.utm-field').forEach(f => f.addEventListener('input', buildFinalURL));
+  });
+
+  // Reference elements
+  const optimizationGoalSelect = document.getElementById('id_optimization_goal');
+  const roasWrapper = document.getElementById('roas_section_wrapper');
+  const roasToggle = document.getElementById('toggle_roas');
+  const roasInputContainer = document.getElementById('roas_input_container');
+  const roasInput = document.getElementById('id_roas_bid');
+
+  // 1. Handle UI Visibility based on Optimization Goal
+  optimizationGoalSelect.addEventListener('change', function () {
+    if (this.value === 'CONVERT') {
+      roasWrapper.classList.add('d-none');
+    } else if (this.value === 'VALUE') {
+      roasWrapper.classList.remove('d-none');
+    }
+  });
+
+  // 2. Toggle the numeric input field
+  roasToggle.addEventListener('change', function () {
+    roasInputContainer.style.display = this.checked ? 'flex' : 'none';
+  });
+
+  // 3. Logic for API Payload Construction (Helper function)
+  function getBidStrategy(goal, isRoasToggled, roasValue) {
+    if (goal === 'VALUE') {
+      return {
+        bid_type: "BID_TYPE_NO_BID",
+        deep_bid_type: isRoasToggled ? "VO_MIN_ROAS" : "VO_HIGHEST_VALUE",
+        roas_bid: isRoasToggled ? roasValue : null
+      };
+    }
+    // Default or 'CONVERT' logic here...
+    return { bid_type: "BID_TYPE_CUSTOM" };
+  }
+
+  const selectAllAge = document.getElementById('selectAllAge');
+  const ageChecks = document.querySelectorAll('.age-check');
+
+  // 1. Master Toggle
+  selectAllAge.addEventListener('change', function () {
+    ageChecks.forEach(cb => cb.checked = this.checked);
+  });
+
+  ageChecks.forEach(cb => {
+    cb.addEventListener('change', function () {
+      const total = ageChecks.length;
+      const checked = document.querySelectorAll('.age-check:checked').length;
+
+      // If all checked, check 'Select All'. If one is missing, uncheck it.
+      selectAllAge.checked = (total === checked);
+
+      // Optional: Indeterminate state (visual dash -)
+      selectAllAge.indeterminate = (checked > 0 && checked < total);
+    });
+  });
+
+  const selectAllNetworks = document.getElementById('selectAllNetworks');
+  const networkChecks = document.querySelectorAll('.network-check');
+
+  selectAllNetworks.addEventListener('change', function () {
+    networkChecks.forEach(cb => cb.checked = this.checked);
+  });
+
+  networkChecks.forEach(cb => {
+    cb.addEventListener('change', function () {
+      const total = networkChecks.length;
+      const checked = document.querySelectorAll('.network-check:checked').length;
+
+      // If all checked, check 'Select All'. If one is missing, uncheck it.
+      selectAllNetworks.checked = (total === checked);
+
+      // Optional: Indeterminate state (visual dash -)
+      selectAllNetworks.indeterminate = (checked > 0 && checked < total);
+    });
+  });
+
+  document.addEventListener('DOMContentLoaded', function () {
+    const langContainer = document.getElementById('langCheckboxContainer');
+    const selectAllLangs = document.getElementById('selectAllLangs');
+    const hiddenInput = document.getElementById('id_languages_hidden');
+    const btnText = document.getElementById('langSelectedText');
+
+    function updateLangUI() {
+      const checked = Array.from(langContainer.querySelectorAll('.lang-check:checked'));
+      const total = langContainer.querySelectorAll('.lang-check').length;
+      const values = checked.map(cb => cb.value);
+
+      // Update Hidden Input
+      hiddenInput.value = values.join(',');
+
+      // Update Button Label
+      if (values.length === 0) {
+        btnText.innerText = "Select Languages...";
+      } else if (values.length === 1) {
+        btnText.innerText = checked[0].dataset.name;
+      } else if (values.length === total) {
+        btnText.innerText = "All Languages Selected";
+      } else {
+        btnText.innerText = `${values.length} Languages Selected`;
+      }
+
+      // Sync Select All Checkbox
+      selectAllLangs.checked = (checked.length === total);
+    }
+
+    // Individual Checkbox Change
+    langContainer.addEventListener('change', function (e) {
+      if (e.target.classList.contains('lang-check')) {
+        updateLangUI();
+      }
+    });
+
+    // Select All Change
+    selectAllLangs.addEventListener('change', function () {
+      const checkboxes = langContainer.querySelectorAll('.lang-check');
+      checkboxes.forEach(cb => cb.checked = this.checked);
+      updateLangUI();
+    });
+
+    // Run once on load
+    updateLangUI();
+  });
+
+  document.getElementById('adFormatSelect').addEventListener('change', function () {
+    const videoSection = document.getElementById('videoUploadSection');
+    const imageSection = document.getElementById('imageUploadSection');
+
+    if (this.value === 'SINGLE_VIDEO') {
+      videoSection.classList.remove('d-none');
+      imageSection.classList.add('d-none');
+    } else {
+      videoSection.classList.add('d-none');
+      imageSection.classList.remove('d-none');
+    }
+  });
+
+  document.getElementById('objectiveSelect').addEventListener('change', function () {
+    const appPro = document.getElementById('app_promotion_type');
+    const salesDes = document.getElementById('sales_destination');
+    const shoppingAds = document.getElementById('shopping_ads_type');
+
+    if (this.value === 'APP_PROMOTION') {
+      appPro.classList.remove('d-none');
+      salesDes.classList.add('d-none');
+    } else if (this.value === 'WEB_CONVERSIONS' || this.value === 'PRODUCT_SALES') {
+      if (this.value === 'PRODUCT_SALES') {
+        shoppingAds.classList.remove('d-none');
+      }
+      salesDes.classList.remove('d-none');
+      appPro.classList.add('d-none');
+    } else {
+      shoppingAds.classList.add('d-none');
+      salesDes.classList.add('d-none');
+      appPro.classList.add('d-none');
+    }
+
+  });
+
+  // Reference elements
+  const noEndTimeRadio = document.getElementById('no_end_time');
+  const hasEndTimeRadio = document.getElementById('has_end_time');
+  const endTimeContainer = document.getElementById('end_time_container');
+  const endTimeInput = document.getElementById('id_end_time');
+
+  // Event listener for "Set end time"
+  hasEndTimeRadio.addEventListener('change', function () {
+    if (this.checked) {
+      endTimeContainer.classList.remove('d-none');
+      // Optional: Set a default end time (e.g., 1 week from now)
+    }
+  });
+
+  // Event listener for "Run continuously"
+  noEndTimeRadio.addEventListener('change', function () {
+    if (this.checked) {
+      endTimeContainer.classList.add('d-none');
+      endTimeInput.value = ''; // Clear the value if hidden
+    }
+  });
+
+  // Load automatically on page ready
+  document.addEventListener('DOMContentLoaded', () => loadLocations());
+  // Function to update Advanced Settings based on Placement
+  function updateAdvancedSettings() {
+    const pangleChecked = document.getElementById('plt_pangle').checked;
+    const pangleSection = document.getElementById('pangle_block_section');
+
+    if (pangleChecked) {
+      pangleSection.classList.remove('d-none');
+    } else {
+      pangleSection.classList.add('d-none');
+    }
+  }
+
+  // Attach listener to the Pangle checkbox in your Manual Placements section
+  document.getElementById('plt_pangle').addEventListener('change', updateAdvancedSettings);
+
+  document.querySelectorAll('input[name="placement_type"]').forEach((elem) => {
+    elem.addEventListener("change", function (event) {
+      const manualSection = document.getElementById('manual_placement_options'); // your checkboxes div
+      if (event.target.value === "PLACEMENT_TYPE_NORMAL") {
+        manualSection.classList.remove('d-none');
+      } else {
+        manualSection.classList.add('d-none');
+      }
+    });
+  });
+
+
+  const cboSwitch = document.getElementById('budget_optimize_on');
+  const manualToggleSwitch = document.getElementById('budget_optimize_off');
+
+  const cboBudgetWrapper = document.getElementById('cbo_budget_wrapper');
+  const noCboToggleWrapper = document.getElementById('no_cbo_toggle_wrapper');
+  const noCboBudgetInputs = document.getElementById('no_cbo_budget_inputs');
+
+  // 1. Handle CBO Main Switch
+  cboSwitch.addEventListener('change', function () {
+    if (this.checked) {
+      // If CBO is ON
+      cboBudgetWrapper.classList.remove('d-none');
+      noCboToggleWrapper.classList.add('d-none');
+      noCboBudgetInputs.classList.add('d-none');
+      // Reset the manual switch so it doesn't stay 'true' in the background
+      manualToggleSwitch.checked = false;
+    } else {
+      // If CBO is OFF
+      cboBudgetWrapper.classList.add('d-none');
+      noCboToggleWrapper.classList.remove('d-none');
+    }
+  });
+
+  // 2. Handle Manual Budget Switch (Only visible when CBO is OFF)
+  manualToggleSwitch.addEventListener('change', function () {
+    if (this.checked) {
+      noCboBudgetInputs.classList.remove('d-none');
+    } else {
+      noCboBudgetInputs.classList.add('d-none');
+    }
+  });
+
+  let step = 1;
+
+  function showStep(n) {
+    document.querySelectorAll('.step').forEach(s => s.classList.add('d-none'));
+    document.querySelector(`.step[data-step="${n}"]`).classList.remove('d-none');
+
+    document.querySelectorAll('#stepsNav .nav-link').forEach(btn => btn.classList.remove('active'));
+    document.querySelector(`#stepsNav [data-step="${n}"]`).classList.add('active');
+  }
+
+  function validateStep(n) {
+    const current = document.querySelector(`.step[data-step="${n}"]`);
+    let valid = true;
+
+    current.querySelectorAll('[required]').forEach(input => {
+      if (input.closest('.d-none')) return;
+
+      if (input.type === "checkbox" || input.type === "radio") {
+        const group = current.querySelectorAll(`[name="${input.name}"]:checked`);
+        if (group.length === 0) valid = false;
+      } else if (!input.value) {
+        valid = false;
+      }
+
+      input.classList.toggle('is-invalid', !valid);
+    });
+
+    return valid;
+  }
+
+  async function loadLocations(objective = 'WEB_CONVERSIONS') {
+    const container = document.getElementById('checkboxContainer');
+    container.innerHTML = '<div class="p-3 text-center">Loading...</div>';
+
+    try {
+      const response = await fetch(`/api/tiktok/locations/?objective=${objective}`);
+      const result = await response.json();
+
+      if (result.status === 'success' && result.data) {
+        container.innerHTML = '';
+
+        // Separate countries and regions
+        const countries = result.data.filter(l => l.level === 'COUNTRY');
+        const subRegions = result.data.filter(l => l.level !== 'COUNTRY');
+
+        countries.forEach(country => {
+          // 1. Add the Country Item
+          renderLocationItem(country, container, false);
+
+          // 2. Add related Provinces (indented)
+          const children = subRegions.filter(s => s.parent_id === country.location_id);
+          children.forEach(child => {
+            renderLocationItem(child, container, true);
+          });
+        });
+      }
+    } catch (error) {
+      container.innerHTML = '<li class="p-3 text-danger">Error fetching locations.</li>';
+    }
+  }
+
+  function renderLocationItem(loc, container, isChild) {
+    const li = document.createElement('li');
+    // Add margin-left if it's a province to show hierarchy
+    li.className = `dropdown-item py-1 ${isChild ? 'ms-3' : 'fw-bold border-bottom'}`;
+
+    li.innerHTML = `
+        <div class="form-check">
+            <input class="form-check-input loc-check" type="checkbox" 
+                  value="${loc.location_id}" id="loc_${loc.location_id}" 
+                  data-name="${loc.name}" data-parent="${loc.parent_id}">
+            <label class="form-check-label d-block cursor-pointer" for="loc_${loc.location_id}">
+                ${loc.name} <span class="text-muted small">(${loc.region_code})</span>
+            </label>
+        </div>`;
+
+    li.querySelector('.loc-check').addEventListener('change', updateUI);
+    container.appendChild(li);
+  }
+
+  // 1. Search Logic
+  document.getElementById('locSearch').addEventListener('input', function (e) {
+    const term = e.target.value.toLowerCase();
+    const items = document.querySelectorAll('#checkboxContainer .dropdown-item');
+
+    items.forEach(item => {
+      const text = item.innerText.toLowerCase();
+      item.style.display = text.includes(term) ? 'block' : 'none';
+    });
+  });
+
+  // 2. Select All Visible Logic
+  document.getElementById('selectAll').addEventListener('change', function (e) {
+    const isChecked = e.target.checked;
+    // Only select items that are currently visible (not filtered out by search)
+    const visibleChecks = document.querySelectorAll('#checkboxContainer .dropdown-item[style*="display: block"] .loc-check, #checkboxContainer .dropdown-item:not([style*="display: none"]) .loc-check');
+
+    visibleChecks.forEach(check => {
+      check.checked = isChecked;
+    });
+
+    updateUI();
+  });
+
+  // 3. Your Updated updateUI function
+  function updateUI() {
+    const checked = document.querySelectorAll('.loc-check:checked');
+    const values = Array.from(checked).map(cb => cb.value);
+    const names = Array.from(checked).map(cb => cb.dataset.name);
+
+    // Match the ID "id_locations" from your HTML
+    const hiddenInput = document.getElementById('id_locations');
+    if (hiddenInput) {
+      hiddenInput.value = values.join(',');
+    }
+
+    const btnText = document.getElementById('selectedCountText');
+    if (!btnText) return;
+
+    if (values.length === 0) {
+      btnText.innerText = "Select Locations...";
+    } else if (values.length === 1) {
+      btnText.innerText = names[0];
+    } else {
+      btnText.innerText = `${values.length} locations selected`;
+    }
+  }
+
+
+  async function submitAll() {
+    const form = document.getElementById('campaignForm');
+    const data = new FormData(form);
+
+    try {
+      // 1️⃣ Create Campaign
+      let campaign = await fetch('/tiktok/create-campaign/', { method: 'POST', body: data }).then(r => r.json());
+      if (!campaign.campaign_id) throw campaign;
+      data.append('campaign_id', campaign.campaign_id);
+
+      // 2️⃣ Create Ad Group
+      let adgroup = await fetch('/tiktok/create-adgroup/', { method: 'POST', body: data }).then(r => r.json());
+      if (!adgroup.adgroup_id) throw adgroup;
+      data.append('adgroup_id', adgroup.adgroup_id);
+
+      // 3️⃣ Handle Media
+      const ad_format = data.get("ad_format");
+
+      // 5️⃣ Build creatives
+      const identity_type = data.get("identity_type");
+      let creatives = [{
+        ad_name: data.get("ad_name") || "",
+        identity_type: identity_type,
+        identity_id: data.get("identity_id"),
+        ad_format: ad_format,
+        // tiktok_item_id: tiktok_item_id,
+        ad_text: data.get("ad_text"),
+        call_to_action: data.get("call_to_action"),
+        landing_page_url: data.get("landing_page_url"),
+      }];
+
+      if (ad_format === "SINGLE_VIDEO" && uploadedVideoId) {
+        creatives.forEach(creative => {
+          creative.video_id = uploadedVideoId;
+          creative.image_ids = [uploadedImageId];
+        })
+      } else if (ad_format === "SINGLE_IMAGE" && uploadedImageId) {
+        creatives.forEach(creative => {
+          creative.image_ids = [uploadedImageId];
+        })
+      } else {
+        throw new Error("Please Select an Ad Format and upload the required media");
+      }
+
+      if (identity_type === "BC_AUTH_TT") {
+        const rawId = data.get("identity_authorized_bc_id");
+        let identityId = null;
+        if (rawId !== null) {
+            const cleaned = String(rawId).trim();
+            if (/^\d+$/.test(cleaned)) {
+                identityId = cleaned;
+            }
+        }
+        if (!identityId) {
+            throw new Error("identity_authorized_bc_id must be a numeric string");
+        }
+        creatives.forEach(creative => {
+          creative.identity_authorized_bc_id = identityId;
+        });
+      }
+
+      // 6️⃣ Create Ad
+      let ad = await fetch('/tiktok/create-ad/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adgroup_id: adgroup.adgroup_id, creatives: creatives })
+      }).then(r => r.json());
+
+      if (!ad.ad_ids) throw ad;
+
+      alert('Campaign Created Successfully');
+
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'Error occurred');
+    }
+  }
+
+  // Navigation
+
+  document.getElementById('nextBtn').onclick = () => {
+    if (!validateStep(step)) return;
+
+    if (step === 4) {
+      submitAll();
+      return;
+    }
+
+    step++;
+    showStep(step);
+  };
+
+  document.getElementById('prevBtn').onclick = () => {
+    if (step > 1) step--;
+    showStep(step);
+  };
+
+  showStep(step);
+
+  const CONFIG = {
+    CONVERSIONS: ["WEB_CONVERSIONS"],
+    TRAFFIC: ["CLICK", "LANDING_PAGE_VIEW"],
+    APP_INSTALL: ["APP_INSTALL"],
+    LEAD_GENERATION: ["LEAD", "CONVERSATION"],
+    PRODUCT_SALES: ["PRODUCT_SALES"]
+  };
+
+  const objectiveSelect = document.getElementById('objectiveSelect');
+  const optimizationSelect = document.getElementById('optimization_event');
+
+  objectiveSelect.addEventListener('change', function () {
+    const value = this.value;
+
+    // hide all sections
+    hideAllSections();
+
+    if (value === "WEB_CONVERSIONS") show("conversionSection");
+    if (value === "APP_INSTALL") show("appSection");
+    if (value === "LEAD_GENERATION") show("leadSection");
+    if (value === "PRODUCT_SALES") show("shoppingSection");
+  });
+
+  // Optimization → Messaging trigger
+  optimizationSelect.addEventListener("change", function () {
+    if (this.value === "CONVERSATION") {
+      show("messagingSection");
+    } else {
+      hide("messagingSection");
+    }
+  });
+
+  // Messaging type logic
+  document.getElementById("messaging_app_type").addEventListener("change", function () {
+    hide("phoneInput");
+    hide("messengerInput");
+
+    if (this.value === "WHATSAPP") show("phoneInput");
+    if (this.value === "MESSENGER" || this.value === "LINE") show("messengerInput");
+  });
+
+  // Product source logic
+  document.getElementById("product_source").addEventListener("change", function () {
+    hide("storeField");
+    hide("catalogField");
+
+    if (this.value === "STORE") show("storeField");
+    if (this.value === "CATALOG") show("catalogField");
+  });
+
+  // helpers
+  function show(id) {
+    document.getElementById(id).classList.remove("d-none");
+  }
+
+  function hide(id) {
+    document.getElementById(id).classList.add("d-none");
+  }
+
+  function hideAllSections() {
+    [
+      "conversionSection",
+      "appSection",
+      "leadSection",
+      "shoppingSection",
+      "messagingSection"
+    ].forEach(id => hide(id));
+  }
+  let selectedVideoFile = null;
+  let selectedImageFile = null;
+  const adFormatSelect = document.getElementById('adFormatSelect');
+  const videoUpload = document.getElementById('videoUpload');
+  const imageUpload = document.getElementById('imageUpload');
+
+  document.addEventListener('DOMContentLoaded', function () {
+    let currentBlobUrl = null;
+    // Existing language logic...
+
+    const form = document.getElementById('campaignForm');
+    const nextBtn = document.getElementById('nextBtn');
+    const mediaPreview = document.getElementById('mediaPreviewContainer');
+    const treeContainer = document.getElementById('treeViewContainer');
+
+    // --- MEDIA PREVIEW LOGIC ---
+    function handleMediaPreview() {
+      const isVideo = adFormatSelect.value === 'SINGLE_VIDEO';
+      const file = isVideo ? selectedVideoFile : selectedImageFile;
+
+      if (currentBlobUrl) {
+        URL.revokeObjectURL(currentBlobUrl);
+        currentBlobUrl = null;
+      }
+
+      if (!file) {
+        mediaPreview.innerHTML = `<p class="text-muted">No media uploaded</p>`;
+        return;
+      }
+
+      currentBlobUrl = URL.createObjectURL(file);
+
+      if (isVideo) {
+        mediaPreview.innerHTML = `
+              <video src="${currentBlobUrl}" controls class="img-fluid rounded shadow-sm"></video>
+          `;
+      } else {
+        mediaPreview.innerHTML = `
+              <img src="${currentBlobUrl}" class="img-fluid rounded shadow-sm">
+          `;
+      }
+    }
+    adFormatSelect.addEventListener('change', handleMediaPreview);
+
+    // Update preview when files are selected
+    videoUpload.addEventListener('change', handleMediaPreview);
+    imageUpload.addEventListener('change', handleMediaPreview);
+
+    // --- TREE VIEW LOGIC ---
+    function renderTreeView() {
+      const data = new FormData(form);
+      const tree = {
+        "Campaign": ["campaign_name", "objective", "campaign_budget"],
+        "Ad Group": ["adgroup_name", "location_ids", "budget", "optimization_goal"],
+        "Creative": ["ad_name", "ad_text", "landing_page_url"]
+      };
+
+      let html = '<ul class="list-unstyled ms-2">';
+
+      for (const [section, fields] of Object.entries(tree)) {
+        html += `
+          <li class="mb-2">
+            <i class="bi bi-folder-fill text-warning me-2"></i><strong>${section}</strong>
+            <ul class="list-unstyled ms-4 border-start ps-3 mt-1">`;
+
+        fields.forEach(field => {
+          let value = data.get(field);
+
+          // Formatting specific fields for readability
+          if (field === 'location_ids') value = value ? `${value.split(',').length} Locations` : 'None';
+          if (!value || value === "") value = '<span class="text-danger italic">Not set</span>';
+
+          // Clean up labels (e.g., campaign_name -> Name)
+          const label = field.replace(/_/g, ' ').replace('campaign', '').replace('adgroup', '');
+          html += `<li class="small py-1"><span class="text-muted">${label}:</span> <strong>${value}</strong></li>`;
+        });
+
+        html += `</ul></li>`;
+      }
+
+      html += '</ul>';
+      treeContainer.innerHTML = html;
+    }
+
+    // --- STEP NAVIGATION LOGIC ---
+    let currentStep = 1;
+    nextBtn.addEventListener('click', () => {
+      if (currentStep < 4) {
+        currentStep++;
+        updateStepUI();
+        if (currentStep === 4) {
+          handleMediaPreview();
+          renderTreeView();
+        }
+      } else {
+        // Final Submit logic here
+        console.log("Form Submitted");
+      }
+    });
+
+    function updateStepUI() {
+      document.querySelectorAll('.step').forEach(s => s.classList.add('d-none'));
+      document.querySelector(`.step[data-step="${currentStep}"]`).classList.remove('d-none');
+
+      document.querySelectorAll('#stepsNav .nav-link').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.step == currentStep);
+      });
+
+      document.getElementById('nextBtn').innerText = currentStep === 4 ? "Launch Campaign" : "Next";
+    }
+  });
+</script>
+{% endblock %}
