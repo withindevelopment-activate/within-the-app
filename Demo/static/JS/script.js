@@ -49,82 +49,20 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
 $(document).ready(function () {
-  // $('.table-class').DataTable({
-  //     paging: false,
-  //     ordering: false,
-  //     info: false,
-  //     retrieve: true,
-  //     destroy: true,
-  //     autoWidth: false
-  // });
+        // $('.table-class').DataTable({
+        //     paging: false,
+        //     ordering: false,
+        //     info: false,
+        //     retrieve: true,
+        //     destroy: true,
+        //     autoWidth: false
+        // });
+        
+        // To allow search in the drop-downs
+        $('select.form-select').select2({
+        theme: 'bootstrap-5',
+        placeholder: 'اختر',
+        allowClear: true
+        });
 
-  // To allow search in the drop-downs
-  $('select.form-select').select2({
-    theme: 'bootstrap-5',
-    placeholder: 'اختر',
-    allowClear: true
-  });
-
-  let initialSort = [[0, 'desc']]; // Default
-
-  if ($('table').hasClass('default-order-1')) {
-    initialSort = [[1, 'desc']];
-  }
-
-  let ordering = true;
-
-  if ($('table').hasClass('no-order')) {
-    ordering = false;
-  }
-
-
-  const table_big = $('.data-table-big').DataTable({
-    paging: true,
-    ordering: ordering,
-    order: initialSort,
-    searching: true,
-    info: false,
-    lengthChange: false,
-    deferRender: true,
-    pageLength: 200,
-    dom: 't',  // ← IMPORTANT: only table, no UI controls
-  });
-
-  $('#table-search-big').on('keyup', function () {
-    table_big.search(this.value).draw();
-  });
-
-  function syncPagination() {
-    const info = table_big.page.info();
-    const currentPage = info.page + 1;
-    const totalPages = info.pages;
-
-    // Update the "Page X of Y" text
-    $('#page-status').text(`Page ${currentPage} of ${totalPages}`);
-
-    // Update Button States
-    $('#prev-item').toggleClass('disabled', info.page === 0);
-    $('#next-item').toggleClass('disabled', info.page >= totalPages - 1 || totalPages === 0);
-  }
-
-  table_big.on('load', function () {
-    syncPagination();
-  });
-
-  // Trigger sync on every draw (Pagination, Search, Sort)
-  table_big.on('draw', function () {
-    syncPagination();
-  });
-
-  // Bootstrap Button Click Events
-  $('#next-btn').on('click', function (e) {
-    e.preventDefault();
-    table_big.page('next').draw('page');
-  });
-
-  $('#prev-btn').on('click', function (e) {
-    e.preventDefault();
-    table_big.page('previous').draw('page');
-  });
-
-});
+    });
