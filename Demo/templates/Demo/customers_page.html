@@ -42,9 +42,14 @@
 
     <!-- Customers Table -->
     <div class="data-wrap">
+        <input id="table-search-big"
+               class="form-control m-2 w-25"
+               type="search"
+               placeholder="Search"
+               aria-label="Search">
         <div class="data-viewport">
             <div class="data-scroller" role="region" aria-label="Customers dataset" tabindex="0">
-                <table class="data-table table table-hover">
+                <table class="data-table table table-hover data-table-big">
                     <thead class="table-light">
                         <tr>
                             <th>ID</th>
@@ -53,7 +58,7 @@
                             <th>Phone</th>
                             <th>Orders</th>
                             <th>Verified</th>
-                            <th>Blocked</th>
+                            <th>Is Active</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -64,14 +69,33 @@
                             <td>{{ c.email|default:"-" }}</td>
                             <td>{{ c.mobile|default:"-" }}</td>
                             <td>{{ c.order_counts }}</td>
-                            <td>{% if c.is_verified %} ✅ {% else %} ❌ {% endif %}</td>
-                            <td>{% if c.is_blocked %} 🚫 {% else %} ✅ {% endif %}</td>
+                            <td>{% if c.verified %} ✅ {% else %} ❌ {% endif %}</td>
+                            <td>{% if c.is_active %} ✅ {% else %} ❌ {% endif %}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
         </div>
+        <nav aria-label="Table navigation">
+            <ul class="pagination justify-content-center mt-3">
+                <li class="page-item" id="prev-item">
+                <button class="page-link" id="prev-btn" aria-label="Previous">
+                    <span aria-hidden="true">&laquo; Previous</span>
+                </button>
+                </li>
+                
+                <li class="page-item disabled">
+                <span class="page-link" id="page-status">Page 1 of 1</span>
+                </li>
+                
+                <li class="page-item" id="next-item">
+                <button class="page-link" id="next-btn" aria-label="Next">
+                    <span aria-hidden="true">Next &raquo;</span>
+                </button>
+                </li>
+            </ul>
+        </nav>
     </div>
 </div>
 
