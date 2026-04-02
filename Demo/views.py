@@ -4567,41 +4567,60 @@ def customers_page(request):
         'Role': 'Manager',
     }
 
+    # Only fetch the page the user is currently viewing
+    page = int(request.GET.get('page', 1))
+
     all_customers = []
-    page = 1
-    per_page = 10
+    total_customers_count = 0
+    MAX_PAGES = 10  # safety cap per request
+
     try:
-        while True:
-            params = {'page': page, 'page_size': per_page}
-            res = requests.get(f"{settings.ZID_API_BASE}/managers/store/customers", headers=headers_customer, params=params)
+        current_page = 1
+        while current_page <= MAX_PAGES:
+            params = {'page': current_page}
+            res = requests.get(
+                f"{settings.ZID_API_BASE}/managers/store/customers",
+                headers=headers_customer,
+                params=params,
+                timeout=10  # ✅ CRITICAL: always set a timeout
+            )
             res.raise_for_status()
             data = res.json()
-            customers_list = data.get('customers', [])  # ✅ FIXED
+
+            customers_list = data.get('customers', [])
+            total_customers_count = data.get('total_customers_count', 0)
+
             if not customers_list:
                 break
 
             all_customers.extend(customers_list)
 
-            if len(all_customers) >= data.get('total_customers_count', 0):  # ✅ FIXED
+            if len(all_customers) >= total_customers_count:
                 break
-            page += 1
+
+            current_page += 1
+
+    except requests.Timeout:
+        messages.error(request, "⚠️ Request timed out. Try again or contact support.")
+        all_customers = []
+        total_customers_count = 0
     except requests.RequestException as e:
         traceback.print_exc()
         messages.error(request, f"⚠️ Error fetching customers: {str(e)}")
         all_customers = []
+        total_customers_count = 0
 
     total_customers = len(all_customers)
 
-    # KPIs (note: Zid uses `verified` not `is_verified`)
     verified_count = sum(1 for c in all_customers if c.get("verified"))
-    blocked_count = sum(1 for c in all_customers if not c.get("is_active"))  # inactive means blocked
+    blocked_count = sum(1 for c in all_customers if not c.get("is_active"))
     avg_orders = round(
         sum(c.get("order_counts", 0) for c in all_customers) / total_customers, 2
     ) if total_customers > 0 else 0
 
     context = {
         "customers": all_customers,
-        "total_customers": data.get("total_customers_count", total_customers),
+        "total_customers": total_customers_count or total_customers,
         "verified_count": verified_count,
         "blocked_count": blocked_count,
         "avg_orders": avg_orders,
