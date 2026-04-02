@@ -4576,7 +4576,7 @@ def customers_page(request):
 
     try:
         current_page = 1
-        while current_page <= MAX_PAGES:
+        while True:
             params = {'page': current_page}
             res = requests.get(
                 f"{settings.ZID_API_BASE}/managers/store/customers",
