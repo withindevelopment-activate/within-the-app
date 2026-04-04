@@ -185,7 +185,7 @@
 
 <script>
     const PER_PAGE = 150;
-    const COOLDOWN_MS = 600;   // ms between each fetch call
+    const COOLDOWN_MS = 150;   // ms between each fetch call
 
     let currentPage = 1;
     let hasMore = true;
@@ -210,6 +210,11 @@
                 emptyTable: 'Loading customers…',
                 info: 'Showing _START_ to _END_ of _TOTAL_ loaded customers',
             },
+            createdRow(row, data) {
+                $(row).addClass('customer-row')
+                    .attr('data-id', data[0])
+                    .css('cursor', 'pointer');
+            }
         });
 
         $('#table-search-big').on('keyup', function () {
@@ -218,36 +223,19 @@
 
         function syncPagination() {
             const info = dt.page.info();
-            const currentPage = info.page + 1;
+            const pg = info.page + 1;           // ✅ renamed — no shadowing
             const totalPages = info.pages;
 
-            // Update the "Page X of Y" text
-            $('#page-status').text(`Page ${currentPage} of ${totalPages}`);
-
-            // Update Button States
+            $('#page-status').text(`Page ${pg} of ${totalPages}`);
             $('#prev-item').toggleClass('disabled', info.page === 0);
             $('#next-item').toggleClass('disabled', info.page >= totalPages - 1 || totalPages === 0);
         }
 
-        dt.on('load', function () {
-            syncPagination();
-        });
+        // ✅ Removed non-existent 'load' event — 'draw' handles everything
+        dt.on('draw', syncPagination);
 
-        // Trigger sync on every draw (Pagination, Search, Sort)
-        dt.on('draw', function () {
-            syncPagination();
-        });
-
-        // Bootstrap Button Click Events
-        $('#next-btn').on('click', function (e) {
-            e.preventDefault();
-            dt.page('next').draw('page');
-        });
-
-        $('#prev-btn').on('click', function (e) {
-            e.preventDefault();
-            dt.page('previous').draw('page');
-        });
+        $('#next-btn').on('click', e => { e.preventDefault(); dt.page('next').draw('page'); });
+        $('#prev-btn').on('click', e => { e.preventDefault(); dt.page('previous').draw('page'); });
 
         startLoading();
     });
@@ -261,7 +249,6 @@
                 await sleep(COOLDOWN_MS);
             }
         }
-        document.getElementById('progress-label').textContent = '✅ All customers loaded';
     }
 
     async function fetchPage(page) {
@@ -270,53 +257,52 @@
             const data = await res.json();
 
             if (!res.ok) {
-                console.error('API error:', data.error);
-                hasMore = false;
-                return;
+                throw new Error(data.error || `HTTP ${res.status}`);
             }
 
             total = data.total;
             hasMore = data.has_more;
 
-            addRowsToTable(data.customers);
-            loaded += data.customers.length;
-
-            updateProgress(loaded, total);
-
-        } catch (err) {
-            console.error('Fetch failed:', err);
-            hasMore = false;
-        }
-    }
-
-    // ── Add rows to DataTable ────────────────────────────────────────────────
-    function addRowsToTable(customers) {
-        customers.forEach(c => {
-            const row = dt.row.add([
-                c.id ?? '—',
-                c.name ?? '—',
-                c.email ?? '—',
-                c.mobile ?? '—',
+            const rows = data.customers.map(c => [
+                c.id          ?? '—',
+                c.name        ?? '—',
+                c.email       ?? '—',
+                c.mobile      ?? '—',
                 c.order_counts ?? 0,
-                c.verified ? '✅' : '❌',
-                c.is_active ? '✅' : '🚫',
+                c.verified    ? '✅' : '❌',
+                c.is_active   ? '✅' : '🚫',
             ]);
 
-            // After adding, grab the <tr> node and set attributes
-            $(row.node())
-                .addClass('customer-row')
-                .attr('data-id', c.id)
-                .css('cursor', 'pointer');
-        });
+            dt.rows.add(rows).draw(false);   // ✅ single draw per batch
 
-        dt.draw(false); // Single draw after all rows added
+            loaded += data.customers.length;
+            updateProgress(loaded, total);
+
+            if (!hasMore) {
+                document.getElementById('progress-label').textContent = '✅ All customers loaded';
+            }
+
+        } catch (err) {
+            console.error(`Fetch failed (page ${page}, attempt ${attempt}):`, err);
+
+            if (attempt < MAX_RETRIES) {
+                await sleep(1000 * attempt);          // exponential back-off
+                return fetchPage(page, attempt + 1);  // ✅ retry
+            }
+
+            // All retries exhausted
+            hasMore = false;
+            document.getElementById('progress-label').textContent =
+                `⚠️ Loading stopped at ${loaded.toLocaleString()} customers (network error)`;
+        }
     }
 
     // ── Progress bar ─────────────────────────────────────────────────────────
     function updateProgress(loaded, total) {
         const pct = total > 0 ? Math.min((loaded / total) * 100, 100).toFixed(1) : 0;
         document.getElementById('progress-bar').style.width = pct + '%';
-        document.getElementById('progress-count').textContent = `${loaded.toLocaleString()} / ${total.toLocaleString()}`;
+        document.getElementById('progress-count').textContent =
+            `${loaded.toLocaleString()} / ${total.toLocaleString()}`;
     }
 
     function sleep(ms) {
