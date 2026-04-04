@@ -4585,7 +4585,7 @@ def customers_api(request):
             res = requests.get(
                 f"{settings.ZID_API_BASE}/managers/store/customers",
                 headers=headers,
-                params={'page': page, 'page_size': per_page},
+                params={'page': page, 'per_page': per_page},
                 timeout=15,
             )
             if res.status_code == 429:
