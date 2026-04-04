@@ -26,7 +26,7 @@
             <div class="card text-center shadow-sm">
                 <div class="card-body">
                     <div id="load-progress">
-                        <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                        <div class="d-flex justify-content-between">
                             <span id="progress-label">Loading customers…</span>
                             <span id="progress-count">0 / 0</span>
                         </div>
@@ -121,14 +121,13 @@
 </div>
 
 <script>
-document.querySelectorAll(".customer-row").forEach(row => {
-    row.addEventListener("click", function() {
-        let id = this.dataset.id;
+    $('#customers-body').on('click', '.customer-row', function () {
+        let id = $(this).data('id');
         let modal = new bootstrap.Modal(document.getElementById('customerModal'));
         document.getElementById("customerDetails").innerHTML = "Loading...";
         modal.show();
 
-        fetch(`/zid/customer-detail/${id}/`)  // <-- API route
+        fetch(`/zid/customer-detail/${id}/`)
             .then(res => res.json())
             .then(c => {
                 if (c.error) {
@@ -198,42 +197,43 @@ document.querySelectorAll(".customer-row").forEach(row => {
                 document.getElementById("customerDetails").innerHTML = "⚠️ " + err;
             });
     });
-});
 </script>
+
 <script>
-    $(document).ready(function () {
+    const PER_PAGE = 150;
+    const COOLDOWN_MS = 600;   // ms between each fetch call
 
-        let initialSort = [[0, 'desc']]; // Default
+    let currentPage = 1;
+    let hasMore = true;
+    let total = 0;
+    let loaded = 0;
+    let dt = null;     // DataTable instance
 
-        if ($('table').hasClass('default-order-1')) {
-            initialSort = [[1, 'desc']];
-        }
-
-        let ordering = true;
-
-        if ($('table').hasClass('no-order')) {
-            ordering = false;
-        }
-
-
-        // const table_big = $('.data-table-big').DataTable({
-        //     paging: true,
-        //     ordering: ordering,
-        //     order: initialSort,
-        //     searching: true,
-        //     info: false,
-        //     lengthChange: false,
-        //     deferRender: true,
-        //     pageLength: 200,
-        //     dom: 't',  // ← IMPORTANT: only table, no UI controls
-        // });
+    // ── Init DataTable (empty, client-side) ──────────────────────────────────
+    $(document).ready(() => {
+        dt = $('#customers-table').DataTable({
+            paging: true,
+            ordering: ordering,
+            order: [[0, 'desc']],
+            searching: true,
+            info: false,
+            lengthChange: false,
+            deferRender: true,
+            dom: 't',
+            pageLength: 150,
+            lengthMenu: [50, 100, 150, 200],
+            language: {
+                emptyTable: 'Loading customers…',
+                info: 'Showing _START_ to _END_ of _TOTAL_ loaded customers',
+            },
+        });
 
         $('#table-search-big').on('keyup', function () {
-            table_big.search(this.value).draw();
+            dt.search(this.value).draw();
         });
 
         function syncPagination() {
-            const info = table_big.page.info();
+            const info = dt.page.info();
             const currentPage = info.page + 1;
             const totalPages = info.pages;
 
@@ -245,122 +245,99 @@ document.querySelectorAll(".customer-row").forEach(row => {
             $('#next-item').toggleClass('disabled', info.page >= totalPages - 1 || totalPages === 0);
         }
 
-        table_big.on('load', function () {
+        dt.on('load', function () {
             syncPagination();
         });
 
         // Trigger sync on every draw (Pagination, Search, Sort)
-        table_big.on('draw', function () {
+        dt.on('draw', function () {
             syncPagination();
         });
 
         // Bootstrap Button Click Events
         $('#next-btn').on('click', function (e) {
             e.preventDefault();
-            table_big.page('next').draw('page');
+            dt.page('next').draw('page');
         });
 
         $('#prev-btn').on('click', function (e) {
             e.preventDefault();
-            table_big.page('previous').draw('page');
+            dt.page('previous').draw('page');
         });
 
-    });
-</script>
-<script>
-  const PER_PAGE     = 150;
-  const COOLDOWN_MS  = 600;   // ms between each fetch call
-
-  let currentPage = 1;
-  let hasMore     = true;
-  let total       = 0;
-  let loaded      = 0;
-  let dt          = null;     // DataTable instance
-
-  // ── Init DataTable (empty, client-side) ──────────────────────────────────
-  $(document).ready(() => {
-    dt = $('#customers-table').DataTable({
-        paging: true,
-        ordering: ordering,
-        order: [[0, 'desc']],
-        searching: true,
-        info: false,
-        lengthChange: false,
-        deferRender: true,
-        dom: 't',
-        pageLength: 150,
-        lengthMenu: [50, 100, 150, 200],
-        language: {
-            emptyTable: 'Loading customers…',
-            info: 'Showing _START_ to _END_ of _TOTAL_ loaded customers',
-      },
+        startLoading();
     });
 
-    startLoading();
-  });
-
-  // ── Main loader loop ─────────────────────────────────────────────────────
-  async function startLoading() {
-    while (hasMore) {
-      await fetchPage(currentPage);
-      if (hasMore) {
-        currentPage++;
-        await sleep(COOLDOWN_MS);
-      }
+    // ── Main loader loop ─────────────────────────────────────────────────────
+    async function startLoading() {
+        while (hasMore) {
+            await fetchPage(currentPage);
+            if (hasMore) {
+                currentPage++;
+                await sleep(COOLDOWN_MS);
+            }
+        }
+        document.getElementById('progress-label').textContent = '✅ All customers loaded';
     }
-    document.getElementById('progress-label').textContent = '✅ All customers loaded';
-  }
 
-  async function fetchPage(page) {
-    try {
-      const res  = await fetch(`/zid/customers/api/?page=${page}&page_size=${PER_PAGE}`);
-      const data = await res.json();
+    async function fetchPage(page) {
+        try {
+            const res = await fetch(`/zid/customers/api/?page=${page}&page_size=${PER_PAGE}`);
+            const data = await res.json();
 
-      if (!res.ok) {
-        console.error('API error:', data.error);
-        hasMore = false;
-        return;
-      }
+            if (!res.ok) {
+                console.error('API error:', data.error);
+                hasMore = false;
+                return;
+            }
 
-      total   = data.total;
-      hasMore = data.has_more;
+            total = data.total;
+            hasMore = data.has_more;
 
-      addRowsToTable(data.customers);
-      loaded += data.customers.length;
+            addRowsToTable(data.customers);
+            loaded += data.customers.length;
 
-      updateProgress(loaded, total);
+            updateProgress(loaded, total);
 
-    } catch (err) {
-      console.error('Fetch failed:', err);
-      hasMore = false;
+        } catch (err) {
+            console.error('Fetch failed:', err);
+            hasMore = false;
+        }
     }
-  }
 
-  // ── Add rows to DataTable ────────────────────────────────────────────────
-  function addRowsToTable(customers) {
-    const rows = customers.map(c => [
-      c.id        ?? '—',
-      c.name      ?? '—',
-      c.email     ?? '—',
-      c.mobile    ?? '—',
-      c.order_counts ?? 0,
-      c.verified  ? '✅' : '❌',
-      c.is_active ? '✅' : '🚫',
-    ]);
+    // ── Add rows to DataTable ────────────────────────────────────────────────
+    function addRowsToTable(customers) {
+        customers.forEach(c => {
+            const row = dt.row.add([
+                c.id ?? '—',
+                c.name ?? '—',
+                c.email ?? '—',
+                c.mobile ?? '—',
+                c.order_counts ?? 0,
+                c.verified ? '✅' : '❌',
+                c.is_active ? '✅' : '🚫',
+            ]);
 
-    dt.rows.add(rows).draw(false);  // draw(false) = stay on current page
-  }
+            // After adding, grab the <tr> node and set attributes
+            $(row.node())
+                .addClass('customer-row')
+                .attr('data-id', c.id)
+                .css('cursor', 'pointer');
+        });
 
-  // ── Progress bar ─────────────────────────────────────────────────────────
-  function updateProgress(loaded, total) {
-    const pct = total > 0 ? Math.min((loaded / total) * 100, 100).toFixed(1) : 0;
-    document.getElementById('progress-bar').style.width   = pct + '%';
-    document.getElementById('progress-count').textContent = `${loaded.toLocaleString()} / ${total.toLocaleString()}`;
-  }
+        dt.draw(false); // Single draw after all rows added
+    }
 
-  function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
+    // ── Progress bar ─────────────────────────────────────────────────────────
+    function updateProgress(loaded, total) {
+        const pct = total > 0 ? Math.min((loaded / total) * 100, 100).toFixed(1) : 0;
+        document.getElementById('progress-bar').style.width = pct + '%';
+        document.getElementById('progress-count').textContent = `${loaded.toLocaleString()} / ${total.toLocaleString()}`;
+    }
+
+    function sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
 </script>
 
 {% endblock %}
