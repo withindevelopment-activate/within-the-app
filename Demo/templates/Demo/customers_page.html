@@ -6,23 +6,7 @@
 <div class="container-fluid mt-4">
     <!-- KPI Cards -->
     <div class="row mb-4">
-        <div class="col-md-4">
-            <div class="card text-center shadow-sm">
-                <div class="card-body">
-                    <h5>Total Customers</h5>
-                    <h3>{{ total_customers }}</h3>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card text-center shadow-sm">
-                <div class="card-body">
-                    <h5>Avg. Orders / Customer</h5>
-                    <h3>{{ avg_orders }}</h3>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
+        <div class="col-md-12">
             <div class="card text-center shadow-sm">
                 <div class="card-body">
                     <div id="load-progress">
@@ -213,7 +197,7 @@
     $(document).ready(() => {
         dt = $('#customers-table').DataTable({
             paging: true,
-            ordering: ordering,
+            ordering: true,
             order: [[0, 'desc']],
             searching: true,
             info: false,
