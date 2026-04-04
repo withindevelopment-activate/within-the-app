@@ -27,6 +27,8 @@ urlpatterns = [
     path('zid/abandoned_carts/', views.abandoned_carts_page, name='abandoned_carts_page'),
     path('zid/customers/', views.customers_page, name='customers_page'),
     path("zid/customer-detail/<int:customer_id>/", views.customer_detail_api, name="customer_detail_api"),
+    path('zid/customers/api/', views.customers_api,  name='customers_api'),
+
 
     path('zid-webhook/product-update/', views.product_update, name='zid_product_update'),
 
