@@ -118,7 +118,7 @@
                     document.getElementById("customerDetails").innerHTML = "⚠️ " + c.error;
                     return;
                 }
-
+                console.log("Customer details:", c)
                 let profileHtml = `
                     <h5>👤 Profile</h5>
                     <p><b>ID:</b> ${c.id}</p>
