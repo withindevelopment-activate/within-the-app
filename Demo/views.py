@@ -4570,13 +4570,14 @@ def customers_page(request):
 
     all_customers = []
     page = 1
-    MAX_PAGES = 50       # hard cap — raise if you need more
+    per_page = 500
+    MAX_PAGES = 10       # hard cap — raise if you need more
     DELAY = 1.0           # seconds between pages (avoids 429)
     MAX_RETRIES = 3       # retries per page on 429
 
     try:
         while page <= MAX_PAGES:
-            params = {'page': page}
+            params = {'page': page, 'page_size': per_page}
 
             # ── retry loop for this page ──
             for attempt in range(1, MAX_RETRIES + 1):
