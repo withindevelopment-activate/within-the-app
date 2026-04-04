@@ -266,7 +266,7 @@
 
     async function fetchPage(page) {
         try {
-            const res = await fetch(`/zid/customers/api/`);
+            const res = await fetch(`/zid/customers/api/?page=${page}`);
             const data = await res.json();
 
             if (!res.ok) {

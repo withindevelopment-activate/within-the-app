@@ -4568,7 +4568,7 @@ def customers_api(request):
         return JsonResponse({'error': 'Unauthorized'}, status=401)
 
     page     = int(request.GET.get('page', 1))
-    per_page = int(request.GET.get('page_size', 150))
+    per_page = 150
 
     headers = {
         'Authorization': f'Bearer {auth_token}',
