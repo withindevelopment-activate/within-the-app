@@ -4553,107 +4553,65 @@ def abandoned_carts_page(request):
 
 def customers_page(request):
     token = request.session.get('access_token')
-    auth_token = request.session.get('authorization_token')
-    store_id = request.session.get('store_id')
-
     if not token:
         return redirect('Demo:zid_login')
+    return render(request, "Demo/customers_page.html")
 
-    headers_customer = {
+
+def customers_api(request):
+    """AJAX endpoint — returns one page of customers as JSON."""
+    token     = request.session.get('access_token')
+    auth_token = request.session.get('authorization_token')
+    store_id  = request.session.get('store_id')
+
+    if not token:
+        return JsonResponse({'error': 'Unauthorized'}, status=401)
+
+    page     = int(request.GET.get('page', 1))
+    per_page = int(request.GET.get('page_size', 50))
+
+    headers = {
         'Authorization': f'Bearer {auth_token}',
         'X-MANAGER-TOKEN': token,
         'accept': 'application/json',
         'Accept-Language': 'all-languages',
-        'Store-Id': f'{store_id}',
+        'Store-Id': str(store_id),
         'Role': 'Manager',
     }
 
-    all_customers = []
-    page = 1
-    per_page = 500
-    MAX_PAGES = 10       # hard cap — raise if you need more
-    DELAY = 1.0           # seconds between pages (avoids 429)
-    MAX_RETRIES = 3       # retries per page on 429
+    MAX_RETRIES = 3
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            res = requests.get(
+                f"{settings.ZID_API_BASE}/managers/store/customers",
+                headers=headers,
+                params={'page': page, 'page_size': per_page},
+                timeout=15,
+            )
+            if res.status_code == 429:
+                retry_after = int(res.headers.get('Retry-After', attempt * 5))
+                time.sleep(retry_after)
+                continue
+            res.raise_for_status()
+            break
+        except requests.Timeout:
+            if attempt == MAX_RETRIES:
+                return JsonResponse({'error': 'Request timed out'}, status=504)
+            time.sleep(attempt * 3)
+    else:
+        return JsonResponse({'error': 'Rate limited after retries'}, status=429)
 
-    try:
-        while page <= MAX_PAGES:
-            params = {'page': page, 'page_size': per_page}
+    data          = res.json()
+    customers     = data.get('customers', [])
+    total_count   = data.get('total_customers_count', 0)
 
-            # ── retry loop for this page ──
-            for attempt in range(1, MAX_RETRIES + 1):
-                try:
-                    res = requests.get(
-                        f"{settings.ZID_API_BASE}/managers/store/customers",
-                        headers=headers_customer,
-                        params=params,
-                        timeout=15,
-                    )
-
-                    if res.status_code == 429:
-                        # Respect Retry-After header if present, else back off
-                        retry_after = int(res.headers.get('Retry-After', attempt * 5))
-                        print(f"[customers] 429 on page {page}, waiting {retry_after}s (attempt {attempt})")
-                        time.sleep(retry_after)
-                        continue  # retry same page
-
-                    res.raise_for_status()
-                    break  # success — exit retry loop
-
-                except requests.Timeout:
-                    if attempt == MAX_RETRIES:
-                        raise
-                    time.sleep(attempt * 3)
-
-            else:
-                # All retries exhausted for this page
-                raise Exception(f"Failed to fetch page {page} after {MAX_RETRIES} retries (429 rate limit).")
-
-            data = res.json()
-            customers_list = data.get('customers', [])
-            total_count = data.get('total_customers_count', 0)
-
-            if not customers_list:
-                break
-
-            all_customers.extend(customers_list)
-
-            if len(all_customers) >= total_count:
-                break
-
-            page += 1
-            time.sleep(DELAY)  # polite delay between pages
-
-    except requests.Timeout:
-        messages.error(request, "⚠️ Request timed out while fetching customers.")
-        all_customers = []
-        total_count = 0
-    except requests.RequestException as e:
-        traceback.print_exc()
-        messages.error(request, f"⚠️ Error fetching customers: {str(e)}")
-        all_customers = []
-        total_count = 0
-    except Exception as e:
-        traceback.print_exc()
-        messages.error(request, f"⚠️ {str(e)}")
-        all_customers = []
-        total_count = 0
-
-    total_customers = len(all_customers)
-
-    verified_count = sum(1 for c in all_customers if c.get("verified"))
-    blocked_count  = sum(1 for c in all_customers if not c.get("is_active"))
-    avg_orders = round(
-        sum(c.get("order_counts", 0) for c in all_customers) / total_customers, 2
-    ) if total_customers > 0 else 0
-
-    context = {
-        "customers":       all_customers,
-        "total_customers": total_count or total_customers,
-        "verified_count":  verified_count,
-        "blocked_count":   blocked_count,
-        "avg_orders":      avg_orders,
-    }
-    return render(request, "Demo/customers_page.html", context)
+    return JsonResponse({
+        'customers':    customers,
+        'total':        total_count,
+        'page':         page,
+        'per_page':     per_page,
+        'has_more':     (page * per_page) < total_count,
+    })
 
 # AJAX endpoint for customer details popup
 def customer_detail_api(request, customer_id):
