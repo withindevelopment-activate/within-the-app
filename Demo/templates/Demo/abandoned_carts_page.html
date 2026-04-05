@@ -203,7 +203,8 @@
 <script>
     const PER_PAGE = 100;
     const MAX_REQUESTS_PER_MIN = 60;
-    const REQUEST_INTERVAL_MS = 60000 / MAX_REQUESTS_PER_MIN; // 1000ms = 1s
+    const REQUEST_INTERVAL_MS = 1000; // 1 request/sec
+    const PARALLEL_BATCH = 3; // number of pages fetched in parallel
 
     let dt = null;
     let total = 0;
@@ -222,7 +223,7 @@
     };
 
     // ─────────────────────────────
-    // Initialize table
+    // Initialize DataTable
     $(document).ready(() => {
         dt = $('#cart-table').DataTable({
             paging: true,
@@ -250,7 +251,7 @@
     });
 
     // ─────────────────────────────
-    // Reset state
+    // Reset table & state
     function resetState() {
         currentPage = 1;
         hasMore = true;
@@ -265,7 +266,7 @@
     // Reload all pages
     function reloadTable() {
         resetState();
-        startLoading();
+        startLoadingParallel();
     }
 
     // ─────────────────────────────
@@ -273,7 +274,7 @@
     function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
     // ─────────────────────────────
-    // Fetch a single page
+    // Fetch single page
     async function fetchPage(page) {
         try {
             let url = `/zid/abandoned-carts/api/?page=${page}&page_size=${PER_PAGE}`;
@@ -292,32 +293,38 @@
             }
 
             try { return JSON.parse(text); }
-            catch (e) { console.error('Invalid JSON', e, text); return null; }
+            catch(e) { console.error('Invalid JSON', e, text); return null; }
 
-        } catch (err) {
+        } catch(err) {
             console.error(err);
             return null;
         }
     }
 
     // ─────────────────────────────
-    // Throttled parallel loader
-    async function startLoading() {
-        const queue = [];
+    // Parallel throttled loader
+    async function startLoadingParallel() {
         while (hasMore) {
-            queue.push(currentPage);
-            currentPage++;
+            const batchPages = [];
 
-            // enqueue next page only if still has more
-            const data = await fetchPage(queue[queue.length - 1]);
-            if (!data) { hasMore = false; break; }
+            for (let i = 0; i < PARALLEL_BATCH && hasMore; i++) {
+                batchPages.push(currentPage);
+                currentPage++;
+            }
 
-            hasMore = data.has_more;
-            total = data.total;
+            // fetch all pages in parallel
+            const batchResults = await Promise.all(batchPages.map(p => fetchPage(p)));
 
-            renderRows(data.carts);
+            for (const data of batchResults) {
+                if (!data) { hasMore = false; continue; }
 
-            await sleep(REQUEST_INTERVAL_MS); // throttle
+                renderRows(data.carts);
+                hasMore = data.has_more;
+                total = data.total;
+            }
+
+            // throttle: wait at least REQUEST_INTERVAL_MS per request
+            await sleep(REQUEST_INTERVAL_MS * PARALLEL_BATCH);
         }
     }
 
@@ -359,6 +366,8 @@
         $('#progress-count').text(`${loaded} / ${total}`);
     }
 
+    // ─────────────────────────────
+    // Render phase badge
     function renderPhaseBadge(phase) {
         const map = {
             payment_method: 'bg-danger',
