@@ -136,8 +136,10 @@
 <script>
     $('#cart-table tbody').on('click', 'tr', function () {
         const data = dt.row(this).data();
-        const cartUrl = $(data[7]).attr('href'); // extract URL
-        const cartId = cartUrl.split('/').pop();
+        if (!data) return;
+
+        const cartUrl = $(data[8]).attr('href'); // extract URL
+        const cartId = cartUrl.split('/checkout/fromBasket/')[1];
 
         let modal = new bootstrap.Modal(document.getElementById('cartModal'));
         $('#cartDetails').html('Loading...');
@@ -207,6 +209,8 @@
     let total = 0;
     let loaded = 0;
     let dt = null;
+    let totalValue = 0;
+    let totalReminders = 0;
 
     // filters state
     let filters = {
@@ -221,7 +225,7 @@
         dt = $('#cart-table').DataTable({
             paging: true,
             ordering: true,
-            order: [[6, 'desc']], // updated_at
+            order: [[77, 'desc']], // updated_at
             searching: false, // ❗ we use server filtering
             info: false,
             lengthChange: false,
@@ -254,6 +258,8 @@
         hasMore = true;
         total = 0;
         loaded = 0;
+        totalValue = 0;
+        totalReminders = 0;
         dt.clear().draw();
     }
 
@@ -308,6 +314,16 @@
             loaded += data.carts.length;
             updateProgress(loaded, total);
 
+            data.carts.forEach(c => {
+                totalValue += parseFloat(c.cart_total || 0);
+                totalReminders += c.reminders_count || 0;
+            });
+
+            $('#kpi-total').text(total);
+            $('#kpi-value').text(totalValue.toFixed(2));
+            $('#kpi-avg').text((totalValue / (loaded + data.carts.length || 1)).toFixed(2));
+            $('#kpi-reminders').text(totalReminders);
+
         } catch (err) {
             console.error(err);
             hasMore = false;
@@ -325,19 +341,6 @@
         return new Promise(r => setTimeout(r, ms));
     }
 
-    let totalValue = 0;
-    let totalReminders = 0;
-
-    data.carts.forEach(c => {
-        totalValue += parseFloat(c.cart_total || 0);
-        totalReminders += c.reminders_count || 0;
-    });
-
-    $('#kpi-total').text(data.total);
-    $('#kpi-value').text(totalValue.toFixed(2));
-    $('#kpi-avg').text((totalValue / (loaded || 1)).toFixed(2));
-    $('#kpi-reminders').text(totalReminders);
-
     function renderPhaseBadge(phase) {
         const map = {
             payment_method: 'bg-danger',
@@ -350,6 +353,9 @@
 
         return `<span class="badge ${cls}">${phase}</span>`;
     }
+    $('#cart-table tbody').on('click', 'a', function (e) {
+        e.stopPropagation();
+    });
 </script>
 
 {% endblock %}
