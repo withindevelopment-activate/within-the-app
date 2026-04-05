@@ -202,17 +202,18 @@
 
 <script>
     const PER_PAGE = 100;
-    const COOLDOWN_MS = 500;
+    const MAX_REQUESTS_PER_MIN = 60;
+    const REQUEST_INTERVAL_MS = 60000 / MAX_REQUESTS_PER_MIN; // 1000ms = 1s
 
-    let currentPage = 1;
-    let hasMore = true;
+    let dt = null;
     let total = 0;
     let loaded = 0;
-    let dt = null;
+    let hasMore = true;
+    let currentPage = 1;
     let totalValue = 0;
     let totalReminders = 0;
 
-    // filters state
+    // filters
     let filters = {
         phase: '',
         customer_id: '',
@@ -220,24 +221,21 @@
         search_term: ''
     };
 
+    // ─────────────────────────────
+    // Initialize table
     $(document).ready(() => {
-
         dt = $('#cart-table').DataTable({
             paging: true,
             ordering: true,
-            order: [[7, 'desc']], // updated_at
-            searching: false, // ❗ we use server filtering
+            order: [[7, 'desc']],
+            searching: false,
             info: false,
             lengthChange: false,
             deferRender: true,
             dom: 't',
-            pageLength: 100,
-            language: {
-                emptyTable: 'Loading carts...',
-            },
-            createdRow(row, data) {
-                $(row).css('cursor', 'pointer');
-            }
+            pageLength: PER_PAGE,
+            language: { emptyTable: 'Loading carts...' },
+            createdRow(row) { $(row).css('cursor', 'pointer'); }
         });
 
         $('#apply-filters').on('click', () => {
@@ -245,14 +243,14 @@
             filters.customer_id = $('#filter-customer-id').val();
             filters.products_count = $('#filter-products-count').val();
             filters.search_term = $('#filter-search-term').val();
-
             reloadTable();
         });
 
-        startLoading();
+        reloadTable();
     });
 
     // ─────────────────────────────
+    // Reset state
     function resetState() {
         currentPage = 1;
         hasMore = true;
@@ -263,22 +261,19 @@
         dt.clear().draw();
     }
 
+    // ─────────────────────────────
+    // Reload all pages
     function reloadTable() {
         resetState();
         startLoading();
     }
 
     // ─────────────────────────────
-    async function startLoading() {
-        while (hasMore) {
-            await fetchPage(currentPage);
-            if (hasMore) {
-                currentPage++;
-                await sleep(COOLDOWN_MS);
-            }
-        }
-    }
+    // Sleep helper
+    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+    // ─────────────────────────────
+    // Fetch a single page
     async function fetchPage(page) {
         try {
             let url = `/zid/abandoned-carts/api/?page=${page}&page_size=${PER_PAGE}`;
@@ -288,73 +283,80 @@
             if (filters.search_term) url += `&search_term=${filters.search_term}`;
 
             const res = await fetch(url);
-
-            // Handle HTML or non-JSON
             const text = await res.text();
+
             if (!res.ok) {
                 console.error('Fetch error', res.status, res.statusText, text);
-                $('#progress-label').text(`Error loading data: ${res.status}`);
-                hasMore = false;
-                return;
+                $('#progress-label').text(`Error: ${res.status}`);
+                return null;
             }
 
-            let data;
-            try {
-                data = JSON.parse(text);
-            } catch(e) {
-                console.error('Invalid JSON:', e, text);
-                $('#progress-label').text("Error: Invalid JSON received");
-                hasMore = false;
-                return;
-            }
-
-            hasMore = data.has_more;
-            total = data.total;
-
-            const rows = data.carts.map(c => [
-                c.customer_id ?? '—',
-                c.customer_name ?? '—',
-                c.customer_email ?? '—',
-                c.customer_mobile ?? '—',
-                c.products_count ?? 0,
-                c.cart_total_string ?? '—',
-                renderPhaseBadge(c.phase),
-                c.updated_at ?? '—',
-                `<a href="${c.url}" target="_blank">Open</a>`
-            ]);
-
-            dt.rows.add(rows).draw(false);
-
-            loaded += data.carts.length;
-
-            data.carts.forEach(c => {
-                totalValue += parseFloat(c.cart_total || 0);
-                totalReminders += c.reminders_count || 0;
-            });
-
-            $('#kpi-total').text(total);
-            $('#kpi-value').text(totalValue.toFixed(2));
-            $('#kpi-avg').text((totalValue / (loaded || 1)).toFixed(2));
-            $('#kpi-reminders').text(totalReminders);
-
-            updateProgress(loaded, total);
+            try { return JSON.parse(text); }
+            catch (e) { console.error('Invalid JSON', e, text); return null; }
 
         } catch (err) {
             console.error(err);
-            $('#progress-label').text("Error fetching data");
-            hasMore = false;
+            return null;
         }
     }
 
     // ─────────────────────────────
+    // Throttled parallel loader
+    async function startLoading() {
+        const queue = [];
+        while (hasMore) {
+            queue.push(currentPage);
+            currentPage++;
+
+            // enqueue next page only if still has more
+            const data = await fetchPage(queue[queue.length - 1]);
+            if (!data) { hasMore = false; break; }
+
+            hasMore = data.has_more;
+            total = data.total;
+
+            renderRows(data.carts);
+
+            await sleep(REQUEST_INTERVAL_MS); // throttle
+        }
+    }
+
+    // ─────────────────────────────
+    // Render rows & update KPIs
+    function renderRows(carts) {
+        const rows = carts.map(c => [
+            c.customer_id ?? '—',
+            c.customer_name ?? '—',
+            c.customer_email ?? '—',
+            c.customer_mobile ?? '—',
+            c.products_count ?? 0,
+            c.cart_total_string ?? '—',
+            renderPhaseBadge(c.phase),
+            c.updated_at ?? '—',
+            `<a href="${c.url}" target="_blank">Open</a>`
+        ]);
+
+        dt.rows.add(rows).draw(false);
+
+        loaded += carts.length;
+        carts.forEach(c => {
+            totalValue += parseFloat(c.cart_total || 0);
+            totalReminders += c.reminders_count || 0;
+        });
+
+        $('#kpi-total').text(total);
+        $('#kpi-value').text(totalValue.toFixed(2));
+        $('#kpi-avg').text((totalValue / (loaded || 1)).toFixed(2));
+        $('#kpi-reminders').text(totalReminders);
+        updateProgress(loaded, total);
+    }
+
+    // ─────────────────────────────
+    // Progress bar
     function updateProgress(loaded, total) {
         const pct = total > 0 ? (loaded / total) * 100 : 0;
         $('#progress-bar').css('width', pct + '%');
         $('#progress-count').text(`${loaded} / ${total}`);
-    }
-
-    function sleep(ms) {
-        return new Promise(r => setTimeout(r, ms));
     }
 
     function renderPhaseBadge(phase) {
@@ -364,14 +366,12 @@
             address: 'bg-info',
             completed: 'bg-success'
         };
-
         const cls = map[phase] || 'bg-secondary';
-
         return `<span class="badge ${cls}">${phase}</span>`;
     }
-    $('#cart-table tbody').on('click', 'a', function (e) {
-        e.stopPropagation();
-    });
+
+    // stop row link clicks from opening modal
+    $('#cart-table tbody').on('click', 'a', e => e.stopPropagation());
 </script>
 
 {% endblock %}
