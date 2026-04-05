@@ -45,17 +45,6 @@
                         </tr>
                     </thead>
                     <tbody id="customers-body">
-                        <!-- {% for c in customers %}
-                        <tr class="customer-row" data-id="{{ c.id }}" style="cursor:pointer;">
-                            <td>{{ c.id }}</td>
-                            <td>{{ c.name }}</td>
-                            <td>{{ c.email|default:"-" }}</td>
-                            <td>{{ c.mobile|default:"-" }}</td>
-                            <td>{{ c.order_counts }}</td>
-                            <td>{% if c.verified %} ✅ {% else %} ❌ {% endif %}</td>
-                            <td>{% if c.is_active %} ✅ {% else %} ❌ {% endif %}</td>
-                        </tr>
-                        {% endfor %} -->
                     </tbody>
                 </table>
             </div>
@@ -80,13 +69,6 @@
             </ul>
         </nav>
     </div>
-</div>
-
-<div id="loader" style="text-align:center; padding:20px; display:none;">
-  Loading more customers...
-</div>
-<div id="end-msg" style="text-align:center; display:none;">
-  ✅ All customers loaded.
 </div>
 
 <!-- Customer Details Modal -->
@@ -118,7 +100,6 @@
                     document.getElementById("customerDetails").innerHTML = "⚠️ " + c.error;
                     return;
                 }
-                console.log("Customer details:", c)
                 let profileHtml = `
                     <h5>👤 Profile</h5>
                     <p><b>ID:</b> ${c.id}</p>

@@ -6,72 +6,350 @@
 <div class="container-fluid mt-4">
     <!-- KPI Cards -->
     <div class="row mb-4">
-        <div class="col-md-3">
+        <div class="col-md-12">
             <div class="card text-center shadow-sm">
                 <div class="card-body">
-                    <h5>Total Abandoned Carts</h5>
-                    <h3>{{ total_carts }}</h3>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card text-center shadow-sm">
-                <div class="card-body">
-                    <h5>Recovered</h5>
-                    <h3>{{ recovered_count }}</h3>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card text-center shadow-sm">
-                <div class="card-body">
-                    <h5>Total Value</h5>
-                    <h3>{{ total_value }}</h3>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card text-center shadow-sm">
-                <div class="card-body">
-                    <h5>Avg. Cart Value</h5>
-                    <h3>{{ avg_cart_value }}</h3>
+                    <div id="load-progress">
+                        <div class="d-flex justify-content-between">
+                            <span id="progress-label">Loading Carts…</span>
+                            <span id="progress-count">0 / 0</span>
+                        </div>
+                        <div style="background:#e5e7eb; border-radius:6px; height:8px;">
+                            <div id="progress-bar" style="background:#3b82f6; height:8px; border-radius:6px; width:0%; transition:width 0.3s;"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Abandoned Cart Table -->
+    <div class="row mb-4 text-center">
+
+        <div class="col-md-3">
+            <div class="card"><div class="card-body">
+                <h6>Total Carts</h6>
+                <h4 id="kpi-total">0</h4>
+            </div></div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card"><div class="card-body">
+                <h6>Total Value</h6>
+                <h4 id="kpi-value">0</h4>
+            </div></div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card"><div class="card-body">
+                <h6>Avg Value</h6>
+                <h4 id="kpi-avg">0</h4>
+            </div></div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card"><div class="card-body">
+                <h6>Reminders</h6>
+                <h4 id="kpi-reminders">0</h4>
+            </div></div>
+        </div>
+
+    </div>
+
+    <div class="d-flex gap-2 m-2">
+
+        <select id="filter-phase" class="form-control w-auto">
+            <option value="">All Phases</option>
+            <option value="payment_method">Payment</option>
+            <option value="shipping">Shipping</option>
+            <option value="address">Address</option>
+        </select>
+
+        <input id="filter-customer-id" class="form-control w-auto" placeholder="Customer ID">
+
+        <input id="filter-products-count" class="form-control w-auto" placeholder="Products Count">
+
+        <input id="filter-search-term" class="form-control w-auto" placeholder="Search...">
+
+        <button id="apply-filters" class="btn btn-primary">Apply</button>
+
+    </div>
+
+    <!-- cart Table -->
     <div class="data-wrap">
         <div class="data-viewport">
-            <div class="data-scroller" role="region" aria-label="Scrollable data table" tabindex="0">
-                <table class="data-table" role="table" aria-label="Abandoned carts dataset">
+            <div class="data-scroller" role="region" aria-label="cart dataset" tabindex="0">
+                <table class="data-table table table-hover data-table-big" id="cart-table">
                     <thead class="table-light">
                         <tr>
-                            <th>ID</th>
-                            <th>Customer</th>
+                            <th>Customer ID</th>
+                            <th>Name</th>
                             <th>Email</th>
-                            <th>Phone</th>
+                            <th>Mobile</th>
+                            <th>Products</th>
                             <th>Total</th>
-                            <th>Recovered</th>
-                            <th>Created At</th>
+                            <th>Phase</th>
+                            <th>Updated at</th>
+                            <th>Link</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        {% for c in carts %}
-                        <tr>
-                            <td>{{ c.id }}</td>
-                            <td>{{ c.customer.name|default:"Guest" }}</td>
-                            <td>{{ c.customer.email|default:"-" }}</td>
-                            <td>{{ c.customer.mobile|default:"-" }}</td>
-                            <td>{{ c.total }}</td>
-                            <td>{% if c.is_recovered %} ✅ {% else %} ❌ {% endif %}</td>
-                            <td>{{ c.created_at }}</td>
-                        </tr>
-                        {% endfor %}
+                    <tbody id="cart-body">
                     </tbody>
                 </table>
             </div>
         </div>
+        <nav aria-label="Table navigation">
+            <ul class="pagination justify-content-center mt-3">
+                <li class="page-item" id="prev-item">
+                <button class="page-link" id="prev-btn" aria-label="Previous">
+                    <span aria-hidden="true">&laquo; Previous</span>
+                </button>
+                </li>
+                
+                <li class="page-item disabled">
+                <span class="page-link" id="page-status">Page 1 of 1</span>
+                </li>
+                
+                <li class="page-item" id="next-item">
+                <button class="page-link" id="next-btn" aria-label="Next">
+                    <span aria-hidden="true">Next &raquo;</span>
+                </button>
+                </li>
+            </ul>
+        </nav>
     </div>
 </div>
+
+<div class="modal fade" id="cartModal" tabindex="-1">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Cart Details</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="cartDetails">Loading...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+    $('#cart-table tbody').on('click', 'tr', function () {
+        const data = dt.row(this).data();
+        const cartUrl = $(data[7]).attr('href'); // extract URL
+        const cartId = cartUrl.split('/').pop();
+
+        let modal = new bootstrap.Modal(document.getElementById('cartModal'));
+        $('#cartDetails').html('Loading...');
+        modal.show();
+
+        fetch(`/abandoned-carts/${cartId}/`)
+            .then(res => res.json())
+            .then(c => {
+
+                let productsHtml = c.products.map(p => `
+                    <tr>
+                        <td>${p.name}</td>
+                        <td>${p.quantity}</td>
+                        <td>${p.price_string}</td>
+                        <td>${p.total_string}</td>
+                    </tr>
+                `).join('');
+
+                let historyHtml = c.history.map(h => `
+                    <li>${h.type} - ${h.created_at}</li>
+                `).join('');
+
+                $('#cartDetails').html(`
+                    <h5>Customer</h5>
+                    <p><b>${c.customer_name}</b> (${c.customer_email})</p>
+                    <p>${c.customer_mobile}</p>
+
+                    <h5 class="mt-3">Cart Info</h5>
+                    <p><b>Total:</b> ${c.cart_total_string}</p>
+                    <p><b>Phase:</b> ${renderPhaseBadge(c.phase)}</p>
+
+                    <h5 class="mt-3">Products</h5>
+                    <div class="data-wrap">
+                        <div class="data-viewport">
+                            <div class="data-scroller" role="region" aria-label="cart dataset" tabindex="0">
+                                <table class="data-table table table-hover data-table-big">
+                                    <thead>
+                                        <tr>
+                                            <th>Name</th>
+                                            <th>Qty</th>
+                                            <th>Price</th>
+                                            <th>Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>${productsHtml}</tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h5 class="mt-3">History</h5>
+                    <ul>${historyHtml}</ul>
+                `);
+            })
+            .catch(err => {
+                $('#cartDetails').html("⚠️ " + err);
+            });
+    });
+</script>
+
+<script>
+    const PER_PAGE = 100;
+    const COOLDOWN_MS = 150;
+
+    let currentPage = 1;
+    let hasMore = true;
+    let total = 0;
+    let loaded = 0;
+    let dt = null;
+
+    // filters state
+    let filters = {
+        phase: '',
+        customer_id: '',
+        products_count: '',
+        search_term: ''
+    };
+
+    $(document).ready(() => {
+
+        dt = $('#cart-table').DataTable({
+            paging: true,
+            ordering: true,
+            order: [[6, 'desc']], // updated_at
+            searching: false, // ❗ we use server filtering
+            info: false,
+            lengthChange: false,
+            deferRender: true,
+            dom: 't',
+            pageLength: 100,
+            language: {
+                emptyTable: 'Loading carts...',
+            },
+            createdRow(row, data) {
+                $(row).css('cursor', 'pointer');
+            }
+        });
+
+        $('#apply-filters').on('click', () => {
+            filters.phase = $('#filter-phase').val();
+            filters.customer_id = $('#filter-customer-id').val();
+            filters.products_count = $('#filter-products-count').val();
+            filters.search_term = $('#filter-search-term').val();
+
+            reloadTable();
+        });
+
+        startLoading();
+    });
+
+    // ─────────────────────────────
+    function resetState() {
+        currentPage = 1;
+        hasMore = true;
+        total = 0;
+        loaded = 0;
+        dt.clear().draw();
+    }
+
+    function reloadTable() {
+        resetState();
+        startLoading();
+    }
+
+    // ─────────────────────────────
+    async function startLoading() {
+        while (hasMore) {
+            await fetchPage(currentPage);
+            if (hasMore) {
+                currentPage++;
+                await sleep(COOLDOWN_MS);
+            }
+        }
+    }
+
+    async function fetchPage(page) {
+        try {
+
+            let url = `/abandoned-carts/api/?page=${page}&page_size=${PER_PAGE}`;
+
+            if (filters.phase) url += `&phase=${filters.phase}`;
+            if (filters.customer_id) url += `&customer_id=${filters.customer_id}`;
+            if (filters.products_count) url += `&products_count=${filters.products_count}`;
+            if (filters.search_term) url += `&search_term=${filters.search_term}`;
+
+            const res = await fetch(url);
+            const data = await res.json();
+
+            if (!res.ok) throw new Error(data.error);
+
+            hasMore = data.has_more;
+            total = data.total;
+
+            const rows = data.carts.map(c => [
+                c.customer_id ?? '—',
+                c.customer_name ?? '—',
+                c.customer_email ?? '—',
+                c.customer_mobile ?? '—',
+                c.products_count ?? 0,
+                c.cart_total_string ?? '—',
+                renderPhaseBadge(c.phase),
+                c.updated_at ?? '—',
+                `<a href="${c.url}" target="_blank">Open</a>`
+            ]);
+
+            dt.rows.add(rows).draw(false);
+
+            loaded += data.carts.length;
+            updateProgress(loaded, total);
+
+        } catch (err) {
+            console.error(err);
+            hasMore = false;
+        }
+    }
+
+    // ─────────────────────────────
+    function updateProgress(loaded, total) {
+        const pct = total > 0 ? (loaded / total) * 100 : 0;
+        $('#progress-bar').css('width', pct + '%');
+        $('#progress-count').text(`${loaded} / ${total}`);
+    }
+
+    function sleep(ms) {
+        return new Promise(r => setTimeout(r, ms));
+    }
+
+    let totalValue = 0;
+    let totalReminders = 0;
+
+    data.carts.forEach(c => {
+        totalValue += parseFloat(c.cart_total || 0);
+        totalReminders += c.reminders_count || 0;
+    });
+
+    $('#kpi-total').text(data.total);
+    $('#kpi-value').text(totalValue.toFixed(2));
+    $('#kpi-avg').text((totalValue / (loaded || 1)).toFixed(2));
+    $('#kpi-reminders').text(totalReminders);
+
+    function renderPhaseBadge(phase) {
+        const map = {
+            payment_method: 'bg-danger',
+            shipping: 'bg-warning',
+            address: 'bg-info',
+            completed: 'bg-success'
+        };
+
+        const cls = map[phase] || 'bg-secondary';
+
+        return `<span class="badge ${cls}">${phase}</span>`;
+    }
+</script>
+
 {% endblock %}

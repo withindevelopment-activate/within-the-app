@@ -25,6 +25,8 @@ urlpatterns = [
     path("view_tracking/", views.view_tracking, name="view_tracking"),
     
     path('zid/abandoned_carts/', views.abandoned_carts_page, name='abandoned_carts_page'),
+    path('zid/abandoned-carts/api/', views.abandoned_carts_api, name='abandoned_carts_api'),
+    path('zid/abandoned-carts/api/<int:cart_id>/', views.abandoned_cart_detail_api, name='abandoned_cart_detail_api'),
     path('zid/customers/', views.customers_page, name='customers_page'),
     path("zid/customer-detail/<int:customer_id>/", views.customer_detail_api, name="customer_detail_api"),
     path('zid/customers/api/', views.customers_api,  name='customers_api'),

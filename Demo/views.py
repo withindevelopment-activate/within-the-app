@@ -4492,61 +4492,98 @@ def view_tracking(request):
 ##############################################################################
 ###############################################################################
 ### Abdandoned Carts
-def abandoned_carts_page(request):
-    token = request.session.get('access_token')
+def abandoned_carts_api(request):
+    token      = request.session.get('access_token')
     auth_token = request.session.get('authorization_token')
-    store_id = request.session.get('store_id')
+    store_id   = request.session.get('store_id')
 
     if not token:
-        return redirect('Demo:zid_login')
+        return JsonResponse({'error': 'Unauthorized'}, status=401)
 
-    headers_cart = {
+    page           = int(request.GET.get('page', 1))
+    page_size      = 100
+    phase          = request.GET.get('phase')
+    customer_id    = request.GET.get('customer_id')
+    products_count = request.GET.get('products_count')
+    search_term    = request.GET.get('search_term')
+
+    headers = {
         'Authorization': f'Bearer {auth_token}',
         'X-MANAGER-TOKEN': token,
         'accept': 'application/json',
         'Accept-Language': 'all-languages',
-        'Store-Id': f'{store_id}',
+        'Store-Id': str(store_id),
         'Role': 'Manager',
     }
 
-    all_carts = []
-    page = 1
-    per_page = 100
-    try:
-        while True:
-            params = {'page': page, 'page_size': per_page}
-            carts_res = requests.get(f"{settings.ZID_API_BASE}/managers/store/abandoned-carts", headers=headers_cart, params=params)
-            carts_res.raise_for_status()
-            carts_data = carts_res.json()
-            carts_list = carts_data.get('results', [])
-            if not carts_list:
-                break
-            all_carts.extend(carts_list)
-            if len(all_carts) >= carts_data.get('count', 0):  # Zid uses 'count'
-                break
-            page += 1
-    except requests.RequestException as e:
-        traceback.print_exc()
-        messages.error(request, f"⚠️ Error fetching abandoned carts: {str(e)}")
-        all_carts = []
-
-    total_carts = len(all_carts)
-
-    # KPIs
-    recovered_count = sum(1 for c in all_carts if c.get("is_recovered"))
-    total_value = sum(float(c.get("total", 0)) for c in all_carts)
-    avg_cart_value = round(total_value / total_carts, 2) if total_carts > 0 else 0
-
-    context = {
-        "carts": all_carts,
-        "total_carts": total_carts,
-        "recovered_count": recovered_count,
-        "avg_cart_value": avg_cart_value,
-        "total_value": total_value,
+    params = {
+        'page': page,
+        'page_size': page_size,
     }
 
-    return render(request, "Demo/abandoned_carts_page.html", context)
+    # ✅ Optional filters
+    if phase:
+        params['phase'] = phase
+    if customer_id:
+        params['customer_id'] = customer_id
+    if products_count:
+        params['products_count'] = products_count
+    if search_term:
+        params['search_term'] = search_term
 
+    try:
+        res = requests.get(
+            f"{settings.ZID_API_BASE}/managers/store/abandoned-carts",
+            headers=headers,
+            params=params,
+            timeout=15
+        )
+        res.raise_for_status()
+        data = res.json()
+
+        carts = data.get('abandoned-carts', [])
+        pagination = data.get('pagination', {})
+
+        return JsonResponse({
+            'carts': carts,
+            'total': pagination.get('result_count', 0),
+            'page': pagination.get('page', page),
+            'has_more': pagination.get('next_page') is not None,
+        })
+
+    except requests.RequestException as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+def abandoned_carts_page(request):
+    token = request.session.get('access_token')
+    if not token:
+        return redirect('Demo:zid_login')
+
+    return render(request, "Demo/abandoned_carts_page.html")
+
+def abandoned_cart_detail_api(request, cart_id):
+    token = request.session.get('access_token')
+    auth_token = request.session.get('authorization_token')
+    store_id = request.session.get('store_id')
+
+    headers = {
+        'Authorization': f'Bearer {auth_token}',
+        'X-MANAGER-TOKEN': token,
+        'accept': 'application/json',
+        'Store-Id': str(store_id),
+        'Role': 'Manager',
+    }
+
+    try:
+        res = requests.get(
+            f"{settings.ZID_API_BASE}/managers/store/abandoned-carts/{cart_id}",
+            headers=headers
+        )
+        res.raise_for_status()
+        return JsonResponse(res.json().get('abandoned_cart', {}), safe=False)
+
+    except requests.RequestException as e:
+        return JsonResponse({'error': str(e)}, status=500)
 ########################################################################################
 ########################################################################################
 ### Customers page -
