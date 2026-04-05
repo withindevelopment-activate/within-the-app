@@ -281,18 +281,32 @@
 
     async function fetchPage(page) {
         try {
-
             let url = `/abandoned-carts/api/?page=${page}&page_size=${PER_PAGE}`;
-
             if (filters.phase) url += `&phase=${filters.phase}`;
             if (filters.customer_id) url += `&customer_id=${filters.customer_id}`;
             if (filters.products_count) url += `&products_count=${filters.products_count}`;
             if (filters.search_term) url += `&search_term=${filters.search_term}`;
 
             const res = await fetch(url);
-            const data = await res.json();
 
-            if (!res.ok) throw new Error(data.error);
+            // Handle HTML or non-JSON
+            const text = await res.text();
+            if (!res.ok) {
+                console.error('Fetch error', res.status, res.statusText, text);
+                $('#progress-label').text(`Error loading data: ${res.status}`);
+                hasMore = false;
+                return;
+            }
+
+            let data;
+            try {
+                data = JSON.parse(text);
+            } catch(e) {
+                console.error('Invalid JSON:', e, text);
+                $('#progress-label').text("Error: Invalid JSON received");
+                hasMore = false;
+                return;
+            }
 
             hasMore = data.has_more;
             total = data.total;
@@ -312,7 +326,6 @@
             dt.rows.add(rows).draw(false);
 
             loaded += data.carts.length;
-            updateProgress(loaded, total);
 
             data.carts.forEach(c => {
                 totalValue += parseFloat(c.cart_total || 0);
@@ -321,11 +334,14 @@
 
             $('#kpi-total').text(total);
             $('#kpi-value').text(totalValue.toFixed(2));
-            $('#kpi-avg').text((totalValue / (loaded + data.carts.length || 1)).toFixed(2));
+            $('#kpi-avg').text((totalValue / (loaded || 1)).toFixed(2));
             $('#kpi-reminders').text(totalReminders);
+
+            updateProgress(loaded, total);
 
         } catch (err) {
             console.error(err);
+            $('#progress-label').text("Error fetching data");
             hasMore = false;
         }
     }
