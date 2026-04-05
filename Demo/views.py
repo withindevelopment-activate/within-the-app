@@ -4501,7 +4501,7 @@ def abandoned_carts_api(request):
         return JsonResponse({'error': 'Unauthorized'}, status=401)
 
     page           = int(request.GET.get('page', 1))
-    page_size      = 100
+    page_size      = 50
     phase          = request.GET.get('phase')
     customer_id    = request.GET.get('customer_id')
     products_count = request.GET.get('products_count')
