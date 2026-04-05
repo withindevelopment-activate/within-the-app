@@ -4535,8 +4535,7 @@ def abandoned_carts_api(request):
         res = requests.get(
             f"{settings.ZID_API_BASE}/managers/store/abandoned-carts",
             headers=headers,
-            params=params,
-            timeout=15
+            params=params
         )
         res.raise_for_status()
         data = res.json()
@@ -4622,8 +4621,7 @@ def customers_api(request):
             res = requests.get(
                 f"{settings.ZID_API_BASE}/managers/store/customers",
                 headers=headers,
-                params={'page': page, 'per_page': per_page},
-                timeout=15,
+                params={'page': page, 'per_page': per_page}
             )
             if res.status_code == 429:
                 retry_after = int(res.headers.get('Retry-After', attempt * 5))

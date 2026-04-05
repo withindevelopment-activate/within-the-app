@@ -145,7 +145,7 @@
         $('#cartDetails').html('Loading...');
         modal.show();
 
-        fetch(`/zid/abandoned-carts/${cartId}/`)
+        fetch(`/zid/abandoned-carts/api/${cartId}/`)
             .then(res => res.json())
             .then(c => {
 
