@@ -145,7 +145,7 @@
         $('#cartDetails').html('Loading...');
         modal.show();
 
-        fetch(`/abandoned-carts/${cartId}/`)
+        fetch(`/zid/abandoned-carts/${cartId}/`)
             .then(res => res.json())
             .then(c => {
 
@@ -281,7 +281,7 @@
 
     async function fetchPage(page) {
         try {
-            let url = `/abandoned-carts/api/?page=${page}&page_size=${PER_PAGE}`;
+            let url = `/zid/abandoned-carts/api/?page=${page}&page_size=${PER_PAGE}`;
             if (filters.phase) url += `&phase=${filters.phase}`;
             if (filters.customer_id) url += `&customer_id=${filters.customer_id}`;
             if (filters.products_count) url += `&products_count=${filters.products_count}`;
