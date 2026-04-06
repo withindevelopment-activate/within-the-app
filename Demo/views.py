@@ -7651,7 +7651,7 @@ def update_tracked_customers(new_event, history_rows):
 
 ############################################################################################
 ############################################################################################
-def view_purchase_camapigns(request):
+def view_purchase_campaigns(request):
 
     # Fetch data
     df = fetch_data_from_supabase("Campaign_Event_Log")
