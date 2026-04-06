@@ -6383,9 +6383,9 @@ def events_table_view(request):
     df = fetch_data_from_supabase_specific(
         table_name="Tracking_Visitors_duplicate",
         columns=[
-            "Customer_ID", "Visitor_ID", "Event_Type", "Event_Details", "Session_ID",
-            "Visited_at", "Client_IP", "User_Agent", "Timezone", "UTM_Source", "UTM_Campaign","UTM_Medium","UTM_Term","UTM_Content",
-            "Cookie_ID", "SleecID", "Customer_Mobile","Screen_Resolution","Order_ID","Attribution_Type","Page_URL","Referrer_Platform"
+            "Visitor_ID", "Event_Type", "UTM_Source", "UTM_Campaign", "Session_ID",
+            "Visited_at", "Client_IP", "User_Agent", "Timezone", "UTM_Medium","UTM_Term","UTM_Content","Event_Details",
+            "Cookie_ID", "Customer_ID",  "Customer_Mobile","Screen_Resolution","Order_ID","Attribution_Type","Page_URL","Referrer_Platform"
             ],
         filters=filters,
         order_by=sort_field,
