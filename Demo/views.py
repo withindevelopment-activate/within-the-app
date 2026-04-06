@@ -7567,3 +7567,44 @@ def update_tracked_customers(new_event, history_rows):
     print("=== END update_tracked_customers ===\n")
 
     return True
+
+
+
+############################################################################################
+############################################################################################
+def view_purchase_camapigns(request):
+
+    # Fetch data
+    df = fetch_data_from_supabase("Campaign_Event_Log")
+
+    # --- Cleaning ---
+    df['Customer_ID'] = df['Customer_ID'].astype(int)
+    df['UTM_Source'] = df['UTM_Source'].str.strip().astype(str)
+    df['UTM_Campaign'] = df['UTM_Campaign'].str.strip().astype(str)
+    df['Event_Type'] = df['Event_Type'].str.strip().astype(str)
+    df['Score'] = df['Score'].astype(float)
+
+    # --- Create purchase flag ---
+    df['Is_Purchase'] = (df['Event_Type'] == 'purchase').astype(int)
+
+    # --- Group by source + campaign ---
+    campaign_summary = (
+        df.groupby(['UTM_Source', 'UTM_Campaign'])
+        .agg(
+            Total_Score=('Score', 'sum'),
+            Purchases=('Is_Purchase', 'sum'),
+            Total_Events=('Event_Type', 'count')
+        )
+        .reset_index()
+    )
+
+    # sort by best performing campaigns
+    campaign_summary = campaign_summary.sort_values(
+        by='Total_Score', ascending=False
+    )
+
+    context = {
+        "campaigns": campaign_summary.to_dict(orient="records")
+    }
+
+    return render(request, "purchase_campaigns.html", context)
