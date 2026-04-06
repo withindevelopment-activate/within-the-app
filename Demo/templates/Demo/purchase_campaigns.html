@@ -3,35 +3,102 @@
 {% block title %} Campaign Performance {% endblock title %}
 
 {% block content %}
+<h2 class="mb-4">Campaign Performance</h2>
+<div style="width: 100%; height: 400px; margin-bottom: 20px;">
+    <canvas id="campaignChart"></canvas>
+</div>
 <div class="data-wrap">
-        <div class="data-viewport">
-            <div class="data-scroller" role="region" aria-label="Scrollable data table" tabindex="0">
-                <table class="data-table" role="table" aria-label="Analytics dataset">
-                    <thead>
-                        <tr>
-                        <th class="sticky-col">Source</th>
-                        <th>Campaign</th>
-                        <th>Total Score</th>
-                        <th>Purchases</th>
-                        <th>Total Events</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for c in campaigns %}
-                        <tr>
-                        <td class="sticky-col">{{ c.UTM_Source }}</td>
-                        <td>{{ c.UTM_Campaign }}</td>
-                        <td>{{ c.Total_Score|floatformat:2 }}</td>
-                        <td>{{ c.Purchases }}</td>
-                        <td>{{ c.Total_Events }}</td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                        <td colspan="5" class="text-center text-muted">No campaign data found</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+    <div class="data-viewport">
+        <div class="data-scroller" role="region" aria-label="Scrollable data table" tabindex="0">
+            <table class="data-table" role="table" aria-label="Analytics dataset">
+                <thead>
+                    <tr>
+                    <th class="sticky-col">Source</th>
+                    <th>Campaign</th>
+                    <th>Total Score</th>
+                    <th>Purchases</th>
+                    <th>Total Events</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in campaigns %}
+                    <tr>
+                    <td class="sticky-col">{{ c.UTM_Source }}</td>
+                    <td>{{ c.UTM_Campaign }}</td>
+                    <td>{{ c.Total_Score|floatformat:2 }}</td>
+                    <td>{{ c.Purchases }}</td>
+                    <td>{{ c.Total_Events }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                    <td colspan="5" class="text-center text-muted">No campaign data found</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
+    </div>
+</div>
+<script>
+const labels = {{ chart_labels|safe }};
+const purchases = {{ chart_purchases|safe }};
+const events = {{ chart_events|safe }};
+
+const ctx = document.getElementById('campaignChart').getContext('2d');
+
+new Chart(ctx, {
+    type: 'bar',
+    data: {
+        labels: labels,
+        datasets: [
+            {
+                label: 'Purchases',
+                data: purchases,
+                borderWidth: 1,
+                yAxisID: 'y',
+            },
+            {
+                label: 'Total Events',
+                data: events,
+                type: 'line',
+                yAxisID: 'y1',
+                tension: 0.3
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        interaction: {
+            mode: 'index',
+            intersect: false
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                position: 'left',
+                title: {
+                    display: true,
+                    text: 'Purchases'
+                }
+            },
+            y1: {
+                beginAtZero: true,
+                position: 'right',
+                grid: {
+                    drawOnChartArea: false
+                },
+                title: {
+                    display: true,
+                    text: 'Events'
+                }
+            }
+        },
+        plugins: {
+            legend: {
+                position: 'top'
+            }
+        }
+    }
+});
+</script>
 {% endblock %}

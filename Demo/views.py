@@ -7675,15 +7675,21 @@ def view_purchase_campaigns(request):
             Total_Events=('Event_Type', 'count')
         )
         .reset_index()
+        .sort_values(by='Total_Score', ascending=False)
     )
 
-    # sort by best performing campaigns
-    campaign_summary = campaign_summary.sort_values(
-        by='Total_Score', ascending=False
-    )
+    labels = campaign_summary.apply(
+        lambda x: f"{x['UTM_Source']} | {x['UTM_Campaign']}", axis=1
+    ).tolist()
+
+    purchases = campaign_summary['Purchases'].tolist()
+    events = campaign_summary['Total_Events'].tolist()
 
     context = {
-        "campaigns": campaign_summary.to_dict(orient="records")
+        "campaigns": campaign_summary.to_dict(orient="records"),
+        "chart_labels": labels,
+        "chart_purchases": purchases,
+        "chart_events": events,
     }
 
     return render(request, "Demo/purchase_campaigns.html", context)
