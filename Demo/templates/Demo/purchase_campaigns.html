@@ -4,7 +4,7 @@
 
 {% block content %}
 <h2 class="mb-4">Campaign Performance</h2>
-<div style="width: 100%; height: 400px; margin-bottom: 20px;">
+<div class="d-flex justify-content-center" style="width: 100%; height: 500px; margin-bottom: 20px;">
     <canvas id="campaignChart"></canvas>
 </div>
 <div class="data-wrap">
@@ -44,25 +44,36 @@ const labels = {{ chart_labels|safe }};
 const purchases = {{ chart_purchases|safe }};
 const events = {{ chart_events|safe }};
 
+// --- Compute global max across BOTH datasets ---
+const maxValue = Math.max(
+    ...purchases,
+    ...events
+);
+
 const ctx = document.getElementById('campaignChart').getContext('2d');
 
 new Chart(ctx, {
-    type: 'bar',
     data: {
         labels: labels,
         datasets: [
             {
+                type: 'bar',
                 label: 'Purchases',
                 data: purchases,
+                backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                borderColor: 'rgba(59, 130, 246, 1)',
                 borderWidth: 1,
-                yAxisID: 'y',
+                borderRadius: 6
             },
             {
+                type: 'line',
                 label: 'Total Events',
                 data: events,
-                type: 'line',
-                yAxisID: 'y1',
-                tension: 0.3
+                borderColor: 'rgb(185, 16, 16)',
+                backgroundColor: 'rgba(185, 16, 16, 0.15)',
+                tension: 0.35,
+                pointRadius: 3,
+                pointHoverRadius: 5
             }
         ]
     },
@@ -75,6 +86,8 @@ new Chart(ctx, {
         scales: {
             y: {
                 beginAtZero: true,
+                min: 0,
+                max: maxValue,
                 position: 'left',
                 title: {
                     display: true,
@@ -83,6 +96,8 @@ new Chart(ctx, {
             },
             y1: {
                 beginAtZero: true,
+                min: 0,
+                max: maxValue,
                 position: 'right',
                 grid: {
                     drawOnChartArea: false
@@ -91,11 +106,6 @@ new Chart(ctx, {
                     display: true,
                     text: 'Events'
                 }
-            }
-        },
-        plugins: {
-            legend: {
-                position: 'top'
             }
         }
     }
