@@ -6393,7 +6393,7 @@ def events_table_view(request):
     }
 
     df_last_30 = fetch_data_from_supabase_specific(
-        table_name="Tracking_Visitors",
+        table_name="Tracking_Visitors_duplicate",
         columns=["Visitor_ID","Visited_at"],
         filters=last_30_filters,
         limit=1000,  # high enough to capture traffic
