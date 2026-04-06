@@ -6454,252 +6454,252 @@ def events_table_view(request):
 ####################### This section is to add a view for the customers database created and updated upon entry logs, for now, we only store customers with a final purchase #####
 ############# Helper functions to help with parsing --- 
 # A list converter --- 
-# def ensure_list(value):
-#     import ast
-#     if isinstance(value, list):
-#         return value
-#     if pd.isna(value):
-#         return []
-#     try:
-#         v = ast.literal_eval(value)
-#         return v if isinstance(v, list) else [str(v)]
-#     except:
-#         return [str(value)]
+def ensure_list(value):
+    import ast
+    if isinstance(value, list):
+        return value
+    if pd.isna(value):
+        return []
+    try:
+        v = ast.literal_eval(value)
+        return v if isinstance(v, list) else [str(v)]
+    except:
+        return [str(value)]
     
-# def ensure_dict(value):
-#     import ast
-#     if isinstance(value, dict):
-#         return value
-#     if pd.isna(value):
-#         return {}
-#     try:
-#         v = ast.literal_eval(value)
-#         return v if isinstance(v, dict) else {}
-#     except:
-#         return {}
+def ensure_dict(value):
+    import ast
+    if isinstance(value, dict):
+        return value
+    if pd.isna(value):
+        return {}
+    try:
+        v = ast.literal_eval(value)
+        return v if isinstance(v, dict) else {}
+    except:
+        return {}
     
-# import ast
+import ast
 
-# def normalize_details(raw):
-#     """
-#     Accepts raw event details (dict or string), returns a dict with normalized
-#     string keys (stripped, lowered) so lookups like 'id' always work.
-#     """
-#     if raw is None:
-#         return {}
+def normalize_details(raw):
+    """
+    Accepts raw event details (dict or string), returns a dict with normalized
+    string keys (stripped, lowered) so lookups like 'id' always work.
+    """
+    if raw is None:
+        return {}
 
-#     # If it's a pandas/np single-value object, convert to Python native
-#     try:
-#         # strings like "{'id': 'abc', ...}"
-#         if isinstance(raw, str):
-#             try:
-#                 parsed = ast.literal_eval(raw)
-#             except Exception:
-#                 parsed = {}
-#         else:
-#             parsed = raw
-#     except Exception:
-#         parsed = {}
+    # If it's a pandas/np single-value object, convert to Python native
+    try:
+        # strings like "{'id': 'abc', ...}"
+        if isinstance(raw, str):
+            try:
+                parsed = ast.literal_eval(raw)
+            except Exception:
+                parsed = {}
+        else:
+            parsed = raw
+    except Exception:
+        parsed = {}
 
-#     # If parsed isn't a dict, bail out with empty dict
-#     if not isinstance(parsed, dict):
-#         return {}
+    # If parsed isn't a dict, bail out with empty dict
+    if not isinstance(parsed, dict):
+        return {}
 
-#     # Normalize keys: strip, lower, and map them to values
-#     norm = {}
-#     for k, v in parsed.items():
-#         try:
-#             ks = str(k).strip().lower()
-#         except Exception:
-#             ks = str(k)
-#         norm[ks] = v
-#     return norm
+    # Normalize keys: strip, lower, and map them to values
+    norm = {}
+    for k, v in parsed.items():
+        try:
+            ks = str(k).strip().lower()
+        except Exception:
+            ks = str(k)
+        norm[ks] = v
+    return norm
 
-# ## Function to only view the table
-# def view_tracked_customers(request):
-#     """
-#     View the customers table with nicely formatted dicts for display,
-#     including UNKNOWN_CAMPAIGN counts by Attribution_Type.
-#     """
+## Function to only view the table
+def view_tracked_customers(request):
+    """
+    View the customers table with nicely formatted dicts for display,
+    including UNKNOWN_CAMPAIGN counts by Attribution_Type.
+    """
 
-#     tracked_customers = fetch_data_from_supabase_specific("Customer_Tracking_duplicate")
+    tracked_customers = fetch_data_from_supabase_specific("Customer_Tracking_duplicate")
 
-#     # ----------------------------
-#     # Helper functions
+    # ----------------------------
+    # Helper functions
 
-#     def safe_dict(d):
-#         if isinstance(d, dict):
-#             return d
-#         return {}
+    def safe_dict(d):
+        if isinstance(d, dict):
+            return d
+        return {}
 
-#     def format_customer_info(info):
-#         info = safe_dict(info)
-#         name = info.get("name", "")
-#         email = info.get("email", "")
-#         mobile = info.get("mobile", "")
-#         return f"{name}<br>{email}<br>{mobile}"
+    def format_customer_info(info):
+        info = safe_dict(info)
+        name = info.get("name", "")
+        email = info.get("email", "")
+        mobile = info.get("mobile", "")
+        return f"{name}<br>{email}<br>{mobile}"
 
-#     def format_atc_dict(atc_dict):
-#         atc_dict = safe_dict(atc_dict)
-#         if not atc_dict:
-#             return ""
+    def format_atc_dict(atc_dict):
+        atc_dict = safe_dict(atc_dict)
+        if not atc_dict:
+            return ""
 
-#         lines = []
-#         pending = safe_dict(atc_dict.get("pending"))
-#         history = safe_dict(atc_dict.get("history"))
+        lines = []
+        pending = safe_dict(atc_dict.get("pending"))
+        history = safe_dict(atc_dict.get("history"))
 
-#         if pending:
-#             lines.append("<b>Pending ATCs:</b>")
-#             for camp, data in pending.items():
-#                 data = safe_dict(data)
-#                 lines.append(f"{camp} — count: {data.get('count',0)}")
+        if pending:
+            lines.append("<b>Pending ATCs:</b>")
+            for camp, data in pending.items():
+                data = safe_dict(data)
+                lines.append(f"{camp} — count: {data.get('count',0)}")
 
-#         if history:
-#             lines.append("<b>ATC History:</b>")
-#             for camp, data in history.items():
-#                 data = safe_dict(data)
-#                 total = data.get("total_credit",0)
-#                 orders = len(data.get("orders",[]))
-#                 lines.append(f"{camp} — total_credit: {total} — orders: {orders}")
+        if history:
+            lines.append("<b>ATC History:</b>")
+            for camp, data in history.items():
+                data = safe_dict(data)
+                total = data.get("total_credit",0)
+                orders = len(data.get("orders",[]))
+                lines.append(f"{camp} — total_credit: {total} — orders: {orders}")
 
-#         return "<br>".join(lines)
+        return "<br>".join(lines)
 
-#     def format_purchase_dict(purchase_dict):
-#         purchase_dict = safe_dict(purchase_dict)
-#         if not purchase_dict:
-#             return ""
+    def format_purchase_dict(purchase_dict):
+        purchase_dict = safe_dict(purchase_dict)
+        if not purchase_dict:
+            return ""
 
-#         lines = []
-#         for camp, data in purchase_dict.items():
-#             data = safe_dict(data)
-#             total = data.get("total_revenue",0)
-#             orders = len(data.get("orders",[]))
-#             lines.append(f"{camp} — total_revenue: {total} — orders: {orders}")
+        lines = []
+        for camp, data in purchase_dict.items():
+            data = safe_dict(data)
+            total = data.get("total_revenue",0)
+            orders = len(data.get("orders",[]))
+            lines.append(f"{camp} — total_revenue: {total} — orders: {orders}")
 
-#         return "<br>".join(lines)
+        return "<br>".join(lines)
 
-#     # ----------------------------
-#     # Per-purchase attribution formatter
-#     # ----------------------------
+    # ----------------------------
+    # Per-purchase attribution formatter
+    # ----------------------------
 
-#     def format_per_purchase(per_purchase_dict):
+    def format_per_purchase(per_purchase_dict):
 
-#         per_purchase_dict = safe_dict(per_purchase_dict)
-#         if not per_purchase_dict:
-#             return ""
+        per_purchase_dict = safe_dict(per_purchase_dict)
+        if not per_purchase_dict:
+            return ""
 
-#         html = []
+        html = []
 
-#         for order_id, order_data in per_purchase_dict.items():
+        for order_id, order_data in per_purchase_dict.items():
 
-#             order_data = safe_dict(order_data)
-#             order_total = order_data.get("order_total",0)
-#             campaigns = safe_dict(order_data.get("campaigns"))
+            order_data = safe_dict(order_data)
+            order_total = order_data.get("order_total",0)
+            campaigns = safe_dict(order_data.get("campaigns"))
 
-#             html.append(f"<div class='order-box'>")
-#             html.append(f"<div class='order-header'>Order {order_id} — {order_total}</div>")
+            html.append(f"<div class='order-box'>")
+            html.append(f"<div class='order-header'>Order {order_id} — {order_total}</div>")
 
-#             for key, camp_data in campaigns.items():
+            for key, camp_data in campaigns.items():
 
-#                 camp_data = safe_dict(camp_data)
+                camp_data = safe_dict(camp_data)
 
-#                 if "__" in key:
-#                     source, campaign = key.split("__",1)
-#                 else:
-#                     source, campaign = key, ""
+                if "__" in key:
+                    source, campaign = key.split("__",1)
+                else:
+                    source, campaign = key, ""
 
-#                 credit = camp_data.get("credit",0)
+                credit = camp_data.get("credit",0)
 
-#                 percent = 0
-#                 if order_total:
-#                     percent = round((credit/order_total)*100)
+                percent = 0
+                if order_total:
+                    percent = round((credit/order_total)*100)
 
-#                 highlight = ""
-#                 if "missing_campaign" in campaign.lower() and source != "direct":
-#                     highlight = "unknown-social"
+                highlight = ""
+                if "missing_campaign" in campaign.lower() and source != "direct":
+                    highlight = "unknown-social"
 
-#                 html.append(f"""
-#                 <div class='campaign-row {highlight}'>
-#                     <div class='campaign-label'>
-#                         <b>{source}</b> — {campaign}
-#                     </div>
+                html.append(f"""
+                <div class='campaign-row {highlight}'>
+                    <div class='campaign-label'>
+                        <b>{source}</b> — {campaign}
+                    </div>
 
-#                     <div class='credit-bar'>
-#                         <div class='credit-fill' style='width:{percent}%'></div>
-#                     </div>
+                    <div class='credit-bar'>
+                        <div class='credit-fill' style='width:{percent}%'></div>
+                    </div>
 
-#                     <div class='credit-value'>
-#                         {credit} ({percent}%)
-#                     </div>
-#                 </div>
-#                 """)
+                    <div class='credit-value'>
+                        {credit} ({percent}%)
+                    </div>
+                </div>
+                """)
 
-#             html.append("</div>")
+            html.append("</div>")
 
-#         return "".join(html)
+        return "".join(html)
 
-#     # ----------------------------
-#     # Count unknown social orders
-#     # ----------------------------
+    # ----------------------------
+    # Count unknown social orders
+    # ----------------------------
 
-#     def count_unknown_social_orders(df):
+    def count_unknown_social_orders(df):
 
-#         social_sources = {
-#             "instagram","facebook","tiktok","snapchat",
-#             "reddit","pinterest","linkedin","x"
-#         }
+        social_sources = {
+            "instagram","facebook","tiktok","snapchat",
+            "reddit","pinterest","linkedin","x"
+        }
 
-#         count = 0
+        count = 0
 
-#         for row in df["Campaign_Contributions_Per_Purchase"]:
+        for row in df["Campaign_Contributions_Per_Purchase"]:
 
-#             row = safe_dict(row)
+            row = safe_dict(row)
 
-#             for order in row.values():
+            for order in row.values():
 
-#                 campaigns = safe_dict(order.get("campaigns"))
+                campaigns = safe_dict(order.get("campaigns"))
 
-#                 for key in campaigns.keys():
+                for key in campaigns.keys():
 
-#                     if "__" in key:
-#                         source, campaign = key.split("__",1)
-#                     else:
-#                         source, campaign = key, ""
+                    if "__" in key:
+                        source, campaign = key.split("__",1)
+                    else:
+                        source, campaign = key, ""
 
-#                     if (
-#                         source in social_sources
-#                         and "missing_campaign" in campaign.lower()
-#                     ):
-#                         count += 1
-#                         break
+                    if (
+                        source in social_sources
+                        and "missing_campaign" in campaign.lower()
+                    ):
+                        count += 1
+                        break
 
-#         return count
+        return count
 
-#     unknown_social_orders = count_unknown_social_orders(tracked_customers)
+    unknown_social_orders = count_unknown_social_orders(tracked_customers)
 
-#     # ----------------------------
-#     # Format dataframe
-#     # ----------------------------
+    # ----------------------------
+    # Format dataframe
+    # ----------------------------
 
-#     display_df = tracked_customers.copy()
+    display_df = tracked_customers.copy()
 
-#     display_df["Customer_Info"] = display_df["Customer_Info"].apply(format_customer_info)
-#     display_df["Campaign_Contributions_atcs"] = display_df["Campaign_Contributions_atcs"].apply(format_atc_dict)
-#     display_df["Campaign_Contributions_Purchases"] = display_df["Campaign_Contributions_Purchases"].apply(format_purchase_dict)
+    display_df["Customer_Info"] = display_df["Customer_Info"].apply(format_customer_info)
+    display_df["Campaign_Contributions_atcs"] = display_df["Campaign_Contributions_atcs"].apply(format_atc_dict)
+    display_df["Campaign_Contributions_Purchases"] = display_df["Campaign_Contributions_Purchases"].apply(format_purchase_dict)
 
-#     display_df["Campaign_Contributions_Per_Purchase"] = \
-#         display_df["Campaign_Contributions_Per_Purchase"].apply(format_per_purchase)
+    display_df["Campaign_Contributions_Per_Purchase"] = \
+        display_df["Campaign_Contributions_Per_Purchase"].apply(format_per_purchase)
 
-#     data = display_df.to_dict(orient="records")
+    data = display_df.to_dict(orient="records")
 
-#     return render(
-#         request,
-#         "Demo/tracked_customers.html",
-#         {
-#             "data": data,
-#             "unknown_social_orders": unknown_social_orders
-#         }
-#     )
+    return render(
+        request,
+        "Demo/tracked_customers.html",
+        {
+            "data": data,
+            "unknown_social_orders": unknown_social_orders
+        }
+    )
 
 ######################
 
@@ -6707,238 +6707,238 @@ def events_table_view(request):
 # Utility helpers
 # ─────────────────────────────────────────────
 
-def ensure_dict(value):
-    if isinstance(value, dict):
-        return value
-    if value is None:
-        return {}
-    try:
-        if isinstance(value, float) and pd.isna(value):
-            return {}
-    except Exception:
-        pass
-    if isinstance(value, str):
-        try:
-            parsed = ast.literal_eval(value)
-            return parsed if isinstance(parsed, dict) else {}
-        except Exception:
-            return {}
-    return {}
+# def ensure_dict(value):
+#     if isinstance(value, dict):
+#         return value
+#     if value is None:
+#         return {}
+#     try:
+#         if isinstance(value, float) and pd.isna(value):
+#             return {}
+#     except Exception:
+#         pass
+#     if isinstance(value, str):
+#         try:
+#             parsed = ast.literal_eval(value)
+#             return parsed if isinstance(parsed, dict) else {}
+#         except Exception:
+#             return {}
+#     return {}
 
 
-def ensure_list(value):
-    if isinstance(value, list):
-        return value
-    if value is None:
-        return []
-    try:
-        if isinstance(value, float) and pd.isna(value):
-            return []
-    except Exception:
-        pass
-    if isinstance(value, str):
-        try:
-            parsed = ast.literal_eval(value)
-            return parsed if isinstance(parsed, list) else [str(parsed)]
-        except Exception:
-            return [str(value)]
-    return [str(value)]
+# def ensure_list(value):
+#     if isinstance(value, list):
+#         return value
+#     if value is None:
+#         return []
+#     try:
+#         if isinstance(value, float) and pd.isna(value):
+#             return []
+#     except Exception:
+#         pass
+#     if isinstance(value, str):
+#         try:
+#             parsed = ast.literal_eval(value)
+#             return parsed if isinstance(parsed, list) else [str(parsed)]
+#         except Exception:
+#             return [str(value)]
+#     return [str(value)]
 
 
-def safe_float(value, default=0.0):
-    try:
-        return float(value)
-    except Exception:
-        return default
+# def safe_float(value, default=0.0):
+#     try:
+#         return float(value)
+#     except Exception:
+#         return default
 
 
-# ─────────────────────────────────────────────
-# Main dashboard view
-# ─────────────────────────────────────────────
+# # ─────────────────────────────────────────────
+# # Main dashboard view
+# # ─────────────────────────────────────────────
 
-def view_tracked_customers(request):
-    """
-    Renders the campaign attribution dashboard.
-    Pulls data from Supabase, aggregates attribution metrics, and
-    passes them as JSON-safe context variables to the template.
-    """
+# def view_tracked_customers(request):
+#     """
+#     Renders the campaign attribution dashboard.
+#     Pulls data from Supabase, aggregates attribution metrics, and
+#     passes them as JSON-safe context variables to the template.
+#     """
 
-    df = fetch_data_from_supabase_specific("Customer_Tracking_duplicate")
+#     df = fetch_data_from_supabase_specific("Customer_Tracking_duplicate")
 
-    # ── Metric cards ──────────────────────────────────────────────────────────
+#     # ── Metric cards ──────────────────────────────────────────────────────────
 
-    total_revenue = 0.0
-    total_orders = 0
-    total_atc = 0
-    source_set = set()
+#     total_revenue = 0.0
+#     total_orders = 0
+#     total_atc = 0
+#     source_set = set()
 
-    # ── Per-source revenue ────────────────────────────────────────────────────
-    # { "instagram": 595.0, "google": 1050.0, ... }
-    source_revenue: dict[str, float] = {}
+#     # ── Per-source revenue ────────────────────────────────────────────────────
+#     # { "instagram": 595.0, "google": 1050.0, ... }
+#     source_revenue: dict[str, float] = {}
 
-    # ── Hook campaign counter ─────────────────────────────────────────────────
-    # { "savings design": {"source": "instagram", "count": 2}, ... }
-    hook_counter: dict[str, dict] = {}
+#     # ── Hook campaign counter ─────────────────────────────────────────────────
+#     # { "savings design": {"source": "instagram", "count": 2}, ... }
+#     hook_counter: dict[str, dict] = {}
 
-    # ── Per-campaign credit totals ────────────────────────────────────────────
-    # { "instagram__savings design": {"orders": {"67828381": 260.0}, "total": 260.0} }
-    campaign_credits: dict[str, dict] = {}
+#     # ── Per-campaign credit totals ────────────────────────────────────────────
+#     # { "instagram__savings design": {"orders": {"67828381": 260.0}, "total": 260.0} }
+#     campaign_credits: dict[str, dict] = {}
 
-    # ── Per-order attribution (stacked waterfall) ─────────────────────────────
-    # { "67828381": {"order_total": 260.0, "campaigns": {"instagram__savings design": 260.0}} }
-    per_order_data: dict[str, dict] = {}
+#     # ── Per-order attribution (stacked waterfall) ─────────────────────────────
+#     # { "67828381": {"order_total": 260.0, "campaigns": {"instagram__savings design": 260.0}} }
+#     per_order_data: dict[str, dict] = {}
 
-    # ── Order details table ───────────────────────────────────────────────────
-    order_rows = []
+#     # ── Order details table ───────────────────────────────────────────────────
+#     order_rows = []
 
-    for _, row in df.iterrows():
+#     for _, row in df.iterrows():
 
-        customer_id = row.get("Customer_ID") or row.get("Visitor_ID", "—")
-        atc = safe_float(row.get("Add_to_Cart", 0))
-        total_atc += int(atc)
+#         customer_id = row.get("Customer_ID") or row.get("Visitor_ID", "—")
+#         atc = safe_float(row.get("Add_to_Cart", 0))
+#         total_atc += int(atc)
 
-        # Hook campaign
-        hook_campaign = str(row.get("Hook_Campaign", "")).strip()
-        hook_source = str(row.get("Hook_Source", "")).strip()
-        if hook_campaign and hook_campaign.lower() not in ("nan", "none", ""):
-            if hook_campaign not in hook_counter:
-                hook_counter[hook_campaign] = {"source": hook_source, "count": 0}
-            hook_counter[hook_campaign]["count"] += 1
+#         # Hook campaign
+#         hook_campaign = str(row.get("Hook_Campaign", "")).strip()
+#         hook_source = str(row.get("Hook_Source", "")).strip()
+#         if hook_campaign and hook_campaign.lower() not in ("nan", "none", ""):
+#             if hook_campaign not in hook_counter:
+#                 hook_counter[hook_campaign] = {"source": hook_source, "count": 0}
+#             hook_counter[hook_campaign]["count"] += 1
 
-        # Campaign_Contributions_Purchases → source revenue
-        purchases = ensure_dict(row.get("Campaign_Contributions_Purchases"))
-        for key, data in purchases.items():
-            data = ensure_dict(data)
-            source = str(data.get("utm_source", key.split("__")[0] if "__" in key else key)).lower().strip()
-            rev = safe_float(data.get("total_revenue", 0))
-            source_revenue[source] = source_revenue.get(source, 0.0) + rev
-            source_set.add(source)
+#         # Campaign_Contributions_Purchases → source revenue
+#         purchases = ensure_dict(row.get("Campaign_Contributions_Purchases"))
+#         for key, data in purchases.items():
+#             data = ensure_dict(data)
+#             source = str(data.get("utm_source", key.split("__")[0] if "__" in key else key)).lower().strip()
+#             rev = safe_float(data.get("total_revenue", 0))
+#             source_revenue[source] = source_revenue.get(source, 0.0) + rev
+#             source_set.add(source)
 
-        # Campaign_Contributions_Per_Purchase → per-order + campaign credit
-        per_purchase = ensure_dict(row.get("Campaign_Contributions_Per_Purchase"))
-        for order_id, order_data in per_purchase.items():
-            order_data = ensure_dict(order_data)
-            order_total = safe_float(order_data.get("order_total", 0))
-            timestamp = str(order_data.get("timestamp", ""))
-            campaigns = ensure_dict(order_data.get("campaigns"))
+#         # Campaign_Contributions_Per_Purchase → per-order + campaign credit
+#         per_purchase = ensure_dict(row.get("Campaign_Contributions_Per_Purchase"))
+#         for order_id, order_data in per_purchase.items():
+#             order_data = ensure_dict(order_data)
+#             order_total = safe_float(order_data.get("order_total", 0))
+#             timestamp = str(order_data.get("timestamp", ""))
+#             campaigns = ensure_dict(order_data.get("campaigns"))
 
-            total_revenue += order_total
-            total_orders += 1
+#             total_revenue += order_total
+#             total_orders += 1
 
-            if order_id not in per_order_data:
-                per_order_data[order_id] = {
-                    "order_total": order_total,
-                    "campaigns": {}
-                }
+#             if order_id not in per_order_data:
+#                 per_order_data[order_id] = {
+#                     "order_total": order_total,
+#                     "campaigns": {}
+#                 }
 
-            camp_credits_for_order = {}
-            for camp_key, camp_data in campaigns.items():
-                camp_data = ensure_dict(camp_data)
-                credit = safe_float(camp_data.get("credit", 0))
-                camp_key_norm = camp_key.lower().strip()
+#             camp_credits_for_order = {}
+#             for camp_key, camp_data in campaigns.items():
+#                 camp_data = ensure_dict(camp_data)
+#                 credit = safe_float(camp_data.get("credit", 0))
+#                 camp_key_norm = camp_key.lower().strip()
 
-                camp_credits_for_order[camp_key_norm] = credit
-                per_order_data[order_id]["campaigns"][camp_key_norm] = \
-                    per_order_data[order_id]["campaigns"].get(camp_key_norm, 0.0) + credit
+#                 camp_credits_for_order[camp_key_norm] = credit
+#                 per_order_data[order_id]["campaigns"][camp_key_norm] = \
+#                     per_order_data[order_id]["campaigns"].get(camp_key_norm, 0.0) + credit
 
-                if camp_key_norm not in campaign_credits:
-                    campaign_credits[camp_key_norm] = {"orders": {}, "total": 0.0}
-                campaign_credits[camp_key_norm]["orders"][order_id] = \
-                    campaign_credits[camp_key_norm]["orders"].get(order_id, 0.0) + credit
-                campaign_credits[camp_key_norm]["total"] += credit
+#                 if camp_key_norm not in campaign_credits:
+#                     campaign_credits[camp_key_norm] = {"orders": {}, "total": 0.0}
+#                 campaign_credits[camp_key_norm]["orders"][order_id] = \
+#                     campaign_credits[camp_key_norm]["orders"].get(order_id, 0.0) + credit
+#                 campaign_credits[camp_key_norm]["total"] += credit
 
-            # Build order row for the details table
-            hook_camp_display = hook_campaign if hook_campaign and hook_campaign.lower() not in ("nan","none","") else "—"
-            hook_src_display  = hook_source  if hook_source  and hook_source.lower()  not in ("nan","none","") else ""
+#             # Build order row for the details table
+#             hook_camp_display = hook_campaign if hook_campaign and hook_campaign.lower() not in ("nan","none","") else "—"
+#             hook_src_display  = hook_source  if hook_source  and hook_source.lower()  not in ("nan","none","") else ""
 
-            # Derive primary source/campaign from the purchase-type credit entry
-            primary_source = ""
-            primary_campaign = ""
-            for ck, cd in campaigns.items():
-                cd = ensure_dict(cd)
-                if cd.get("type") == "purchase":
-                    parts = ck.split("__", 1)
-                    primary_source   = parts[0] if len(parts) > 0 else ""
-                    primary_campaign = parts[1] if len(parts) > 1 else ""
-                    break
+#             # Derive primary source/campaign from the purchase-type credit entry
+#             primary_source = ""
+#             primary_campaign = ""
+#             for ck, cd in campaigns.items():
+#                 cd = ensure_dict(cd)
+#                 if cd.get("type") == "purchase":
+#                     parts = ck.split("__", 1)
+#                     primary_source   = parts[0] if len(parts) > 0 else ""
+#                     primary_campaign = parts[1] if len(parts) > 1 else ""
+#                     break
 
-            order_rows.append({
-                "customer_id":    str(customer_id),
-                "order_id":       str(order_id),
-                "revenue":        order_total,
-                "source":         primary_source,
-                "campaign":       primary_campaign,
-                "hook_campaign":  hook_camp_display,
-                "hook_source":    hook_src_display,
-                "timestamp":      timestamp,
-            })
+#             order_rows.append({
+#                 "customer_id":    str(customer_id),
+#                 "order_id":       str(order_id),
+#                 "revenue":        order_total,
+#                 "source":         primary_source,
+#                 "campaign":       primary_campaign,
+#                 "hook_campaign":  hook_camp_display,
+#                 "hook_source":    hook_src_display,
+#                 "timestamp":      timestamp,
+#             })
 
-    avg_order = round(total_revenue / total_orders, 2) if total_orders else 0
+#     avg_order = round(total_revenue / total_orders, 2) if total_orders else 0
 
-    # ── Prepare JSON-safe chart data ──────────────────────────────────────────
+#     # ── Prepare JSON-safe chart data ──────────────────────────────────────────
 
-    # Pie: source revenue
-    source_labels = list(source_revenue.keys())
-    source_values = [round(v, 2) for v in source_revenue.values()]
+#     # Pie: source revenue
+#     source_labels = list(source_revenue.keys())
+#     source_values = [round(v, 2) for v in source_revenue.values()]
 
-    # Hook bars (sorted by count desc)
-    hook_bars = sorted(
-        [{"campaign": k, "source": v["source"], "count": v["count"]}
-         for k, v in hook_counter.items()],
-        key=lambda x: x["count"],
-        reverse=True
-    )
+#     # Hook bars (sorted by count desc)
+#     hook_bars = sorted(
+#         [{"campaign": k, "source": v["source"], "count": v["count"]}
+#          for k, v in hook_counter.items()],
+#         key=lambda x: x["count"],
+#         reverse=True
+#     )
 
-    # Campaign pies
-    campaign_pie_data = []
-    for camp_key, data in campaign_credits.items():
-        parts = camp_key.split("__", 1)
-        source   = parts[0] if len(parts) > 0 else camp_key
-        campaign = parts[1] if len(parts) > 1 else ""
-        slices = [
-            {"label": f"Order {oid}", "value": round(credit, 2)}
-            for oid, credit in data["orders"].items()
-        ]
-        campaign_pie_data.append({
-            "key":      camp_key,
-            "source":   source,
-            "campaign": campaign,
-            "total":    round(data["total"], 2),
-            "slices":   slices,
-        })
+#     # Campaign pies
+#     campaign_pie_data = []
+#     for camp_key, data in campaign_credits.items():
+#         parts = camp_key.split("__", 1)
+#         source   = parts[0] if len(parts) > 0 else camp_key
+#         campaign = parts[1] if len(parts) > 1 else ""
+#         slices = [
+#             {"label": f"Order {oid}", "value": round(credit, 2)}
+#             for oid, credit in data["orders"].items()
+#         ]
+#         campaign_pie_data.append({
+#             "key":      camp_key,
+#             "source":   source,
+#             "campaign": campaign,
+#             "total":    round(data["total"], 2),
+#             "slices":   slices,
+#         })
 
-    # Stacked waterfall
-    all_camp_keys = sorted({ck for od in per_order_data.values() for ck in od["campaigns"]})
-    waterfall_labels = [f"Order {oid}" for oid in per_order_data]
-    waterfall_datasets = []
-    for ck in all_camp_keys:
-        waterfall_datasets.append({
-            "label": ck,
-            "data":  [round(od["campaigns"].get(ck, 0), 2) for od in per_order_data.values()]
-        })
+#     # Stacked waterfall
+#     all_camp_keys = sorted({ck for od in per_order_data.values() for ck in od["campaigns"]})
+#     waterfall_labels = [f"Order {oid}" for oid in per_order_data]
+#     waterfall_datasets = []
+#     for ck in all_camp_keys:
+#         waterfall_datasets.append({
+#             "label": ck,
+#             "data":  [round(od["campaigns"].get(ck, 0), 2) for od in per_order_data.values()]
+#         })
 
-    context = {
-        # Metric cards
-        "total_revenue":     round(total_revenue, 2),
-        "total_orders":      total_orders,
-        "avg_order":         avg_order,
-        "total_atc":         total_atc,
-        "source_count":      len(source_set),
-        "source_names":      " · ".join(sorted(source_set)),
+#     context = {
+#         # Metric cards
+#         "total_revenue":     round(total_revenue, 2),
+#         "total_orders":      total_orders,
+#         "avg_order":         avg_order,
+#         "total_atc":         total_atc,
+#         "source_count":      len(source_set),
+#         "source_names":      " · ".join(sorted(source_set)),
 
-        # Chart data (passed as JSON strings for use in <script>)
-        "source_labels_json":       json.dumps(source_labels),
-        "source_values_json":       json.dumps(source_values),
-        "hook_bars_json":           json.dumps(hook_bars),
-        "campaign_pie_data_json":   json.dumps(campaign_pie_data),
-        "waterfall_labels_json":    json.dumps(waterfall_labels),
-        "waterfall_datasets_json":  json.dumps(waterfall_datasets),
+#         # Chart data (passed as JSON strings for use in <script>)
+#         "source_labels_json":       json.dumps(source_labels),
+#         "source_values_json":       json.dumps(source_values),
+#         "hook_bars_json":           json.dumps(hook_bars),
+#         "campaign_pie_data_json":   json.dumps(campaign_pie_data),
+#         "waterfall_labels_json":    json.dumps(waterfall_labels),
+#         "waterfall_datasets_json":  json.dumps(waterfall_datasets),
 
-        # Table
-        "order_rows": order_rows,
-    }
+#         # Table
+#         "order_rows": order_rows,
+#     }
 
-    return render(request, "Demo/tracked_customers.html", context)
+#     return render(request, "Demo/tracked_customers.html", context)
 
 ######################
 def update_tracked_customers_b4(new_event, history_rows):
