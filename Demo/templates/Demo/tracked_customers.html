@@ -4,8 +4,8 @@
 
 {% block content %}
 <div class="alert-warning">
-Unknown campaign orders from social media:
-<b>{{ unknown_social_orders }}</b>
+  Unknown campaign orders from social media:
+  <b>{{ unknown_social_orders }}</b>
 </div>
 <br><br>
 <div class="data-wrap">
@@ -50,39 +50,36 @@ Unknown campaign orders from social media:
 </div>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;700&display=swap" rel="stylesheet">
-
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;700&display=swap"
+  rel="stylesheet">
 <style>
   :root {
-    --ink:       #0f0f0f;
-    --ink-2:     #4a4a4a;
-    --ink-3:     #8a8a8a;
-    --surface:   #ffffff;
+    /* Main Palette - Forced Light Mode */
+    --ink: #0f0f0f;
+    --ink-2: #4a4a4a;
+    --ink-3: #8a8a8a;
+    --surface: #ffffff;
     --surface-2: #f6f5f2;
     --surface-3: #eeecea;
-    --border:    rgba(0,0,0,0.08);
-    --border-md: rgba(0,0,0,0.13);
-    --accent:    #534AB7;
-    --ff-head:   'Syne', sans-serif;
-    --ff-mono:   'DM Mono', monospace;
+    --border: rgba(0, 0, 0, 0.08);
+    --border-md: rgba(0, 0, 0, 0.13);
+    --accent: #534AB7;
+
+    /* Typography & Radius */
+    --ff-head: 'Syne', sans-serif;
+    --ff-mono: 'DM Mono', monospace;
     --radius-lg: 16px;
     --radius-md: 10px;
   }
 
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --ink:       #f0ede8;
-      --ink-2:     #b0ada8;
-      --ink-3:     #706d69;
-      --surface:   #18181a;
-      --surface-2: #202023;
-      --surface-3: #2a2a2e;
-      --border:    rgba(255,255,255,0.07);
-      --border-md: rgba(255,255,255,0.12);
-    }
+  /* Global Resets */
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
   }
-
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   .page {
     font-family: var(--ff-head);
@@ -103,19 +100,23 @@ Unknown campaign orders from social media:
     flex-wrap: wrap;
     gap: 1rem;
   }
+
   .page-header h1 {
     font-size: 20px;
     font-weight: 700;
     letter-spacing: -0.02em;
   }
+
   .header-stats {
     display: flex;
     gap: 1.5rem;
     align-items: center;
   }
+
   .stat {
     text-align: right;
   }
+
   .stat-val {
     font-size: 18px;
     font-weight: 700;
@@ -123,6 +124,7 @@ Unknown campaign orders from social media:
     color: var(--ink);
     line-height: 1;
   }
+
   .stat-label {
     font-family: var(--ff-mono);
     font-size: 10px;
@@ -131,13 +133,14 @@ Unknown campaign orders from social media:
     letter-spacing: 0.05em;
     margin-top: 3px;
   }
+
   .stat-divider {
     width: 0.5px;
     height: 32px;
     background: var(--border-md);
   }
 
-  /* ── Search / filter bar ── */
+  /* ── Toolbar ── */
   .toolbar {
     display: flex;
     align-items: center;
@@ -145,12 +148,14 @@ Unknown campaign orders from social media:
     margin-bottom: 1rem;
     flex-wrap: wrap;
   }
+
   .search-wrap {
     position: relative;
     flex: 1;
     min-width: 200px;
     max-width: 340px;
   }
+
   .search-wrap svg {
     position: absolute;
     left: 10px;
@@ -163,6 +168,7 @@ Unknown campaign orders from social media:
     stroke-width: 2;
     stroke-linecap: round;
   }
+
   .search-input {
     width: 100%;
     padding: 7px 10px 7px 32px;
@@ -174,8 +180,14 @@ Unknown campaign orders from social media:
     border-radius: var(--radius-md);
     outline: none;
   }
-  .search-input::placeholder { color: var(--ink-3); }
-  .search-input:focus { border-color: var(--accent); }
+
+  .search-input::placeholder {
+    color: var(--ink-3);
+  }
+
+  .search-input:focus {
+    border-color: var(--accent);
+  }
 
   .filter-select {
     padding: 7px 10px;
@@ -188,7 +200,10 @@ Unknown campaign orders from social media:
     outline: none;
     cursor: pointer;
   }
-  .filter-select:focus { border-color: var(--accent); }
+
+  .filter-select:focus {
+    border-color: var(--accent);
+  }
 
   .count-tag {
     margin-left: auto;
@@ -207,20 +222,26 @@ Unknown campaign orders from social media:
     border: 0.5px solid var(--border);
     border-radius: var(--radius-lg);
     overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
   }
-  .table-scroll { overflow-x: auto; }
+
+  .table-scroll {
+    overflow-x: auto;
+  }
 
   table.orders {
     width: 100%;
     border-collapse: collapse;
     font-size: 13px;
   }
+
   table.orders thead {
     background: var(--surface-2);
     position: sticky;
     top: 0;
     z-index: 1;
   }
+
   table.orders th {
     text-align: left;
     font-family: var(--ff-mono);
@@ -236,14 +257,22 @@ Unknown campaign orders from social media:
     user-select: none;
     transition: color 0.15s;
   }
-  table.orders th:hover { color: var(--ink-2); }
+
+  table.orders th:hover {
+    color: var(--ink-2);
+  }
+
   table.orders th .sort-arrow {
     display: inline-block;
     margin-left: 4px;
     opacity: 0.3;
     font-size: 9px;
   }
-  table.orders th.sorted .sort-arrow { opacity: 1; color: var(--accent); }
+
+  table.orders th.sorted .sort-arrow {
+    opacity: 1;
+    color: var(--accent);
+  }
 
   table.orders td {
     padding: 11px 16px;
@@ -251,11 +280,18 @@ Unknown campaign orders from social media:
     color: var(--ink);
     vertical-align: middle;
   }
-  table.orders tbody tr:last-child td { border-bottom: none; }
+
+  table.orders tbody tr:last-child td {
+    border-bottom: none;
+  }
+
   table.orders tbody tr {
     transition: background 0.1s;
   }
-  table.orders tbody tr:hover td { background: var(--surface-2); }
+
+  table.orders tbody tr:hover td {
+    background: var(--surface-2);
+  }
 
   /* ── Badges ── */
   .badge {
@@ -269,29 +305,69 @@ Unknown campaign orders from social media:
     font-weight: 500;
     white-space: nowrap;
   }
+
   .badge-dot {
     width: 5px;
     height: 5px;
     border-radius: 50%;
     flex-shrink: 0;
   }
-  .src-instagram { background: #EEEDFE; color: #3C3489; }
-  .src-instagram .badge-dot { background: #534AB7; }
-  .src-google    { background: #E6F1FB; color: #0C447C; }
-  .src-google    .badge-dot { background: #378ADD; }
-  .src-content   { background: #EAF3DE; color: #27500A; }
-  .src-content   .badge-dot { background: #639922; }
-  .src-direct    { background: #F1EFE8; color: #444441; }
-  .src-direct    .badge-dot { background: #888780; }
-  .src-default   { background: var(--surface-3); color: var(--ink-2); }
-  .src-default   .badge-dot { background: var(--ink-3); }
+
+  /* Adjusted for Light Surface */
+  .src-instagram {
+    background: #EEEDFE;
+    color: #3C3489;
+  }
+
+  .src-instagram .badge-dot {
+    background: #534AB7;
+  }
+
+  .src-google {
+    background: #E6F1FB;
+    color: #0C447C;
+  }
+
+  .src-google .badge-dot {
+    background: #378ADD;
+  }
+
+  .src-content {
+    background: #EAF3DE;
+    color: #27500A;
+  }
+
+  .src-content .badge-dot {
+    background: #639922;
+  }
+
+  .src-direct {
+    background: #F1EFE8;
+    color: #444441;
+  }
+
+  .src-direct .badge-dot {
+    background: #888780;
+  }
+
+  .src-default {
+    background: var(--surface-3);
+    color: var(--ink-2);
+  }
+
+  .src-default .badge-dot {
+    background: var(--ink-3);
+  }
 
   .badge-hook {
     background: #FFF3E6;
     color: #854F0B;
-    border: 0.5px solid rgba(213,127,11,0.2);
+    border: 0.5px solid rgba(213, 127, 11, 0.2);
   }
-  .badge-hook .badge-dot { background: #BA7517; }
+
+  .badge-hook .badge-dot {
+    background: #BA7517;
+  }
 
   .badge-anon {
     background: var(--surface-3);
@@ -303,7 +379,7 @@ Unknown campaign orders from social media:
     margin-left: 4px;
   }
 
-  /* ── Order total ── */
+  /* ── UI Elements ── */
   .order-total {
     font-family: var(--ff-mono);
     font-size: 13px;
@@ -311,7 +387,6 @@ Unknown campaign orders from social media:
     color: var(--ink);
   }
 
-  /* ── Timestamp ── */
   .ts {
     font-family: var(--ff-mono);
     font-size: 10px;
@@ -319,33 +394,22 @@ Unknown campaign orders from social media:
     white-space: nowrap;
   }
 
-  /* ── Order ID ── */
   .order-id {
     font-family: var(--ff-mono);
     font-size: 11px;
     color: var(--ink-2);
   }
 
-  /* ── Empty state ── */
-  .empty-state {
+  .empty-state,
+  .no-results {
     text-align: center;
     padding: 4rem 2rem;
     color: var(--ink-3);
     font-family: var(--ff-mono);
     font-size: 12px;
   }
-
-  /* ── No-results row ── */
-  .no-results {
-    text-align: center;
-    padding: 2.5rem;
-    color: var(--ink-3);
-    font-family: var(--ff-mono);
-    font-size: 12px;
-  }
 </style>
-
-<div class="page">
+<div class="mt-5">
 
   {# ── Page header ── #}
   <div class="page-header">
@@ -367,216 +431,216 @@ Unknown campaign orders from social media:
       </div>
     </div>
   </div>
-
-  {# ── Toolbar ── #}
-  <div class="toolbar">
-    <div class="search-wrap">
-      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <input class="search-input" id="searchInput" type="text" placeholder="Search order, customer, campaign…">
-    </div>
-
-    <select class="filter-select" id="sourceFilter">
-      <option value="">All sources</option>
-      {% for r in order_rows %}
-        {% if r.purchase_source %}
-          <option value="{{ r.purchase_source|lower }}">{{ r.purchase_source }}</option>
-        {% endif %}
-      {% endfor %}
-    </select>
-
-    <span class="count-tag" id="countTag">{{ total_orders }} orders</span>
-  </div>
-
+  
   {# ── Table ── #}
-  <div class="table-card">
-    <div class="table-scroll">
-      <table class="orders" id="ordersTable">
-        <thead>
-          <tr>
-            <th data-col="0">Order ID <span class="sort-arrow">↕</span></th>
-            <th data-col="1">Customer <span class="sort-arrow">↕</span></th>
-            <th data-col="2">Purchase campaign <span class="sort-arrow">↕</span></th>
-            <th data-col="3">Hook campaign <span class="sort-arrow">↕</span></th>
-            <th data-col="4" class="sorted">Order total <span class="sort-arrow">↓</span></th>
-            <th data-col="5">Timestamp <span class="sort-arrow">↕</span></th>
-          </tr>
-        </thead>
-        <tbody id="tableBody">
-          {% for r in order_rows %}
-          <tr
-            data-order="{{ r.order_id|lower }}"
-            data-customer="{{ r.customer_id|lower }}"
-            data-campaign="{{ r.purchase_campaign|lower }}"
-            data-hook="{{ r.hook_campaign|lower }}"
-            data-source="{{ r.purchase_source|lower }}"
-            data-total="{{ r.order_total }}"
-            data-ts="{{ r.timestamp }}"
-          >
-            {# Order ID #}
-            <td><span class="order-id">#{{ r.order_id }}</span></td>
+  <div class="data-wrap">
+    <div class="toolbar">
+      <div class="search-wrap">
+        <svg viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="8" />
+          <line x1="21" y1="21" x2="16.65" y2="16.65" />
+        </svg>
+        <input class="search-input" id="searchInput" type="text" placeholder="Search order, customer, campaign…">
+      </div>
+  
+      <select class="filter-select" id="sourceFilter">
+        <option value="">All sources</option>
+        {% for r in order_rows %}
+        {% if r.purchase_source %}
+        <option value="{{ r.purchase_source|lower }}">{{ r.purchase_source }}</option>
+        {% endif %}
+        {% endfor %}
+      </select>
+  
+      <span class="count-tag" id="countTag">{{ total_orders }} orders</span>
+    </div>
+    <div class="data-viewport">
+      <div class="data-scroller" role="region" aria-label="Customers dataset" tabindex="0">
+        <table class="data-table table table-hover data-table-big" id="customers-table">
+          <table class="data-table table table-hover data-table-big orders" id="ordersTable">
+            <thead>
+              <tr>
+                <th data-col="0">Order ID <span class="sort-arrow">↕</span></th>
+                <th data-col="1">Customer <span class="sort-arrow">↕</span></th>
+                <th data-col="2">Purchase campaign <span class="sort-arrow">↕</span></th>
+                <th data-col="3">Hook campaign <span class="sort-arrow">↕</span></th>
+                <th data-col="4" class="sorted">Order total <span class="sort-arrow">↓</span></th>
+                <th data-col="5">Timestamp <span class="sort-arrow">↕</span></th>
+              </tr>
+            </thead>
+            <tbody id="tableBody">
+              {% for r in order_rows %}
+              <tr data-order="{{ r.order_id|lower }}" data-customer="{{ r.customer_id|lower }}"
+                data-campaign="{{ r.purchase_campaign|lower }}" data-hook="{{ r.hook_campaign|lower }}"
+                data-source="{{ r.purchase_source|lower }}" data-total="{{ r.order_total }}"
+                data-ts="{{ r.timestamp }}">
+                {# Order ID #}
+                <td><span class="order-id">#{{ r.order_id }}</span></td>
 
-            {# Customer #}
-            <td>
-              {{ r.customer_id }}
-              {% if r.is_anon %}<span class="badge-anon">anon</span>{% endif %}
-            </td>
+                {# Customer #}
+                <td>
+                  {{ r.customer_id }}
+                  {% if r.is_anon %}<span class="badge-anon">anon</span>{% endif %}
+                </td>
 
-            {# Purchase campaign #}
-            <td>
-              {% if r.purchase_source or r.purchase_campaign %}
-                {% with src=r.purchase_source|lower %}
-                <span class="badge
+                {# Purchase campaign #}
+                <td>
+                  {% if r.purchase_source or r.purchase_campaign %}
+                  {% with src=r.purchase_source|lower %}
+                  <span class="badge
                   {% if src == 'instagram' %}src-instagram
                   {% elif src == 'google' %}src-google
                   {% elif src == 'content creators' or src == 'content' %}src-content
                   {% elif src == 'direct' %}src-direct
                   {% else %}src-default{% endif %}">
-                  <span class="badge-dot"></span>
-                  {% if r.purchase_source %}{{ r.purchase_source }}{% endif %}
-                  {% if r.purchase_campaign %} / {{ r.purchase_campaign }}{% endif %}
-                </span>
-                {% endwith %}
-              {% else %}
-                <span style="color:var(--ink-3);font-family:var(--ff-mono);font-size:11px;">—</span>
-              {% endif %}
-            </td>
+                    <span class="badge-dot"></span>
+                    {% if r.purchase_source %}{{ r.purchase_source }}{% endif %}
+                    {% if r.purchase_campaign %} / {{ r.purchase_campaign }}{% endif %}
+                  </span>
+                  {% endwith %}
+                  {% else %}
+                  <span style="color:var(--ink-3);font-family:var(--ff-mono);font-size:11px;">—</span>
+                  {% endif %}
+                </td>
 
-            {# Hook campaign #}
-            <td>
-              {% if r.hook_campaign %}
-                <span class="badge badge-hook">
-                  <span class="badge-dot"></span>
-                  {% if r.hook_source %}{{ r.hook_source }} / {% endif %}{{ r.hook_campaign }}
-                </span>
-              {% else %}
-                <span style="color:var(--ink-3);font-family:var(--ff-mono);font-size:11px;">—</span>
-              {% endif %}
-            </td>
+                {# Hook campaign #}
+                <td>
+                  {% if r.hook_campaign %}
+                  <span class="badge badge-hook">
+                    <span class="badge-dot"></span>
+                    {% if r.hook_source %}{{ r.hook_source }} / {% endif %}{{ r.hook_campaign }}
+                  </span>
+                  {% else %}
+                  <span style="color:var(--ink-3);font-family:var(--ff-mono);font-size:11px;">—</span>
+                  {% endif %}
+                </td>
 
-            {# Order total #}
-            <td><span class="order-total">{{ r.order_total|floatformat:0 }}</span></td>
+                {# Order total #}
+                <td><span class="order-total">{{ r.order_total|floatformat:0 }}</span></td>
 
-            {# Timestamp #}
-            <td><span class="ts">{{ r.timestamp|default:"—" }}</span></td>
-          </tr>
-          {% empty %}
-          <tr><td colspan="6" class="empty-state">No orders found.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
+                {# Timestamp #}
+                <td><span class="ts">{{ r.timestamp|default:"—" }}</span></td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="6" class="empty-state">No orders found.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+      </div>
     </div>
+
   </div>
-
 </div>
-
 <script>
-(function () {
-  const searchInput  = document.getElementById('searchInput');
-  const sourceFilter = document.getElementById('sourceFilter');
-  const countTag     = document.getElementById('countTag');
-  const tbody        = document.getElementById('tableBody');
-  const headers      = document.querySelectorAll('table.orders th[data-col]');
+  (function () {
+    const searchInput = document.getElementById('searchInput');
+    const sourceFilter = document.getElementById('sourceFilter');
+    const countTag = document.getElementById('countTag');
+    const tbody = document.getElementById('tableBody');
+    const headers = document.querySelectorAll('table.orders th[data-col]');
 
-  /* ── De-duplicate source options ── */
-  const seen = new Set();
-  Array.from(sourceFilter.options).forEach(opt => {
-    if (opt.value === '') { seen.add(''); return; }
-    if (seen.has(opt.value)) opt.remove();
-    else seen.add(opt.value);
-  });
-
-  /* ── Filter ── */
-  function applyFilter() {
-    const q   = searchInput.value.toLowerCase().trim();
-    const src = sourceFilter.value.toLowerCase();
-    let visible = 0;
-
-    Array.from(tbody.querySelectorAll('tr[data-order]')).forEach(row => {
-      const matchSearch = !q ||
-        row.dataset.order.includes(q)    ||
-        row.dataset.customer.includes(q) ||
-        row.dataset.campaign.includes(q) ||
-        row.dataset.hook.includes(q);
-
-      const matchSource = !src || row.dataset.source === src;
-
-      const show = matchSearch && matchSource;
-      row.style.display = show ? '' : 'none';
-      if (show) visible++;
+    /* ── De-duplicate source options ── */
+    const seen = new Set();
+    Array.from(sourceFilter.options).forEach(opt => {
+      if (opt.value === '') { seen.add(''); return; }
+      if (seen.has(opt.value)) opt.remove();
+      else seen.add(opt.value);
     });
 
-    /* no-results row */
-    let noRow = tbody.querySelector('.no-results-row');
-    if (visible === 0) {
-      if (!noRow) {
-        noRow = document.createElement('tr');
-        noRow.className = 'no-results-row';
-        noRow.innerHTML = '<td colspan="6" class="no-results">No orders match your filter.</td>';
-        tbody.appendChild(noRow);
+    /* ── Filter ── */
+    function applyFilter() {
+      const q = searchInput.value.toLowerCase().trim();
+      const src = sourceFilter.value.toLowerCase();
+      let visible = 0;
+
+      Array.from(tbody.querySelectorAll('tr[data-order]')).forEach(row => {
+        const matchSearch = !q ||
+          row.dataset.order.includes(q) ||
+          row.dataset.customer.includes(q) ||
+          row.dataset.campaign.includes(q) ||
+          row.dataset.hook.includes(q);
+
+        const matchSource = !src || row.dataset.source === src;
+
+        const show = matchSearch && matchSource;
+        row.style.display = show ? '' : 'none';
+        if (show) visible++;
+      });
+
+      /* no-results row */
+      let noRow = tbody.querySelector('.no-results-row');
+      if (visible === 0) {
+        if (!noRow) {
+          noRow = document.createElement('tr');
+          noRow.className = 'no-results-row';
+          noRow.innerHTML = '<td colspan="6" class="no-results">No orders match your filter.</td>';
+          tbody.appendChild(noRow);
+        }
+      } else {
+        if (noRow) noRow.remove();
       }
-    } else {
-      if (noRow) noRow.remove();
+
+      countTag.textContent = visible + ' order' + (visible !== 1 ? 's' : '');
     }
 
-    countTag.textContent = visible + ' order' + (visible !== 1 ? 's' : '');
-  }
+    searchInput.addEventListener('input', applyFilter);
+    sourceFilter.addEventListener('change', applyFilter);
 
-  searchInput.addEventListener('input', applyFilter);
-  sourceFilter.addEventListener('change', applyFilter);
+    /* ── Sort ── */
+    let sortCol = 4;    /* default: order total */
+    let sortAsc = false;
 
-  /* ── Sort ── */
-  let sortCol = 4;    /* default: order total */
-  let sortAsc = false;
+    function sortTable(col) {
+      if (sortCol === col) {
+        sortAsc = !sortAsc;
+      } else {
+        sortCol = col;
+        sortAsc = col !== 4; /* total defaults desc, others asc */
+      }
 
-  function sortTable(col) {
-    if (sortCol === col) {
-      sortAsc = !sortAsc;
-    } else {
-      sortCol = col;
-      sortAsc = col !== 4; /* total defaults desc, others asc */
+      headers.forEach(th => {
+        const arrow = th.querySelector('.sort-arrow');
+        if (parseInt(th.dataset.col) === sortCol) {
+          th.classList.add('sorted');
+          arrow.textContent = sortAsc ? '↑' : '↓';
+        } else {
+          th.classList.remove('sorted');
+          arrow.textContent = '↕';
+        }
+      });
+
+      const rows = Array.from(tbody.querySelectorAll('tr[data-order]'));
+
+      const keyMap = ['order', 'customer', 'campaign', 'hook', 'total', 'ts'];
+      const key = keyMap[col];
+
+      rows.sort((a, b) => {
+        let va = a.dataset[key] || '';
+        let vb = b.dataset[key] || '';
+
+        if (key === 'total') {
+          va = parseFloat(va) || 0;
+          vb = parseFloat(vb) || 0;
+          return sortAsc ? va - vb : vb - va;
+        }
+
+        return sortAsc
+          ? va.localeCompare(vb)
+          : vb.localeCompare(va);
+      });
+
+      rows.forEach(r => tbody.appendChild(r));
     }
 
     headers.forEach(th => {
-      const arrow = th.querySelector('.sort-arrow');
-      if (parseInt(th.dataset.col) === sortCol) {
-        th.classList.add('sorted');
-        arrow.textContent = sortAsc ? '↑' : '↓';
-      } else {
-        th.classList.remove('sorted');
-        arrow.textContent = '↕';
-      }
+      th.addEventListener('click', () => sortTable(parseInt(th.dataset.col)));
     });
 
-    const rows = Array.from(tbody.querySelectorAll('tr[data-order]'));
-
-    const keyMap = ['order', 'customer', 'campaign', 'hook', 'total', 'ts'];
-    const key = keyMap[col];
-
-    rows.sort((a, b) => {
-      let va = a.dataset[key] || '';
-      let vb = b.dataset[key] || '';
-
-      if (key === 'total') {
-        va = parseFloat(va) || 0;
-        vb = parseFloat(vb) || 0;
-        return sortAsc ? va - vb : vb - va;
-      }
-
-      return sortAsc
-        ? va.localeCompare(vb)
-        : vb.localeCompare(va);
-    });
-
-    rows.forEach(r => tbody.appendChild(r));
-  }
-
-  headers.forEach(th => {
-    th.addEventListener('click', () => sortTable(parseInt(th.dataset.col)));
-  });
-
-  /* initial sort */
-  sortTable(4);
-})();
+    /* initial sort */
+    sortTable(4);
+  })();
 </script>
 
 {% endblock %}
