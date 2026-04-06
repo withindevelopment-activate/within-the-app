@@ -4,7 +4,16 @@
 {% block content %}
 
 <div class="container mt-4">
-    <h3 class="mb-4">Tracking Events Viewer</h3>
+    <div class="row">
+        <h3 class="col-9 mb-4">Tracking Events Viewer</h3>
+        <div class="col-3 card mb-4">
+            <div class="card-body">
+                <p class="card-text">
+                {{ last_30_unique_visitors }} visitors in the last 30 minutes
+                </p>
+            </div>
+        </div>
+    </div>
 
     <!-- Filters Form -->
     <form method="GET" class="row g-3 mb-4">
