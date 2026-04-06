@@ -1,8 +1,53 @@
 {% extends "Demo/base.html" %}
 
-{% block title %}Campaign Attribution Dashboard{% endblock %}
+{% block title %} Tracked Customers - Purchases {% endblock title %}
 
 {% block content %}
+<div class="alert-warning">
+Unknown campaign orders from social media:
+<b>{{ unknown_social_orders }}</b>
+</div>
+<br><br>
+<div class="data-wrap">
+  <div class="data-viewport">
+    <div class="data-scroller" role="region" aria-label="Scrollable data table" tabindex="0">
+      <table class="data-table" role="table" aria-label="Analytics dataset">
+        <thead>
+          <tr>
+            <th class="sticky-col">Customer_ID</th>
+            <th>Customer_Info</th>
+            <th>Add_to_Cart</th>
+            <th>Purchases</th>
+            <th>Order Attribution</th>
+            <th>Campaign_ATC_Contributions</th>
+            <th>Campaign_Purchase_Contributions</th>
+            <th>Customer_LTV</th>
+            <th>Last_Visit</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in data %}
+          <tr>
+            <td class="sticky-col">{{ row.Customer_ID }}</td>
+            <td>{{ row.Customer_Info|safe }}</td>
+            <td>{{ row.Add_to_Cart|default:"0" }}</td>
+            <td>{{ row.Purchases|default:"0" }}</td>
+            <td>{{ row.Campaign_Contributions_Per_Purchase|safe }}</td>
+            <td>{{ row.Campaign_Contributions_atcs|safe }}</td>
+            <td>{{ row.Campaign_Contributions_Purchases|safe }}</td>
+            <td>{{ row.Customer_LTV|default:"0" }}</td>
+            <td>{{ row.Updated_at|default:"N/A" }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="10" class="text-center text-muted">No data found.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;700&display=swap" rel="stylesheet">
@@ -15,16 +60,13 @@
     --surface:   #ffffff;
     --surface-2: #f6f5f2;
     --surface-3: #eeecea;
-    --border:    rgba(0,0,0,0.09);
-    --border-md: rgba(0,0,0,0.14);
+    --border:    rgba(0,0,0,0.08);
+    --border-md: rgba(0,0,0,0.13);
     --accent:    #534AB7;
-    --accent-2:  #378ADD;
-    --accent-3:  #1D9E75;
-    --radius-sm: 6px;
-    --radius-md: 10px;
-    --radius-lg: 16px;
     --ff-head:   'Syne', sans-serif;
     --ff-mono:   'DM Mono', monospace;
+    --radius-lg: 16px;
+    --radius-md: 10px;
   }
 
   @media (prefers-color-scheme: dark) {
@@ -42,7 +84,7 @@
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  .dash-wrap {
+  .page {
     font-family: var(--ff-head);
     color: var(--ink);
     background: var(--surface-2);
@@ -51,569 +93,489 @@
   }
 
   /* ── Header ── */
-  .dash-header {
+  .page-header {
     display: flex;
-    align-items: baseline;
-    gap: 1rem;
-    margin-bottom: 2rem;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.75rem;
     padding-bottom: 1.25rem;
     border-bottom: 0.5px solid var(--border-md);
+    flex-wrap: wrap;
+    gap: 1rem;
   }
-  .dash-header h1 {
+  .page-header h1 {
     font-size: 20px;
     font-weight: 700;
     letter-spacing: -0.02em;
-    color: var(--ink);
   }
-  .dash-header .tag {
-    font-family: var(--ff-mono);
-    font-size: 10px;
-    padding: 3px 8px;
-    border-radius: 4px;
-    background: var(--surface-3);
-    color: var(--ink-3);
-    border: 0.5px solid var(--border-md);
-    letter-spacing: 0.04em;
+  .header-stats {
+    display: flex;
+    gap: 1.5rem;
+    align-items: center;
   }
-
-  /* ── Metric cards ── */
-  .metrics {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0,1fr));
-    gap: 10px;
-    margin-bottom: 1.5rem;
+  .stat {
+    text-align: right;
   }
-  .metric {
-    background: var(--surface);
-    border: 0.5px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: 14px 16px;
-    position: relative;
-    overflow: hidden;
-  }
-  .metric::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 2px;
-    background: var(--accent);
-    opacity: 0.5;
-  }
-  .metric:nth-child(2)::before { background: var(--accent-2); }
-  .metric:nth-child(3)::before { background: var(--accent-3); }
-  .metric:nth-child(4)::before { background: #D85A30; }
-  .metric-label {
-    font-family: var(--ff-mono);
-    font-size: 10px;
-    color: var(--ink-3);
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    margin-bottom: 6px;
-  }
-  .metric-val {
-    font-size: 24px;
+  .stat-val {
+    font-size: 18px;
     font-weight: 700;
-    letter-spacing: -0.03em;
+    letter-spacing: -0.02em;
     color: var(--ink);
     line-height: 1;
   }
-  .metric-sub {
+  .stat-label {
     font-family: var(--ff-mono);
     font-size: 10px;
     color: var(--ink-3);
-    margin-top: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 3px;
+  }
+  .stat-divider {
+    width: 0.5px;
+    height: 32px;
+    background: var(--border-md);
   }
 
-  /* ── Cards ── */
-  .card {
+  /* ── Search / filter bar ── */
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+  }
+  .search-wrap {
+    position: relative;
+    flex: 1;
+    min-width: 200px;
+    max-width: 340px;
+  }
+  .search-wrap svg {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 14px;
+    height: 14px;
+    stroke: var(--ink-3);
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+  }
+  .search-input {
+    width: 100%;
+    padding: 7px 10px 7px 32px;
+    font-family: var(--ff-mono);
+    font-size: 11px;
+    color: var(--ink);
+    background: var(--surface);
+    border: 0.5px solid var(--border-md);
+    border-radius: var(--radius-md);
+    outline: none;
+  }
+  .search-input::placeholder { color: var(--ink-3); }
+  .search-input:focus { border-color: var(--accent); }
+
+  .filter-select {
+    padding: 7px 10px;
+    font-family: var(--ff-mono);
+    font-size: 11px;
+    color: var(--ink);
+    background: var(--surface);
+    border: 0.5px solid var(--border-md);
+    border-radius: var(--radius-md);
+    outline: none;
+    cursor: pointer;
+  }
+  .filter-select:focus { border-color: var(--accent); }
+
+  .count-tag {
+    margin-left: auto;
+    font-family: var(--ff-mono);
+    font-size: 10px;
+    color: var(--ink-3);
+    padding: 5px 10px;
+    background: var(--surface-3);
+    border-radius: 6px;
+    border: 0.5px solid var(--border);
+  }
+
+  /* ── Table card ── */
+  .table-card {
     background: var(--surface);
     border: 0.5px solid var(--border);
     border-radius: var(--radius-lg);
-    padding: 18px 20px;
-  }
-  .card-title {
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--ink-2);
-    font-family: var(--ff-mono);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    margin-bottom: 14px;
-  }
-
-  /* ── Two-col row ── */
-  .row-2 {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 14px;
-    margin-bottom: 14px;
-  }
-
-  /* ── Legend ── */
-  .legend {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-bottom: 10px;
-    font-family: var(--ff-mono);
-    font-size: 10px;
-    color: var(--ink-3);
-  }
-  .legend span { display: flex; align-items: center; gap: 5px; }
-  .legend-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
-
-  /* ── Hook bars ── */
-  .hook-bars { display: flex; flex-direction: column; gap: 14px; margin-top: 4px; }
-  .hook-row { display: flex; align-items: center; gap: 10px; }
-  .hook-meta { min-width: 160px; }
-  .hook-name {
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--ink);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .hook-src {
-    font-family: var(--ff-mono);
-    font-size: 10px;
-    color: var(--ink-3);
-    margin-top: 2px;
-  }
-  .hook-bar-outer {
-    flex: 1;
-    background: var(--surface-3);
-    border-radius: 4px;
-    height: 22px;
     overflow: hidden;
   }
-  .hook-bar-inner {
-    height: 100%;
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    padding-right: 8px;
-    font-family: var(--ff-mono);
-    font-size: 11px;
-    font-weight: 500;
-    color: #fff;
-    transition: width 0.8s cubic-bezier(.22,1,.36,1);
-    min-width: 28px;
-  }
+  .table-scroll { overflow-x: auto; }
 
-  /* ── Campaign pies grid ── */
-  .camp-pies {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 12px;
-    margin-top: 4px;
-  }
-  .pie-cell {
-    background: var(--surface-2);
-    border: 0.5px solid var(--border);
-    border-radius: var(--radius-md);
-    padding: 12px 14px;
-  }
-  .pie-cell-title {
-    font-family: var(--ff-mono);
-    font-size: 10px;
-    color: var(--ink-2);
-    margin-bottom: 10px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .pie-cell-title b {
-    display: block;
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--ink);
-    font-family: var(--ff-head);
-    margin-bottom: 2px;
-  }
-  .pie-cell-legend {
-    margin-top: 10px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    font-family: var(--ff-mono);
-    font-size: 10px;
-    color: var(--ink-3);
-  }
-  .pie-cell-legend span { display: flex; align-items: center; gap: 5px; }
-
-  /* ── Table ── */
-  .table-wrap { overflow-x: auto; margin-top: 4px; }
-  table.data {
+  table.orders {
     width: 100%;
     border-collapse: collapse;
-    font-size: 12px;
+    font-size: 13px;
   }
-  table.data th {
+  table.orders thead {
+    background: var(--surface-2);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+  table.orders th {
     text-align: left;
     font-family: var(--ff-mono);
     font-size: 10px;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.06em;
     color: var(--ink-3);
     font-weight: 400;
-    padding: 6px 10px;
+    padding: 10px 16px;
     border-bottom: 0.5px solid var(--border-md);
     white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.15s;
   }
-  table.data td {
-    padding: 9px 10px;
+  table.orders th:hover { color: var(--ink-2); }
+  table.orders th .sort-arrow {
+    display: inline-block;
+    margin-left: 4px;
+    opacity: 0.3;
+    font-size: 9px;
+  }
+  table.orders th.sorted .sort-arrow { opacity: 1; color: var(--accent); }
+
+  table.orders td {
+    padding: 11px 16px;
     border-bottom: 0.5px solid var(--border);
     color: var(--ink);
     vertical-align: middle;
   }
-  table.data tr:last-child td { border-bottom: none; }
-  table.data tr:hover td { background: var(--surface-2); }
+  table.orders tbody tr:last-child td { border-bottom: none; }
+  table.orders tbody tr {
+    transition: background 0.1s;
+  }
+  table.orders tbody tr:hover td { background: var(--surface-2); }
 
+  /* ── Badges ── */
   .badge {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 9px;
+    border-radius: 5px;
     font-family: var(--ff-mono);
     font-size: 10px;
     font-weight: 500;
     white-space: nowrap;
   }
-  .badge-instagram { background: #EEEDFE; color: #3C3489; }
-  .badge-google    { background: #E6F1FB; color: #0C447C; }
-  .badge-content   { background: #EAF3DE; color: #27500A; }
-  .badge-direct    { background: #F1EFE8; color: #444441; }
-  .badge-hook      { background: #FFF3E6; color: #854F0B; }
-  .badge-anon      { background: var(--surface-3); color: var(--ink-3); }
+  .badge-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .src-instagram { background: #EEEDFE; color: #3C3489; }
+  .src-instagram .badge-dot { background: #534AB7; }
+  .src-google    { background: #E6F1FB; color: #0C447C; }
+  .src-google    .badge-dot { background: #378ADD; }
+  .src-content   { background: #EAF3DE; color: #27500A; }
+  .src-content   .badge-dot { background: #639922; }
+  .src-direct    { background: #F1EFE8; color: #444441; }
+  .src-direct    .badge-dot { background: #888780; }
+  .src-default   { background: var(--surface-3); color: var(--ink-2); }
+  .src-default   .badge-dot { background: var(--ink-3); }
 
-  .mb-14 { margin-bottom: 14px; }
+  .badge-hook {
+    background: #FFF3E6;
+    color: #854F0B;
+    border: 0.5px solid rgba(213,127,11,0.2);
+  }
+  .badge-hook .badge-dot { background: #BA7517; }
+
+  .badge-anon {
+    background: var(--surface-3);
+    color: var(--ink-3);
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    vertical-align: middle;
+    margin-left: 4px;
+  }
+
+  /* ── Order total ── */
+  .order-total {
+    font-family: var(--ff-mono);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink);
+  }
+
+  /* ── Timestamp ── */
+  .ts {
+    font-family: var(--ff-mono);
+    font-size: 10px;
+    color: var(--ink-3);
+    white-space: nowrap;
+  }
+
+  /* ── Order ID ── */
+  .order-id {
+    font-family: var(--ff-mono);
+    font-size: 11px;
+    color: var(--ink-2);
+  }
+
+  /* ── Empty state ── */
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--ink-3);
+    font-family: var(--ff-mono);
+    font-size: 12px;
+  }
+
+  /* ── No-results row ── */
+  .no-results {
+    text-align: center;
+    padding: 2.5rem;
+    color: var(--ink-3);
+    font-family: var(--ff-mono);
+    font-size: 12px;
+  }
 </style>
 
-<div class="dash-wrap">
+<div class="page">
 
-  <div class="dash-header">
-    <h1>Campaign Attribution</h1>
-    <span class="tag">LIVE · {{ order_rows|length }} orders</span>
-  </div>
-
-  {# ── Metric cards ──────────────────────────────────────────────── #}
-  <div class="metrics">
-    <div class="metric">
-      <div class="metric-label">Total Revenue</div>
-      <div class="metric-val">{{ total_revenue|floatformat:0 }}</div>
-      <div class="metric-sub">{{ total_orders }} orders</div>
-    </div>
-    <div class="metric">
-      <div class="metric-label">Avg Order Value</div>
-      <div class="metric-val">{{ avg_order|floatformat:0 }}</div>
-      <div class="metric-sub">per order</div>
-    </div>
-    <div class="metric">
-      <div class="metric-label">Add-to-Carts</div>
-      <div class="metric-val">{{ total_atc }}</div>
-      <div class="metric-sub">total events</div>
-    </div>
-    <div class="metric">
-      <div class="metric-label">Sources</div>
-      <div class="metric-val">{{ source_count }}</div>
-      <div class="metric-sub">{{ source_names }}</div>
-    </div>
-  </div>
-
-  {# ── Row 1: source pie + hook bars ─────────────────────────────── #}
-  <div class="row-2 mb-14">
-
-    <div class="card">
-      <div class="card-title">Revenue by source</div>
-      <div class="legend" id="sourceLegend"></div>
-      <div style="position:relative;height:220px;">
-        <canvas id="sourceChart"></canvas>
+  {# ── Page header ── #}
+  <div class="page-header">
+    <h1>Orders</h1>
+    <div class="header-stats">
+      <div class="stat">
+        <div class="stat-val">{{ total_orders }}</div>
+        <div class="stat-label">Total orders</div>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat">
+        <div class="stat-val">{{ total_revenue|floatformat:0 }}</div>
+        <div class="stat-label">Total revenue</div>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat">
+        <div class="stat-val">{{ avg_order|floatformat:0 }}</div>
+        <div class="stat-label">Avg order</div>
       </div>
     </div>
+  </div>
 
-    <div class="card">
-      <div class="card-title">Hook campaign counter</div>
-      <div class="hook-bars" id="hookBars"></div>
+  {# ── Toolbar ── #}
+  <div class="toolbar">
+    <div class="search-wrap">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input class="search-input" id="searchInput" type="text" placeholder="Search order, customer, campaign…">
     </div>
 
+    <select class="filter-select" id="sourceFilter">
+      <option value="">All sources</option>
+      {% for r in order_rows %}
+        {% if r.purchase_source %}
+          <option value="{{ r.purchase_source|lower }}">{{ r.purchase_source }}</option>
+        {% endif %}
+      {% endfor %}
+    </select>
+
+    <span class="count-tag" id="countTag">{{ total_orders }} orders</span>
   </div>
 
-  {# ── Campaign credit pies ──────────────────────────────────────── #}
-  <div class="card mb-14">
-    <div class="card-title">Campaign credit breakdown — per campaign</div>
-    <div class="camp-pies" id="campPies"></div>
-  </div>
-
-  {# ── Waterfall stacked bar ─────────────────────────────────────── #}
-  <div class="card mb-14">
-    <div class="card-title">Per-order attribution — credit waterfall</div>
-    <div style="position:relative;" id="waterfallWrap">
-      <canvas id="waterfallChart"></canvas>
-    </div>
-  </div>
-
-  {# ── Order details table ───────────────────────────────────────── #}
-  <div class="card">
-    <div class="card-title">Order details</div>
-    <div class="table-wrap">
-      <table class="data">
+  {# ── Table ── #}
+  <div class="table-card">
+    <div class="table-scroll">
+      <table class="orders" id="ordersTable">
         <thead>
           <tr>
-            <th>Customer</th>
-            <th>Order ID</th>
-            <th>Revenue</th>
-            <th>Source</th>
-            <th>Campaign</th>
-            <th>Hook campaign</th>
-            <th>Hook source</th>
-            <th>Timestamp</th>
+            <th data-col="0">Order ID <span class="sort-arrow">↕</span></th>
+            <th data-col="1">Customer <span class="sort-arrow">↕</span></th>
+            <th data-col="2">Purchase campaign <span class="sort-arrow">↕</span></th>
+            <th data-col="3">Hook campaign <span class="sort-arrow">↕</span></th>
+            <th data-col="4" class="sorted">Order total <span class="sort-arrow">↓</span></th>
+            <th data-col="5">Timestamp <span class="sort-arrow">↕</span></th>
           </tr>
         </thead>
-        <tbody>
+        <tbody id="tableBody">
           {% for r in order_rows %}
-          <tr>
+          <tr
+            data-order="{{ r.order_id|lower }}"
+            data-customer="{{ r.customer_id|lower }}"
+            data-campaign="{{ r.purchase_campaign|lower }}"
+            data-hook="{{ r.hook_campaign|lower }}"
+            data-source="{{ r.purchase_source|lower }}"
+            data-total="{{ r.order_total }}"
+            data-ts="{{ r.timestamp }}"
+          >
+            {# Order ID #}
+            <td><span class="order-id">#{{ r.order_id }}</span></td>
+
+            {# Customer #}
             <td>
-              {% if r.customer_id == "-586" or r.customer_id|slice:":1" == "-" %}
-                {{ r.customer_id }} <span class="badge badge-anon">anon</span>
+              {{ r.customer_id }}
+              {% if r.is_anon %}<span class="badge-anon">anon</span>{% endif %}
+            </td>
+
+            {# Purchase campaign #}
+            <td>
+              {% if r.purchase_source or r.purchase_campaign %}
+                {% with src=r.purchase_source|lower %}
+                <span class="badge
+                  {% if src == 'instagram' %}src-instagram
+                  {% elif src == 'google' %}src-google
+                  {% elif src == 'content creators' or src == 'content' %}src-content
+                  {% elif src == 'direct' %}src-direct
+                  {% else %}src-default{% endif %}">
+                  <span class="badge-dot"></span>
+                  {% if r.purchase_source %}{{ r.purchase_source }}{% endif %}
+                  {% if r.purchase_campaign %} / {{ r.purchase_campaign }}{% endif %}
+                </span>
+                {% endwith %}
               {% else %}
-                {{ r.customer_id }}
+                <span style="color:var(--ink-3);font-family:var(--ff-mono);font-size:11px;">—</span>
               {% endif %}
             </td>
-            <td style="font-family:var(--ff-mono);font-size:11px;">{{ r.order_id }}</td>
-            <td style="font-family:var(--ff-mono);">{{ r.revenue|floatformat:0 }}</td>
+
+            {# Hook campaign #}
             <td>
-              {% if r.source %}
-                <span class="badge badge-{{ r.source|lower }}">{{ r.source }}</span>
-              {% else %}—{% endif %}
+              {% if r.hook_campaign %}
+                <span class="badge badge-hook">
+                  <span class="badge-dot"></span>
+                  {% if r.hook_source %}{{ r.hook_source }} / {% endif %}{{ r.hook_campaign }}
+                </span>
+              {% else %}
+                <span style="color:var(--ink-3);font-family:var(--ff-mono);font-size:11px;">—</span>
+              {% endif %}
             </td>
-            <td>{{ r.campaign|default:"—" }}</td>
-            <td>
-              {% if r.hook_campaign != "—" %}
-                <span class="badge badge-hook">{{ r.hook_campaign }}</span>
-              {% else %}—{% endif %}
-            </td>
-            <td>
-              {% if r.hook_source %}
-                <span class="badge badge-{{ r.hook_source|lower }}">{{ r.hook_source }}</span>
-              {% else %}—{% endif %}
-            </td>
-            <td style="font-family:var(--ff-mono);font-size:10px;color:var(--ink-3);">
-              {{ r.timestamp|default:"—" }}
-            </td>
+
+            {# Order total #}
+            <td><span class="order-total">{{ r.order_total|floatformat:0 }}</span></td>
+
+            {# Timestamp #}
+            <td><span class="ts">{{ r.timestamp|default:"—" }}</span></td>
           </tr>
           {% empty %}
-          <tr>
-            <td colspan="8" style="text-align:center;color:var(--ink-3);padding:2rem;">
-              No orders found.
-            </td>
-          </tr>
+          <tr><td colspan="6" class="empty-state">No orders found.</td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
   </div>
 
-</div>{# /dash-wrap #}
+</div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
-/* ── Data from Django ── */
-const sourceLabels   = {{ source_labels_json|safe }};
-const sourceValues   = {{ source_values_json|safe }};
-const hookBarsData   = {{ hook_bars_json|safe }};
-const campPieData    = {{ campaign_pie_data_json|safe }};
-const wfLabels       = {{ waterfall_labels_json|safe }};
-const wfDatasets     = {{ waterfall_datasets_json|safe }};
+(function () {
+  const searchInput  = document.getElementById('searchInput');
+  const sourceFilter = document.getElementById('sourceFilter');
+  const countTag     = document.getElementById('countTag');
+  const tbody        = document.getElementById('tableBody');
+  const headers      = document.querySelectorAll('table.orders th[data-col]');
 
-/* ── Theme ── */
-const isDark    = matchMedia('(prefers-color-scheme: dark)').matches;
-const gridColor = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)';
-const tickColor = isDark ? '#706d69' : '#8a8a8a';
-
-/* ── Color palette ── */
-const PALETTE = [
-  '#534AB7','#378ADD','#1D9E75','#D85A30','#BA7517',
-  '#D4537E','#8B5CF6','#14B8A6','#F97316','#84CC16',
-  '#3366CC','#DC3912','#FF9900','#109618','#990099'
-];
-
-function colorFor(i) { return PALETTE[i % PALETTE.length]; }
-
-/* ── Source pie chart ── */
-(function() {
-  const colors = sourceLabels.map((_,i) => colorFor(i));
-
-  /* custom legend */
-  const leg = document.getElementById('sourceLegend');
-  const total = sourceValues.reduce((a,b) => a+b, 0);
-  sourceLabels.forEach((l, i) => {
-    const pct = total ? Math.round(sourceValues[i]/total*100) : 0;
-    leg.innerHTML += `<span>
-      <span class="legend-dot" style="background:${colors[i]}"></span>
-      ${l} ${pct}%
-    </span>`;
+  /* ── De-duplicate source options ── */
+  const seen = new Set();
+  Array.from(sourceFilter.options).forEach(opt => {
+    if (opt.value === '') { seen.add(''); return; }
+    if (seen.has(opt.value)) opt.remove();
+    else seen.add(opt.value);
   });
 
-  new Chart(document.getElementById('sourceChart'), {
-    type: 'pie',
-    data: {
-      labels: sourceLabels,
-      datasets: [{
-        data: sourceValues,
-        backgroundColor: colors,
-        hoverOffset: 20,
-        borderWidth: 0,
-        borderRadius: 10,
-        spacing: 0,
-        radius: '80%'
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            label: ctx => ` ${ctx.label}: ${ctx.parsed.toFixed(0)} (${Math.round(ctx.parsed/total*100)}%)`
-          }
-        }
-      }
-    }
-  });
-})();
+  /* ── Filter ── */
+  function applyFilter() {
+    const q   = searchInput.value.toLowerCase().trim();
+    const src = sourceFilter.value.toLowerCase();
+    let visible = 0;
 
-/* ── Hook bars ── */
-(function() {
-  const wrap = document.getElementById('hookBars');
-  const max  = Math.max(...hookBarsData.map(h => h.count), 1);
+    Array.from(tbody.querySelectorAll('tr[data-order]')).forEach(row => {
+      const matchSearch = !q ||
+        row.dataset.order.includes(q)    ||
+        row.dataset.customer.includes(q) ||
+        row.dataset.campaign.includes(q) ||
+        row.dataset.hook.includes(q);
 
-  hookBarsData.forEach((h, i) => {
-    const pct = Math.round((h.count / max) * 100);
-    const col = colorFor(i);
-    wrap.innerHTML += `
-      <div class="hook-row">
-        <div class="hook-meta">
-          <div class="hook-name">${h.campaign}</div>
-          <div class="hook-src">${h.source}</div>
-        </div>
-        <div class="hook-bar-outer">
-          <div class="hook-bar-inner" style="width:${pct}%;background:${col};">${h.count}</div>
-        </div>
-      </div>`;
-  });
-})();
+      const matchSource = !src || row.dataset.source === src;
 
-/* ── Campaign pies ── */
-(function() {
-  const wrap = document.getElementById('campPies');
-
-  campPieData.forEach((camp, ci) => {
-    const id    = `cp_${ci}`;
-    const sliceColors = camp.slices.map((_, si) => {
-      const base = colorFor(ci);
-      /* lighten for subsequent slices by mixing with white/surface */
-      if (si === 0) return base;
-      const alpha = Math.max(0.35, 1 - si * 0.25);
-      return base + Math.round(alpha * 255).toString(16).padStart(2,'0');
+      const show = matchSearch && matchSource;
+      row.style.display = show ? '' : 'none';
+      if (show) visible++;
     });
 
-    const legendHtml = camp.slices.map((s, si) =>
-      `<span>
-        <span class="legend-dot" style="background:${sliceColors[si]}"></span>
-        Order ${s.label.replace('Order ','')} — ${s.value.toFixed(0)}
-      </span>`
-    ).join('');
-
-    wrap.innerHTML += `
-      <div class="pie-cell">
-        <div class="pie-cell-title">
-          <b>${camp.campaign || camp.source}</b>
-          ${camp.source}
-        </div>
-        <div style="position:relative;height:110px;">
-          <canvas id="${id}"></canvas>
-        </div>
-        <div class="pie-cell-legend">${legendHtml}</div>
-      </div>`;
-
-    setTimeout(() => {
-      const total = camp.slices.reduce((a, s) => a + s.value, 0);
-      new Chart(document.getElementById(id), {
-        type: 'pie',
-        data: {
-          labels: camp.slices.map(s => s.label),
-          datasets: [{
-            data: camp.slices.map(s => s.value),
-            backgroundColor: sliceColors,
-            hoverOffset: 8,
-            borderWidth: 0,
-            borderRadius: 6,
-            spacing: camp.slices.length > 1 ? 2 : 0,
-            radius: '88%'
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              callbacks: {
-                label: ctx => ` ${ctx.label}: ${ctx.parsed.toFixed(0)} (${Math.round(ctx.parsed/total*100)}%)`
-              }
-            }
-          }
-        }
-      });
-    }, 60);
-  });
-})();
-
-/* ── Waterfall stacked bar ── */
-(function() {
-  const numOrders = wfLabels.length;
-  const wrapEl    = document.getElementById('waterfallWrap');
-  wrapEl.style.height = Math.max(120, numOrders * 44 + 60) + 'px';
-
-  const datasets = wfDatasets.map((ds, i) => ({
-    label:           ds.label,
-    data:            ds.data,
-    backgroundColor: colorFor(i) + 'CC',
-    borderRadius:    4,
-    borderSkipped:   false
-  }));
-
-  new Chart(document.getElementById('waterfallChart'), {
-    type: 'bar',
-    data: { labels: wfLabels, datasets },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      indexAxis: 'y',
-      scales: {
-        x: {
-          stacked: true,
-          grid:  { color: gridColor },
-          ticks: { color: tickColor, callback: v => v.toFixed(0) }
-        },
-        y: {
-          stacked: true,
-          grid:  { display: false },
-          ticks: { color: tickColor, font: { size: 11 } }
-        }
-      },
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.x.toFixed(0)}`
-          }
-        }
+    /* no-results row */
+    let noRow = tbody.querySelector('.no-results-row');
+    if (visible === 0) {
+      if (!noRow) {
+        noRow = document.createElement('tr');
+        noRow.className = 'no-results-row';
+        noRow.innerHTML = '<td colspan="6" class="no-results">No orders match your filter.</td>';
+        tbody.appendChild(noRow);
       }
+    } else {
+      if (noRow) noRow.remove();
     }
+
+    countTag.textContent = visible + ' order' + (visible !== 1 ? 's' : '');
+  }
+
+  searchInput.addEventListener('input', applyFilter);
+  sourceFilter.addEventListener('change', applyFilter);
+
+  /* ── Sort ── */
+  let sortCol = 4;    /* default: order total */
+  let sortAsc = false;
+
+  function sortTable(col) {
+    if (sortCol === col) {
+      sortAsc = !sortAsc;
+    } else {
+      sortCol = col;
+      sortAsc = col !== 4; /* total defaults desc, others asc */
+    }
+
+    headers.forEach(th => {
+      const arrow = th.querySelector('.sort-arrow');
+      if (parseInt(th.dataset.col) === sortCol) {
+        th.classList.add('sorted');
+        arrow.textContent = sortAsc ? '↑' : '↓';
+      } else {
+        th.classList.remove('sorted');
+        arrow.textContent = '↕';
+      }
+    });
+
+    const rows = Array.from(tbody.querySelectorAll('tr[data-order]'));
+
+    const keyMap = ['order', 'customer', 'campaign', 'hook', 'total', 'ts'];
+    const key = keyMap[col];
+
+    rows.sort((a, b) => {
+      let va = a.dataset[key] || '';
+      let vb = b.dataset[key] || '';
+
+      if (key === 'total') {
+        va = parseFloat(va) || 0;
+        vb = parseFloat(vb) || 0;
+        return sortAsc ? va - vb : vb - va;
+      }
+
+      return sortAsc
+        ? va.localeCompare(vb)
+        : vb.localeCompare(va);
+    });
+
+    rows.forEach(r => tbody.appendChild(r));
+  }
+
+  headers.forEach(th => {
+    th.addEventListener('click', () => sortTable(parseInt(th.dataset.col)));
   });
+
+  /* initial sort */
+  sortTable(4);
 })();
 </script>
 
