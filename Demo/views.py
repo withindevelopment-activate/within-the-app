@@ -7384,7 +7384,8 @@ def update_tracked_customers(new_event, history_rows):
             "Order_ID": order_id,
             "Products": products,
             "Is_Hook_Campaign": campaign == hook_campaign,
-            "Timestamp": get_uae_current_date()
+            "Timestamp": get_uae_current_date(),
+            "Maunal": False
         }
 
         print("Logging campaign event:", row_log)
@@ -7657,9 +7658,9 @@ def view_purchase_camapigns(request):
 
     # --- Cleaning ---
     df['Customer_ID'] = df['Customer_ID'].astype(int)
-    df['UTM_Source'] = df['UTM_Source'].str.strip().astype(str)
-    df['UTM_Campaign'] = df['UTM_Campaign'].str.strip().astype(str)
-    df['Event_Type'] = df['Event_Type'].str.strip().astype(str)
+    df['UTM_Source'] = df['UTM_Source'].str.strip().str.lower().astype(str)
+    df['UTM_Campaign'] = df['UTM_Campaign'].str.strip().str.lower().astype(str)
+    df['Event_Type'] = df['Event_Type'].str.strip().str.lower().astype(str)
     df['Score'] = df['Score'].astype(float)
 
     # --- Create purchase flag ---

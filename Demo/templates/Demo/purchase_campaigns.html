@@ -1,0 +1,37 @@
+{% extends "Demo/base.html" %}
+
+{% block title %} Campaign Performance {% endblock title %}
+
+{% block content %}
+<div class="data-wrap">
+        <div class="data-viewport">
+            <div class="data-scroller" role="region" aria-label="Scrollable data table" tabindex="0">
+                <table class="data-table" role="table" aria-label="Analytics dataset">
+                    <thead>
+                        <tr>
+                        <th class="sticky-col">Source</th>
+                        <th>Campaign</th>
+                        <th>Total Score</th>
+                        <th>Purchases</th>
+                        <th>Total Events</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in campaigns %}
+                        <tr>
+                        <td class="sticky-col">{{ c.UTM_Source }}</td>
+                        <td>{{ c.UTM_Campaign }}</td>
+                        <td>{{ c.Total_Score|floatformat:2 }}</td>
+                        <td>{{ c.Purchases }}</td>
+                        <td>{{ c.Total_Events }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                        <td colspan="5" class="text-center text-muted">No campaign data found</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+{% endblock %}
