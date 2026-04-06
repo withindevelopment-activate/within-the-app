@@ -1,4 +1,4 @@
-{% extends "Demo/base.html" %}
+<!-- {% extends "Demo/base.html" %}
 
 {% block title %} Tracked Customers - Purchases {% endblock title %}
 
@@ -48,4 +48,625 @@ Unknown campaign orders from social media:
     </div>
   </div>
 </div>
+{% endblock %} -->
+
+{% extends "Demo/base.html" %}
+
+{% block title %}Campaign Attribution Dashboard{% endblock %}
+
+{% block content %}
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;700&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --ink:       #0f0f0f;
+    --ink-2:     #4a4a4a;
+    --ink-3:     #8a8a8a;
+    --surface:   #ffffff;
+    --surface-2: #f6f5f2;
+    --surface-3: #eeecea;
+    --border:    rgba(0,0,0,0.09);
+    --border-md: rgba(0,0,0,0.14);
+    --accent:    #534AB7;
+    --accent-2:  #378ADD;
+    --accent-3:  #1D9E75;
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 16px;
+    --ff-head:   'Syne', sans-serif;
+    --ff-mono:   'DM Mono', monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink:       #f0ede8;
+      --ink-2:     #b0ada8;
+      --ink-3:     #706d69;
+      --surface:   #18181a;
+      --surface-2: #202023;
+      --surface-3: #2a2a2e;
+      --border:    rgba(255,255,255,0.07);
+      --border-md: rgba(255,255,255,0.12);
+    }
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  .dash-wrap {
+    font-family: var(--ff-head);
+    color: var(--ink);
+    background: var(--surface-2);
+    min-height: 100vh;
+    padding: 2rem 2.5rem 4rem;
+  }
+
+  /* ── Header ── */
+  .dash-header {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 0.5px solid var(--border-md);
+  }
+  .dash-header h1 {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+  }
+  .dash-header .tag {
+    font-family: var(--ff-mono);
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: var(--surface-3);
+    color: var(--ink-3);
+    border: 0.5px solid var(--border-md);
+    letter-spacing: 0.04em;
+  }
+
+  /* ── Metric cards ── */
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0,1fr));
+    gap: 10px;
+    margin-bottom: 1.5rem;
+  }
+  .metric {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 14px 16px;
+    position: relative;
+    overflow: hidden;
+  }
+  .metric::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--accent);
+    opacity: 0.5;
+  }
+  .metric:nth-child(2)::before { background: var(--accent-2); }
+  .metric:nth-child(3)::before { background: var(--accent-3); }
+  .metric:nth-child(4)::before { background: #D85A30; }
+  .metric-label {
+    font-family: var(--ff-mono);
+    font-size: 10px;
+    color: var(--ink-3);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .metric-val {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: var(--ink);
+    line-height: 1;
+  }
+  .metric-sub {
+    font-family: var(--ff-mono);
+    font-size: 10px;
+    color: var(--ink-3);
+    margin-top: 4px;
+  }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 18px 20px;
+  }
+  .card-title {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ink-2);
+    font-family: var(--ff-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 14px;
+  }
+
+  /* ── Two-col row ── */
+  .row-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+
+  /* ── Legend ── */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 10px;
+    font-family: var(--ff-mono);
+    font-size: 10px;
+    color: var(--ink-3);
+  }
+  .legend span { display: flex; align-items: center; gap: 5px; }
+  .legend-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+
+  /* ── Hook bars ── */
+  .hook-bars { display: flex; flex-direction: column; gap: 14px; margin-top: 4px; }
+  .hook-row { display: flex; align-items: center; gap: 10px; }
+  .hook-meta { min-width: 160px; }
+  .hook-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .hook-src {
+    font-family: var(--ff-mono);
+    font-size: 10px;
+    color: var(--ink-3);
+    margin-top: 2px;
+  }
+  .hook-bar-outer {
+    flex: 1;
+    background: var(--surface-3);
+    border-radius: 4px;
+    height: 22px;
+    overflow: hidden;
+  }
+  .hook-bar-inner {
+    height: 100%;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 8px;
+    font-family: var(--ff-mono);
+    font-size: 11px;
+    font-weight: 500;
+    color: #fff;
+    transition: width 0.8s cubic-bezier(.22,1,.36,1);
+    min-width: 28px;
+  }
+
+  /* ── Campaign pies grid ── */
+  .camp-pies {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+    margin-top: 4px;
+  }
+  .pie-cell {
+    background: var(--surface-2);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 12px 14px;
+  }
+  .pie-cell-title {
+    font-family: var(--ff-mono);
+    font-size: 10px;
+    color: var(--ink-2);
+    margin-bottom: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .pie-cell-title b {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ink);
+    font-family: var(--ff-head);
+    margin-bottom: 2px;
+  }
+  .pie-cell-legend {
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-family: var(--ff-mono);
+    font-size: 10px;
+    color: var(--ink-3);
+  }
+  .pie-cell-legend span { display: flex; align-items: center; gap: 5px; }
+
+  /* ── Table ── */
+  .table-wrap { overflow-x: auto; margin-top: 4px; }
+  table.data {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  table.data th {
+    text-align: left;
+    font-family: var(--ff-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--ink-3);
+    font-weight: 400;
+    padding: 6px 10px;
+    border-bottom: 0.5px solid var(--border-md);
+    white-space: nowrap;
+  }
+  table.data td {
+    padding: 9px 10px;
+    border-bottom: 0.5px solid var(--border);
+    color: var(--ink);
+    vertical-align: middle;
+  }
+  table.data tr:last-child td { border-bottom: none; }
+  table.data tr:hover td { background: var(--surface-2); }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-family: var(--ff-mono);
+    font-size: 10px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .badge-instagram { background: #EEEDFE; color: #3C3489; }
+  .badge-google    { background: #E6F1FB; color: #0C447C; }
+  .badge-content   { background: #EAF3DE; color: #27500A; }
+  .badge-direct    { background: #F1EFE8; color: #444441; }
+  .badge-hook      { background: #FFF3E6; color: #854F0B; }
+  .badge-anon      { background: var(--surface-3); color: var(--ink-3); }
+
+  .mb-14 { margin-bottom: 14px; }
+</style>
+
+<div class="dash-wrap">
+
+  <div class="dash-header">
+    <h1>Campaign Attribution</h1>
+    <span class="tag">LIVE · {{ order_rows|length }} orders</span>
+  </div>
+
+  {# ── Metric cards ──────────────────────────────────────────────── #}
+  <div class="metrics">
+    <div class="metric">
+      <div class="metric-label">Total Revenue</div>
+      <div class="metric-val">{{ total_revenue|floatformat:0 }}</div>
+      <div class="metric-sub">{{ total_orders }} orders</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Avg Order Value</div>
+      <div class="metric-val">{{ avg_order|floatformat:0 }}</div>
+      <div class="metric-sub">per order</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Add-to-Carts</div>
+      <div class="metric-val">{{ total_atc }}</div>
+      <div class="metric-sub">total events</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Sources</div>
+      <div class="metric-val">{{ source_count }}</div>
+      <div class="metric-sub">{{ source_names }}</div>
+    </div>
+  </div>
+
+  {# ── Row 1: source pie + hook bars ─────────────────────────────── #}
+  <div class="row-2 mb-14">
+
+    <div class="card">
+      <div class="card-title">Revenue by source</div>
+      <div class="legend" id="sourceLegend"></div>
+      <div style="position:relative;height:220px;">
+        <canvas id="sourceChart"></canvas>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Hook campaign counter</div>
+      <div class="hook-bars" id="hookBars"></div>
+    </div>
+
+  </div>
+
+  {# ── Campaign credit pies ──────────────────────────────────────── #}
+  <div class="card mb-14">
+    <div class="card-title">Campaign credit breakdown — per campaign</div>
+    <div class="camp-pies" id="campPies"></div>
+  </div>
+
+  {# ── Waterfall stacked bar ─────────────────────────────────────── #}
+  <div class="card mb-14">
+    <div class="card-title">Per-order attribution — credit waterfall</div>
+    <div style="position:relative;" id="waterfallWrap">
+      <canvas id="waterfallChart"></canvas>
+    </div>
+  </div>
+
+  {# ── Order details table ───────────────────────────────────────── #}
+  <div class="card">
+    <div class="card-title">Order details</div>
+    <div class="table-wrap">
+      <table class="data">
+        <thead>
+          <tr>
+            <th>Customer</th>
+            <th>Order ID</th>
+            <th>Revenue</th>
+            <th>Source</th>
+            <th>Campaign</th>
+            <th>Hook campaign</th>
+            <th>Hook source</th>
+            <th>Timestamp</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in order_rows %}
+          <tr>
+            <td>
+              {% if r.customer_id == "-586" or r.customer_id|slice:":1" == "-" %}
+                {{ r.customer_id }} <span class="badge badge-anon">anon</span>
+              {% else %}
+                {{ r.customer_id }}
+              {% endif %}
+            </td>
+            <td style="font-family:var(--ff-mono);font-size:11px;">{{ r.order_id }}</td>
+            <td style="font-family:var(--ff-mono);">{{ r.revenue|floatformat:0 }}</td>
+            <td>
+              {% if r.source %}
+                <span class="badge badge-{{ r.source|lower }}">{{ r.source }}</span>
+              {% else %}—{% endif %}
+            </td>
+            <td>{{ r.campaign|default:"—" }}</td>
+            <td>
+              {% if r.hook_campaign != "—" %}
+                <span class="badge badge-hook">{{ r.hook_campaign }}</span>
+              {% else %}—{% endif %}
+            </td>
+            <td>
+              {% if r.hook_source %}
+                <span class="badge badge-{{ r.hook_source|lower }}">{{ r.hook_source }}</span>
+              {% else %}—{% endif %}
+            </td>
+            <td style="font-family:var(--ff-mono);font-size:10px;color:var(--ink-3);">
+              {{ r.timestamp|default:"—" }}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="8" style="text-align:center;color:var(--ink-3);padding:2rem;">
+              No orders found.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>{# /dash-wrap #}
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+/* ── Data from Django ── */
+const sourceLabels   = {{ source_labels_json|safe }};
+const sourceValues   = {{ source_values_json|safe }};
+const hookBarsData   = {{ hook_bars_json|safe }};
+const campPieData    = {{ campaign_pie_data_json|safe }};
+const wfLabels       = {{ waterfall_labels_json|safe }};
+const wfDatasets     = {{ waterfall_datasets_json|safe }};
+
+/* ── Theme ── */
+const isDark    = matchMedia('(prefers-color-scheme: dark)').matches;
+const gridColor = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)';
+const tickColor = isDark ? '#706d69' : '#8a8a8a';
+
+/* ── Color palette ── */
+const PALETTE = [
+  '#534AB7','#378ADD','#1D9E75','#D85A30','#BA7517',
+  '#D4537E','#8B5CF6','#14B8A6','#F97316','#84CC16',
+  '#3366CC','#DC3912','#FF9900','#109618','#990099'
+];
+
+function colorFor(i) { return PALETTE[i % PALETTE.length]; }
+
+/* ── Source pie chart ── */
+(function() {
+  const colors = sourceLabels.map((_,i) => colorFor(i));
+
+  /* custom legend */
+  const leg = document.getElementById('sourceLegend');
+  const total = sourceValues.reduce((a,b) => a+b, 0);
+  sourceLabels.forEach((l, i) => {
+    const pct = total ? Math.round(sourceValues[i]/total*100) : 0;
+    leg.innerHTML += `<span>
+      <span class="legend-dot" style="background:${colors[i]}"></span>
+      ${l} ${pct}%
+    </span>`;
+  });
+
+  new Chart(document.getElementById('sourceChart'), {
+    type: 'pie',
+    data: {
+      labels: sourceLabels,
+      datasets: [{
+        data: sourceValues,
+        backgroundColor: colors,
+        hoverOffset: 20,
+        borderWidth: 0,
+        borderRadius: 10,
+        spacing: 0,
+        radius: '80%'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.label}: ${ctx.parsed.toFixed(0)} (${Math.round(ctx.parsed/total*100)}%)`
+          }
+        }
+      }
+    }
+  });
+})();
+
+/* ── Hook bars ── */
+(function() {
+  const wrap = document.getElementById('hookBars');
+  const max  = Math.max(...hookBarsData.map(h => h.count), 1);
+
+  hookBarsData.forEach((h, i) => {
+    const pct = Math.round((h.count / max) * 100);
+    const col = colorFor(i);
+    wrap.innerHTML += `
+      <div class="hook-row">
+        <div class="hook-meta">
+          <div class="hook-name">${h.campaign}</div>
+          <div class="hook-src">${h.source}</div>
+        </div>
+        <div class="hook-bar-outer">
+          <div class="hook-bar-inner" style="width:${pct}%;background:${col};">${h.count}</div>
+        </div>
+      </div>`;
+  });
+})();
+
+/* ── Campaign pies ── */
+(function() {
+  const wrap = document.getElementById('campPies');
+
+  campPieData.forEach((camp, ci) => {
+    const id    = `cp_${ci}`;
+    const sliceColors = camp.slices.map((_, si) => {
+      const base = colorFor(ci);
+      /* lighten for subsequent slices by mixing with white/surface */
+      if (si === 0) return base;
+      const alpha = Math.max(0.35, 1 - si * 0.25);
+      return base + Math.round(alpha * 255).toString(16).padStart(2,'0');
+    });
+
+    const legendHtml = camp.slices.map((s, si) =>
+      `<span>
+        <span class="legend-dot" style="background:${sliceColors[si]}"></span>
+        Order ${s.label.replace('Order ','')} — ${s.value.toFixed(0)}
+      </span>`
+    ).join('');
+
+    wrap.innerHTML += `
+      <div class="pie-cell">
+        <div class="pie-cell-title">
+          <b>${camp.campaign || camp.source}</b>
+          ${camp.source}
+        </div>
+        <div style="position:relative;height:110px;">
+          <canvas id="${id}"></canvas>
+        </div>
+        <div class="pie-cell-legend">${legendHtml}</div>
+      </div>`;
+
+    setTimeout(() => {
+      const total = camp.slices.reduce((a, s) => a + s.value, 0);
+      new Chart(document.getElementById(id), {
+        type: 'pie',
+        data: {
+          labels: camp.slices.map(s => s.label),
+          datasets: [{
+            data: camp.slices.map(s => s.value),
+            backgroundColor: sliceColors,
+            hoverOffset: 8,
+            borderWidth: 0,
+            borderRadius: 6,
+            spacing: camp.slices.length > 1 ? 2 : 0,
+            radius: '88%'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: ctx => ` ${ctx.label}: ${ctx.parsed.toFixed(0)} (${Math.round(ctx.parsed/total*100)}%)`
+              }
+            }
+          }
+        }
+      });
+    }, 60);
+  });
+})();
+
+/* ── Waterfall stacked bar ── */
+(function() {
+  const numOrders = wfLabels.length;
+  const wrapEl    = document.getElementById('waterfallWrap');
+  wrapEl.style.height = Math.max(120, numOrders * 44 + 60) + 'px';
+
+  const datasets = wfDatasets.map((ds, i) => ({
+    label:           ds.label,
+    data:            ds.data,
+    backgroundColor: colorFor(i) + 'CC',
+    borderRadius:    4,
+    borderSkipped:   false
+  }));
+
+  new Chart(document.getElementById('waterfallChart'), {
+    type: 'bar',
+    data: { labels: wfLabels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      indexAxis: 'y',
+      scales: {
+        x: {
+          stacked: true,
+          grid:  { color: gridColor },
+          ticks: { color: tickColor, callback: v => v.toFixed(0) }
+        },
+        y: {
+          stacked: true,
+          grid:  { display: false },
+          ticks: { color: tickColor, font: { size: 11 } }
+        }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.x.toFixed(0)}`
+          }
+        }
+      }
+    }
+  });
+})();
+</script>
+
 {% endblock %}
