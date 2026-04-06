@@ -74,5 +74,6 @@ urlpatterns = [
 
     ### The tracked customers
     path("view_tracked_customers/", views.view_tracked_customers, name="view_tracked_customers"),
+    path("view_purchase_camapigns/", views.view_purchase_camapigns, name="view_purchase_camapigns"),
 
 ]
