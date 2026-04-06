@@ -7608,4 +7608,4 @@ def view_purchase_camapigns(request):
         "campaigns": campaign_summary.to_dict(orient="records")
     }
 
-    return render(request, "purchase_campaigns.html", context)
+    return render(request, "Demo/purchase_campaigns.html", context)
