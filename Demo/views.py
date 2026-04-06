@@ -18,7 +18,7 @@ from urllib.parse import urlparse, parse_qs
 
 ## Custom Imports ------------------
 # Supabase & Supporting imports
-from Demo.supporting_files.supabase_functions import get_next_id_from_supabase_compatible_all, batch_insert_to_supabase, sync_customers, fetch_data_from_supabase_specific, update_database_after_filter, get_last_non_direct_utm, upsert_partial
+from Demo.supporting_files.supabase_functions import get_next_id_from_supabase_compatible_all, batch_insert_to_supabase, sync_customers, fetch_data_from_supabase_specific, update_database_after_filter, get_last_non_direct_utm, upsert_partial, fetch_data_from_supabase
 
 from Demo.supporting_files.supporting_functions import get_uae_current_date, detect_source_from_url_or_domain, detect_source_from_row, detect_source_from_user_agent
 # Marketing Report functions
@@ -6522,77 +6522,7 @@ def view_tracked_customers(request):
     including UNKNOWN_CAMPAIGN counts by Attribution_Type.
     """
 
-    def safe_float(value, default=0.0):
-        try:
-            return float(value)
-        except Exception:
-            return default
-
-
     tracked_customers = fetch_data_from_supabase_specific("Customer_Tracking_duplicate")
-
-    order_rows = []
-
-    for _, row in tracked_customers.iterrows():
-
-        customer_id  = str(row.get("Customer_ID") or row.get("Visitor_ID") or "—").strip()
-        hook_campaign = str(row.get("Hook_Campaign", "")).strip()
-        hook_source   = str(row.get("Hook_Source",   "")).strip()
-
-        # Sanitise nulls
-        if hook_campaign.lower() in ("nan", "none", ""):
-            hook_campaign = ""
-        if hook_source.lower() in ("nan", "none", ""):
-            hook_source = ""
-
-        is_anon = str(row.get("Is_Anonymous", "false")).lower() == "true"
-
-        per_purchase = ensure_dict(row.get("Campaign_Contributions_Per_Purchase"))
-
-        for order_id, order_data in per_purchase.items():
-            order_data  = ensure_dict(order_data)
-            order_total = safe_float(order_data.get("order_total", 0))
-            timestamp   = str(order_data.get("timestamp", "")).strip()
-            campaigns   = ensure_dict(order_data.get("campaigns"))
-
-            # Find the purchase-type campaign (primary attribution)
-            purchase_source   = ""
-            purchase_campaign = ""
-            for camp_key, camp_data in campaigns.items():
-                camp_data = ensure_dict(camp_data)
-                if camp_data.get("type") == "purchase":
-                    parts = camp_key.split("__", 1)
-                    purchase_source   = parts[0].strip() if len(parts) > 0 else ""
-                    purchase_campaign = parts[1].strip() if len(parts) > 1 else ""
-                    break
-
-            # If no explicit purchase type, fall back to largest credit
-            if not purchase_source and campaigns:
-                best = max(campaigns.items(),
-                           key=lambda kv: safe_float(ensure_dict(kv[1]).get("credit", 0)))
-                parts = best[0].split("__", 1)
-                purchase_source   = parts[0].strip() if len(parts) > 0 else ""
-                purchase_campaign = parts[1].strip() if len(parts) > 1 else ""
-
-            order_rows.append({
-                "order_id":         str(order_id),
-                "customer_id":      customer_id,
-                "is_anon":          is_anon,
-                "purchase_source":  purchase_source,
-                "purchase_campaign": purchase_campaign,
-                "hook_campaign":    hook_campaign,
-                "hook_source":      hook_source,
-                "order_total":      order_total,
-                "timestamp":        timestamp,
-            })
-
-    # Sort newest first
-    order_rows.sort(key=lambda x: x["timestamp"], reverse=True)
-
-    # Summary counts for the header bar
-    total_orders  = len(order_rows)
-    total_revenue = sum(r["order_total"] for r in order_rows)
-    avg_order     = round(total_revenue / total_orders, 2) if total_orders else 0
 
     # ----------------------------
     # Helper functions
@@ -6762,20 +6692,12 @@ def view_tracked_customers(request):
 
     data = display_df.to_dict(orient="records")
 
-    context = {
-        "order_rows":    order_rows,
-        "total_orders":  total_orders,
-        "total_revenue": round(total_revenue, 2),
-        "avg_order":     avg_order,
-    }
-
     return render(
         request,
         "Demo/tracked_customers.html",
         {
             "data": data,
-            "unknown_social_orders": unknown_social_orders,
-            **context
+            "unknown_social_orders": unknown_social_orders
         }
     )
 
