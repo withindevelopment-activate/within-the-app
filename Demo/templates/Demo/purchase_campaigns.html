@@ -547,10 +547,9 @@
 
 <script>
     (function () {
-        const labels = {{ chart_labels| safe
-    }};
-    const purchases = {{ chart_purchases| safe }};
-    const events = {{ chart_events| safe }};
+        const labels = {{ chart_labels|safe }};
+    const purchases = {{ chart_purchases|safe }};
+    const events = {{ chart_events|safe }};
 
     const totalPurchases = purchases.reduce((sum, value) => sum + (Number(value) || 0), 0);
     const totalEvents = events.reduce((sum, value) => sum + (Number(value) || 0), 0);
