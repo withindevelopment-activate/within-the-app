@@ -3810,7 +3810,7 @@ def save_tracking(request):
         ## Update the customers_db
         events_list = ['purchase', 'add_to_cart']
         if event_type in events_list:
-            response = update_tracked_customers(tracking_entry, history_rows) ## pass the history rows 
+            response = update_tracked_customers(tracking_entry, history_rows, session_customer_info) ## pass the history rows 
             if response:
                 print(f"UPDATED THE CUSTOMER DB for Customer_ID: {tracking_entry.get('Customer_ID')} Event_Type: {event_type}")
 
@@ -7252,7 +7252,7 @@ def update_tracked_customers_b4(new_event, history_rows):
     print("=== END update_tracked_customers ===\n")
     return True
 
-def update_tracked_customers(new_event, history_rows):
+def update_tracked_customers(new_event, history_rows, customer_dict):
     print("=== START update_tracked_customers ===")
     print("Incoming event:", new_event)
 
@@ -7348,7 +7348,6 @@ def update_tracked_customers(new_event, history_rows):
     # Campaign event logging
 
     def log_campaign_event(event, row, details):
-
         event_type = event.get("Event_Type")
 
         if event_type not in ["purchase", "add_to_cart"]:
@@ -7358,16 +7357,37 @@ def update_tracked_customers(new_event, history_rows):
         source = str(event.get("UTM_Source")).strip() or "unknown"
 
         score = 1 if event_type == "purchase" else 0.25
-
         order_id = event.get("Order_ID")
 
         products = []
 
         try:
-            items = details.get("items", [])
-            products = [i.get("sku") for i in items if i.get("sku")]
-        except:
-            pass
+
+            # -----------------------------
+            # ADD TO CART
+            if event_type == "add_to_cart":
+
+                sku = details.get("sku")
+
+                if sku:
+                    products = [sku]
+
+            # -----------------------------
+            # PURCHASE
+            elif event_type == "purchase":
+
+                items = details.get("items", [])
+
+                products = [
+                    i.get("item_sku")
+                    for i in items
+                    if i.get("item_sku")
+                ]
+
+        except Exception as e:
+            print("Product extraction error:", e)
+
+        print("Extracted products:", products)
 
         hook_campaign = row.get("Hook_Campaign")
 
@@ -7385,7 +7405,8 @@ def update_tracked_customers(new_event, history_rows):
             "Products": products,
             "Is_Hook_Campaign": campaign == hook_campaign,
             "Timestamp": get_uae_current_date(),
-            "Maunal": False
+            "Maunal": False,
+            "Which_Update": "070426 1054AM"
         }
 
         print("Logging campaign event:", row_log)
@@ -7465,7 +7486,7 @@ def update_tracked_customers(new_event, history_rows):
             min_id = customer_df["Customer_ID"].min()
             customer_id = -1 if pd.isna(min_id) or min_id >= 0 else int(min_id) - 1
 
-        customer_info = {
+        customer_info_event = {
             k: v for k, v in {
                 "name": new_event.get("Customer_Name"),
                 "email": new_event.get("Customer_Email"),
@@ -7475,7 +7496,7 @@ def update_tracked_customers(new_event, history_rows):
 
         row = pd.Series({
             "Customer_ID": customer_id,
-            "Customer_Info": customer_info,
+            "Customer_Info": customer_dict, ## Retrieved from the main tracking event
             "Is_Anonymous": is_anonymous,
             "Visitor_ID": "",
             "Add_to_Cart": 0,
@@ -7498,7 +7519,7 @@ def update_tracked_customers(new_event, history_rows):
             "Hook_Campaign": None,
             "Hook_Source": None,
             "Hook_Timestamp": None,
-            "Which_Update": "060426"
+            "Which_Update": "070426 1054AM"
         })
 
         customer_df = pd.concat([customer_df, pd.DataFrame([row])], ignore_index=True)
