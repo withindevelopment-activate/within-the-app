@@ -7674,134 +7674,65 @@ def update_tracked_customers(new_event, history_rows, customer_dict):
 ############################################################################################
 ############################################################################################
 def view_purchase_campaigns(request):
-    def format_source_label(value):
-        value = str(value or "").strip()
-        return value.title() if value else "Unknown"
 
-    def format_campaign_label(value):
-        value = str(value or "").strip()
-        return value if value else "Missing Campaign"
-
-    def summarize_campaigns(filtered_df):
-        if filtered_df.empty:
-            return pd.DataFrame(columns=[
-                "UTM_Source", "UTM_Campaign", "Total_Score", "Purchases",
-                "Total_Events", "Source_Display", "Campaign_Display"
-            ])
-
-        summary = (
-            filtered_df.groupby(["UTM_Source", "UTM_Campaign"], dropna=False)
-            .agg(
-                Total_Score=("Score", "sum"),
-                Purchases=("Is_Purchase", "sum"),
-                Total_Events=("Event_Type", "count")
-            )
-            .reset_index()
-            .sort_values(by=["Purchases", "Total_Events", "Total_Score"], ascending=False)
-        )
-
-        summary["Source_Display"] = summary["UTM_Source"].apply(format_source_label)
-        summary["Campaign_Display"] = summary["UTM_Campaign"].apply(format_campaign_label)
-        return summary
-
-    def serialize_campaign_rows(summary_df):
-        rows = []
-        for _, row in summary_df.iterrows():
-            rows.append({
-                "UTM_Source": row["UTM_Source"],
-                "UTM_Campaign": row["UTM_Campaign"],
-                "Source_Display": row["Source_Display"],
-                "Campaign_Display": row["Campaign_Display"],
-                "Total_Score": round(float(row["Total_Score"] or 0), 2),
-                "Purchases": int(row["Purchases"] or 0),
-                "Total_Events": int(row["Total_Events"] or 0),
-            })
-        return rows
-
+    # Fetch data
     df = fetch_data_from_supabase("Campaign_Event_Log")
-    if df is None or df.empty:
-        empty_context = {
-            "campaigns": [],
-            "selected_campaigns": [],
-            "source_labels": [],
-            "source_purchases": [],
-            "source_events": [],
-            "source_list": [],
-            "selected_source": "",
-            "selected_source_label": "No Source",
-        }
 
-        if request.GET.get("format") == "json":
-            return JsonResponse({
-                "source": "",
-                "source_label": "No Source",
-                "campaigns": [],
-                "labels": [],
-                "purchases": [],
-                "events": [],
-                "total_purchases": 0,
-                "total_events": 0,
-                "campaign_count": 0,
-            })
+    # --- Cleaning ---
+    df['Customer_ID'] = df['Customer_ID'].astype(int)
+    df['UTM_Source'] = df['UTM_Source'].str.strip().str.lower().astype(str)
+    df['UTM_Campaign'] = df['UTM_Campaign'].str.strip().str.lower().astype(str)
+    df['Event_Type'] = df['Event_Type'].str.strip().str.lower().astype(str)
+    df['Score'] = df['Score'].astype(float)
 
-        return render(request, "Demo/purchase_campaigns.html", empty_context)
+    # --- Create purchase flag ---
+    df['Is_Purchase'] = (df['Event_Type'] == 'purchase').astype(int)
 
-    df["UTM_Source"] = df["UTM_Source"].fillna("").astype(str).str.strip().str.lower()
-    df["UTM_Campaign"] = df["UTM_Campaign"].fillna("").astype(str).str.strip().str.lower()
-    df["Event_Type"] = df["Event_Type"].fillna("").astype(str).str.strip().str.lower()
-    df["Score"] = pd.to_numeric(df["Score"], errors="coerce").fillna(0.0)
-    df = df[df["UTM_Source"] != ""].copy()
-    df["Is_Purchase"] = (df["Event_Type"] == "purchase").astype(int)
-
-    source_summary = (
-        df.groupby("UTM_Source", dropna=False)
+    # --- Group by source + campaign ---
+    campaign_summary = (
+        df.groupby(['UTM_Source', 'UTM_Campaign'])
         .agg(
-            Total_Score=("Score", "sum"),
-            Purchases=("Is_Purchase", "sum"),
-            Total_Events=("Event_Type", "count")
+            Total_Score=('Score', 'sum'),
+            Purchases=('Is_Purchase', 'sum'),
+            Total_Events=('Event_Type', 'count')
         )
         .reset_index()
-        .sort_values(by=["Purchases", "Total_Events", "Total_Score"], ascending=False)
+        .sort_values(by='Total_Score', ascending=False)
     )
-    source_summary["Source_Display"] = source_summary["UTM_Source"].apply(format_source_label)
 
-    source_list = source_summary["UTM_Source"].tolist()
-    selected_source = (request.GET.get("source") or "").strip().lower()
-    if selected_source not in source_list:
-        selected_source = source_list[0] if source_list else ""
+    
+    source_summary = (
+        df.groupby('UTM_Source')
+        .agg(
+            Total_Score=('Score', 'sum'),
+            Purchases=('Is_Purchase', 'sum'),
+            Total_Events=('Event_Type', 'count')
+        )
+        .reset_index()
+        .sort_values(by='Total_Score', ascending=False)
+    )
 
-    selected_source_df = df[df["UTM_Source"] == selected_source].copy() if selected_source else df.iloc[0:0].copy()
-    all_campaign_summary = summarize_campaigns(df)
-    all_campaign_rows = serialize_campaign_rows(all_campaign_summary)
-    campaign_summary = summarize_campaigns(selected_source_df)
-    campaign_rows = serialize_campaign_rows(campaign_summary)
-    selected_source_label = format_source_label(selected_source)
+    source_to_campaigns = {}
 
-    if request.GET.get("format") == "json":
-        return JsonResponse({
-            "source": selected_source,
-            "source_label": selected_source_label,
-            "campaigns": campaign_rows,
-            "labels": campaign_summary["Campaign_Display"].tolist(),
-            "purchases": [int(v) for v in campaign_summary["Purchases"].tolist()],
-            "events": [int(v) for v in campaign_summary["Total_Events"].tolist()],
-            "total_purchases": int(campaign_summary["Purchases"].sum()) if not campaign_summary.empty else 0,
-            "total_events": int(campaign_summary["Total_Events"].sum()) if not campaign_summary.empty else 0,
-            "campaign_count": len(campaign_rows),
-        })
+    for source in campaign_summary['UTM_Source'].unique():
+        subset = campaign_summary[campaign_summary['UTM_Source'] == source].sort_values(by='Total_Score', ascending=False)
+        source_to_campaigns[source] = {
+            'labels': subset['UTM_Campaign'].tolist(),
+            'purchases': subset['Purchases'].tolist(),
+            'events': subset['Total_Events'].tolist()
+        }
 
     context = {
-        "campaigns": all_campaign_rows,
-        "selected_campaigns": campaign_rows,
-        "chart_labels": source_summary["Source_Display"].tolist(),
-        "chart_purchases": [int(v) for v in source_summary["Purchases"].tolist()],
-        "chart_events": [int(v) for v in source_summary["Total_Events"].tolist()],
-        "source_list": [
-            {"value": row["UTM_Source"], "label": row["Source_Display"]}
-            for _, row in source_summary.iterrows()
-        ],
-        "selected_source": selected_source,
-        "selected_source_label": selected_source_label,
+        "campaigns": campaign_summary.to_dict(orient="records"),
+        # Chart 1 Data
+        "source_labels": source_summary['UTM_Source'].tolist(),
+        "source_purchases": source_summary['Purchases'].tolist(),
+        "source_events": source_summary['Total_Events'].tolist(),
+
+        
+        # Chart 2 Data (The Dropdown & Mapping)
+        "source_list": source_summary['UTM_Source'].tolist(),
+        "campaign_data_json": json.dumps(source_to_campaigns),
     }
 
     return render(request, "Demo/purchase_campaigns.html", context)

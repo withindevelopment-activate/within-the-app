@@ -484,14 +484,20 @@
                 <input class="search-input" id="searchInput" type="text" placeholder="Search source or campaign...">
             </div>
 
-            <select class="filter-select" id="sourceFilter">
-                <option value="">All sources</option>
-                {% for c in campaigns %}
-                {% if c.UTM_Source %}
-                <option value="{{ c.UTM_Source|lower }}">{{ c.UTM_Source }}</option>
-                {% endif %}
-                {% endfor %}
-            </select>
+            <div class="filter-section" style="display: flex; gap: 1rem; align-items: center; margin-top: 10px; flex-wrap: wrap;">
+                <span class="stat-label" style="margin-top: 0;">Filter Sources:</span>
+                <div id="sourceCheckboxGroup" style="display: flex; gap: 12px; flex-wrap: wrap;">
+                    {% regroup campaigns by UTM_Source as source_list %}
+                    {% for source in source_list %}
+                        {% if source.grouper %}
+                        <label style="display: flex; align-items: center; gap: 6px; font-family: var(--ff-mono); font-size: 11px; cursor: pointer;">
+                            <input type="checkbox" class="source-check" value="{{ source.grouper|lower }}" checked>
+                            {{ source.grouper }}
+                        </label>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
 
             <span class="count-tag" id="countTag">{{ campaigns|length }} campaigns</span>
         </div>
@@ -501,17 +507,19 @@
                 <table class="orders" id="campaignsTable" role="table" aria-label="Campaign analytics dataset">
                     <thead>
                         <tr>
-                            <th data-col="0">Source <span class="sort-arrow">↕</span></th>
-                            <th data-col="1">Campaign <span class="sort-arrow">↕</span></th>
+                            <th data-col="0">Campaign <span class="sort-arrow">↕</span></th>
+                            <th data-col="1">Source <span class="sort-arrow">↕</span></th>
                             <th data-col="2">Total Score <span class="sort-arrow">↕</span></th>
                             <th data-col="3" class="sorted">Purchases <span class="sort-arrow">↓</span></th>
                             <th data-col="4">Total Events <span class="sort-arrow">↕</span></th>
+                            <th data-col="5">Conversion %</th>
                         </tr>
                     </thead>
                     <tbody id="tableBody">
                         {% for c in campaigns %}
-                        <tr data-source="{{ c.UTM_Source|default:''|lower }}"
-                            data-campaign="{{ c.UTM_Campaign|default:''|lower }}"
+                        <tr 
+                        data-campaign="{{ c.UTM_Campaign|default:''|lower }}"
+                        data-source="{{ c.UTM_Source|default:''|lower }}"
                             data-score="{{ c.Total_Score|default:0 }}" data-purchases="{{ c.Purchases|default:0 }}"
                             data-events="{{ c.Total_Events|default:0 }}">
                             <td>
@@ -532,6 +540,7 @@
                             <td><span class="score-chip"><span class="badge-dot"></span>{{ c.Total_Score|floatformat:2}}</span></td>
                             <td><span class="metric">{{ c.Purchases }}</span></td>
                             <td><span class="metric">{{ c.Total_Events }}</span></td>
+                            <td class="metric conversion-cell"></td>
                         </tr>
                         {% empty %}
                         <tr>
@@ -547,9 +556,9 @@
 
 <script>
     (function () {
-        const labels = {{ chart_labels|safe }};
-    const purchases = {{ chart_purchases|safe }};
-    const events = {{ chart_events|safe }};
+        const labels = {{ source_labels|safe }};
+    const purchases = {{ source_purchases|safe }};
+    const events = {{ source_events|safe }};
 
     const totalPurchases = purchases.reduce((sum, value) => sum + (Number(value) || 0), 0);
     const totalEvents = events.reduce((sum, value) => sum + (Number(value) || 0), 0);
@@ -672,6 +681,38 @@
         });
     }
 
+    function computeConversionRates() {
+        const rows = tbody.querySelectorAll('tr[data-source]');
+
+        rows.forEach(row => {
+            const purchases = parseFloat(row.dataset.purchases) || 0;
+            const events = parseFloat(row.dataset.events) || 0;
+
+            let conversion = 0;
+
+            if (events > 0) {
+                conversion = (purchases / events) * 100;
+            }
+
+            // Store it (useful for sorting later)
+            row.dataset.conversion = conversion;
+
+            // Render it
+            const cell = row.querySelector('.conversion-cell');
+            if (cell) {
+                cell.textContent = conversion.toFixed(2) + '%';
+
+                if (conversion > 10) {
+                    cell.style.color = '#16a34a'; // strong
+                } else if (conversion > 3) {
+                    cell.style.color = '#ca8a04'; // medium
+                } else {
+                    cell.style.color = '#dc2626'; // weak
+                }
+            }
+        });
+    }
+
     const searchInput = document.getElementById('searchInput');
     const sourceFilter = document.getElementById('sourceFilter');
     const countTag = document.getElementById('countTag');
@@ -694,35 +735,69 @@
 
     function applyFilter() {
         const q = searchInput.value.toLowerCase().trim();
-        const src = sourceFilter.value.toLowerCase();
+        
+        // Get all checked values from the checkbox group
+        const checkedSources = Array.from(document.querySelectorAll('.source-check:checked'))
+                                    .map(cb => cb.value);
+        
         let visible = 0;
+        const rows = tbody.querySelectorAll('tr[data-source]');
 
-        Array.from(tbody.querySelectorAll('tr[data-source]')).forEach(row => {
-            const matchSearch = !q ||
-                row.dataset.source.includes(q) ||
-                row.dataset.campaign.includes(q);
+        rows.forEach(row => {
+            const rowSource = row.getAttribute('data-source') || '';
+            const rowCampaign = row.getAttribute('data-campaign') || '';
 
-            const matchSource = !src || row.dataset.source === src;
+            // 1. Check Search Input
+            const matchSearch = q === '' || 
+                                rowSource.includes(q) || 
+                                rowCampaign.includes(q);
+
+            // 2. Check Checkboxes (Match if the source is in the checked list)
+            const matchSource = checkedSources.length === 0 || checkedSources.includes(rowSource);
+
             const show = matchSearch && matchSource;
 
             row.style.display = show ? '' : 'none';
             if (show) visible++;
         });
 
+        // Update UI states
+        updateNoResults(visible, rows.length);
+        if (countTag) {
+            countTag.textContent = `${visible} campaign${visible === 1 ? '' : 's'}`;
+        }
+    }
+
+    function updateNoResults(visible, totalRows) {
         let noRow = tbody.querySelector('.no-results-row');
-        if (visible === 0 && tbody.querySelectorAll('tr[data-source]').length > 0) {
+        if (visible === 0 && totalRows > 0) {
             if (!noRow) {
                 noRow = document.createElement('tr');
                 noRow.className = 'no-results-row';
-                noRow.innerHTML = '<td colspan="5" class="no-results">No campaigns match your filter.</td>';
+                noRow.innerHTML = '<td colspan="5" class="no-results" style="text-align:center; padding:3rem; color:var(--ink-3);">No campaigns match your selection.</td>';
                 tbody.appendChild(noRow);
             }
         } else if (noRow) {
             noRow.remove();
         }
-
-        countTag.textContent = visible + ' campaign' + (visible === 1 ? '' : 's');
     }
+
+    // New Listeners
+    searchInput.addEventListener('input', applyFilter);
+    
+    // Delegate change event to the checkbox container
+    const checkboxGroup = document.getElementById('sourceCheckboxGroup');
+    if (checkboxGroup) {
+        checkboxGroup.addEventListener('change', applyFilter);
+    }
+
+    // Attach listeners
+    searchInput.addEventListener('input', applyFilter);
+    sourceFilter.addEventListener('change', applyFilter);
+
+    // Ensure the initial count is correct on load
+    computeConversionRates();
+    applyFilter();
 
     let sortCol = null;
     let sortAsc = false;
