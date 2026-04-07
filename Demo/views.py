@@ -7722,6 +7722,7 @@ def view_purchase_campaigns(request):
     if df is None or df.empty:
         empty_context = {
             "campaigns": [],
+            "selected_campaigns": [],
             "source_labels": [],
             "source_purchases": [],
             "source_events": [],
@@ -7770,6 +7771,8 @@ def view_purchase_campaigns(request):
         selected_source = source_list[0] if source_list else ""
 
     selected_source_df = df[df["UTM_Source"] == selected_source].copy() if selected_source else df.iloc[0:0].copy()
+    all_campaign_summary = summarize_campaigns(df)
+    all_campaign_rows = serialize_campaign_rows(all_campaign_summary)
     campaign_summary = summarize_campaigns(selected_source_df)
     campaign_rows = serialize_campaign_rows(campaign_summary)
     selected_source_label = format_source_label(selected_source)
@@ -7788,7 +7791,8 @@ def view_purchase_campaigns(request):
         })
 
     context = {
-        "campaigns": campaign_rows,
+        "campaigns": all_campaign_rows,
+        "selected_campaigns": campaign_rows,
         "source_labels": source_summary["Source_Display"].tolist(),
         "source_purchases": [int(v) for v in source_summary["Purchases"].tolist()],
         "source_events": [int(v) for v in source_summary["Total_Events"].tolist()],

@@ -755,8 +755,8 @@
           },
           y1: {
             beginAtZero: true,
-            position: 'right',
             max: maxValue + 5 || 1,
+            position: 'right',
             grid: {
               drawOnChartArea: false
             },
@@ -811,111 +811,181 @@
       }
     });
 
-
-    const searchInput = document.getElementById('searchInput');
-    const sourceFilter = document.getElementById('sourceFilter');
-    const countTag = document.getElementById('countTag');
-    const tbody = document.getElementById('tableBody');
-    const headers = document.querySelectorAll('table.orders th[data-col]');
-
-    const seen = new Set();
-    Array.from(sourceFilter.options).forEach(option => {
-        if (option.value === '') {
-            seen.add('');
-            return;
-        }
-
-        if (seen.has(option.value)) {
-            option.remove();
-        } else {
-            seen.add(option.value);
-        }
-    });
-
-    function applyFilter() {
-        const q = searchInput.value.toLowerCase().trim();
-        const src = sourceFilter.value.toLowerCase();
-        let visible = 0;
-
-        Array.from(tbody.querySelectorAll('tr[data-source]')).forEach(row => {
-            const matchSearch = !q ||
-                row.dataset.source.includes(q) ||
-                row.dataset.campaign.includes(q);
-
-            const matchSource = !src || row.dataset.source === src;
-            const show = matchSearch && matchSource;
-
-            row.style.display = show ? '' : 'none';
-            if (show) visible++;
-        });
-
-        let noRow = tbody.querySelector('.no-results-row');
-        if (visible === 0 && tbody.querySelectorAll('tr[data-source]').length > 0) {
-            if (!noRow) {
-                noRow = document.createElement('tr');
-                noRow.className = 'no-results-row';
-                noRow.innerHTML = '<td colspan="5" class="no-results">No campaigns match your filter.</td>';
-                tbody.appendChild(noRow);
-            }
-        } else if (noRow) {
-            noRow.remove();
-        }
-
-        countTag.textContent = visible + ' campaign' + (visible === 1 ? '' : 's');
-    }
-
     let sortCol = null;
     let sortAsc = false;
 
-    function sortTable(col) {
-        if (sortCol === col) {
-            sortAsc = !sortAsc;
-        } else {
-            sortCol = col;
-            sortAsc = col < 2;
-        }
+    function renderTable(rows) {
+      if (!rows.length) {
+        countTag.textContent = '0 campaigns';
+        tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No campaigns found for this source.</td></tr>';
+        return;
+      }
 
-        headers.forEach(th => {
-            const arrow = th.querySelector('.sort-arrow');
-            if (parseInt(th.dataset.col, 10) === sortCol) {
-                th.classList.add('sorted');
-                arrow.textContent = sortAsc ? '↑' : '↓';
-            } else {
-                th.classList.remove('sorted');
-                arrow.textContent = '↕';
-            }
-        });
-
-        const rows = Array.from(tbody.querySelectorAll('tr[data-source]'));
-        const keyMap = ['source', 'campaign', 'score', 'purchases', 'events'];
-        const key = keyMap[col];
-
-        rows.sort((a, b) => {
-            let va = a.dataset[key] || '';
-            let vb = b.dataset[key] || '';
-
-            if (key === 'score' || key === 'purchases' || key === 'events') {
-                va = parseFloat(va) || 0;
-                vb = parseFloat(vb) || 0;
-                return sortAsc ? va - vb : vb - va;
-            }
-
-            return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
-        });
-
-        rows.forEach(row => tbody.appendChild(row));
-        applyFilter();
+      tbody.innerHTML = rows.map(row => `
+        <tr
+          data-source="${escapeHtml((row.UTM_Source || '').toLowerCase())}"
+          data-campaign="${escapeHtml((row.Campaign_Display || '').toLowerCase())}"
+          data-score="${escapeHtml(row.Total_Score)}"
+          data-purchases="${escapeHtml(row.Purchases)}"
+          data-events="${escapeHtml(row.Total_Events)}">
+          <td>
+            <span class="badge ${badgeClassForSource(row.UTM_Source)}">
+              <span class="badge-dot"></span>
+              ${escapeHtml(row.Source_Display || 'Unknown')}
+            </span>
+          </td>
+          <td>${escapeHtml(row.Campaign_Display || '—')}</td>
+          <td><span class="score-chip"><span class="badge-dot"></span>${Number(row.Total_Score || 0).toFixed(2)}</span></td>
+          <td><span class="metric">${escapeHtml(row.Purchases)}</span></td>
+          <td><span class="metric">${escapeHtml(row.Total_Events)}</span></td>
+        </tr>
+      `).join('');
     }
 
+    function applyFilter() {
+      const q = searchInput.value.toLowerCase().trim();
+      let visible = 0;
+
+      Array.from(tbody.querySelectorAll('tr[data-source]')).forEach(row => {
+        const matchSearch = !q || row.dataset.campaign.includes(q) || row.dataset.source.includes(q);
+        row.style.display = matchSearch ? '' : 'none';
+        if (matchSearch) visible++;
+      });
+
+      let noRow = tbody.querySelector('.no-results-row');
+      if (visible === 0 && tbody.querySelectorAll('tr[data-source]').length > 0) {
+        if (!noRow) {
+          noRow = document.createElement('tr');
+          noRow.className = 'no-results-row';
+          noRow.innerHTML = '<td colspan="5" class="no-results">No campaigns match your search.</td>';
+          tbody.appendChild(noRow);
+        }
+      } else if (noRow) {
+        noRow.remove();
+      }
+
+      countTag.textContent = visible + ' campaign' + (visible === 1 ? '' : 's');
+    }
+
+    function sortTable(col) {
+      const rows = Array.from(tbody.querySelectorAll('tr[data-source]'));
+      if (!rows.length) return;
+
+      if (sortCol === col) {
+        sortAsc = !sortAsc;
+      } else {
+        sortCol = col;
+        sortAsc = col < 2;
+      }
+
+      headers.forEach(th => {
+        const arrow = th.querySelector('.sort-arrow');
+        if (parseInt(th.dataset.col, 10) === sortCol) {
+          th.classList.add('sorted');
+          arrow.textContent = sortAsc ? '↑' : '↓';
+        } else {
+          th.classList.remove('sorted');
+          arrow.textContent = '↕';
+        }
+      });
+
+      const keyMap = ['source', 'campaign', 'score', 'purchases', 'events'];
+      const key = keyMap[col];
+
+      rows.sort((a, b) => {
+        let va = a.dataset[key] || '';
+        let vb = b.dataset[key] || '';
+
+        if (key === 'score' || key === 'purchases' || key === 'events') {
+          va = parseFloat(va) || 0;
+          vb = parseFloat(vb) || 0;
+          return sortAsc ? va - vb : vb - va;
+        }
+
+        return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+      });
+
+      rows.forEach(row => tbody.appendChild(row));
+      applyFilter();
+    }
+
+    function updatePieChart(rows, sourceLabel) {
+      const labels = rows.map(row => row.Campaign_Display);
+      const purchases = rows.map(row => Number(row.Purchases) || 0);
+
+      campaignPieChart.data.labels = labels.length ? labels : ['No campaigns'];
+      campaignPieChart.data.datasets[0].data = purchases.length ? purchases : [1];
+      campaignPieChart.data.datasets[0].backgroundColor = (labels.length ? labels : ['fallback'])
+        .map((_, index) => piePalette[index % piePalette.length]);
+      campaignPieChart.update();
+
+      campaignChartLabel.textContent = `${sourceLabel} campaign purchases`;
+    }
+
+    function setActiveTab(source) {
+      Array.from(sourceTabs.querySelectorAll('.source-tab')).forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.source === source);
+      });
+    }
+
+    async function loadSource(source) {
+      if (!source) return;
+
+      chartStatus.textContent = 'Loading source campaigns...';
+
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.set('format', 'json');
+        url.searchParams.set('source', source);
+
+        const response = await fetch(url.toString(), {
+          headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+
+        if (!response.ok) {
+          throw new Error(`Request failed with ${response.status}`);
+        }
+
+        const payload = await response.json();
+        currentCampaignRows = payload.campaigns || [];
+        activeSource = payload.source || source;
+        activeSourceLabel = payload.source_label || source;
+
+        setActiveTab(activeSource);
+        updatePieChart(currentCampaignRows, activeSourceLabel);
+        renderTable(currentCampaignRows);
+        searchInput.value = '';
+        sortCol = null;
+        sortAsc = false;
+        sortTable(3);
+        chartStatus.textContent = `${payload.campaign_count || 0} campaigns loaded for ${activeSourceLabel}.`;
+
+        const nextUrl = new URL(window.location.href);
+        nextUrl.searchParams.set('source', activeSource);
+        window.history.replaceState({}, '', nextUrl.toString());
+      } catch (error) {
+        chartStatus.textContent = 'Could not load campaigns for this source.';
+      }
+    }
+
+    updateHeaderStats();
+    updatePieChart(currentCampaignRows, activeSourceLabel);
+    renderTable(currentCampaignRows);
+    sortTable(3);
+
     searchInput.addEventListener('input', applyFilter);
-    sourceFilter.addEventListener('change', applyFilter);
     headers.forEach(th => {
-        th.addEventListener('click', () => sortTable(parseInt(th.dataset.col, 10)));
+      th.addEventListener('click', () => sortTable(parseInt(th.dataset.col, 10)));
     });
 
-    applyFilter();
-    sortTable(3);
-  }) ();
+    Array.from(sourceTabs.querySelectorAll('.source-tab')).forEach(tab => {
+      tab.addEventListener('click', () => {
+        if (tab.dataset.source !== activeSource) {
+          loadSource(tab.dataset.source);
+        }
+      });
+    });
+  })();
 </script>
 
 {% endblock %}
