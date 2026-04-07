@@ -547,66 +547,75 @@
     </div>
   </div>
 
-  <div class="table-card">
-    <div class="toolbar">
-      <div class="search-wrap">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <circle cx="11" cy="11" r="8"></circle>
-          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-        </svg>
-        <input class="search-input" id="searchInput" type="text" placeholder="Search campaign...">
-      </div>
+    <div class="data-wrap">
+        <div class="toolbar">
+            <div class="search-wrap">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input class="search-input" id="searchInput" type="text" placeholder="Search source or campaign...">
+            </div>
 
-      <span class="count-tag" id="countTag">{{ campaigns|length }} campaigns</span>
-    </div>
+            <select class="filter-select" id="sourceFilter">
+                <option value="">All sources</option>
+                {% for c in campaigns %}
+                {% if c.UTM_Source %}
+                <option value="{{ c.UTM_Source|lower }}">{{ c.UTM_Source }}</option>
+                {% endif %}
+                {% endfor %}
+            </select>
 
-    <div class="table-scroll">
-      <table class="orders" id="campaignsTable" role="table" aria-label="Campaign analytics dataset">
-        <thead>
-          <tr>
-            <th data-col="0">Source <span class="sort-arrow">↕</span></th>
-            <th data-col="1">Campaign <span class="sort-arrow">↕</span></th>
-            <th data-col="2">Total Score <span class="sort-arrow">↕</span></th>
-            <th data-col="3" class="sorted">Purchases <span class="sort-arrow">↓</span></th>
-            <th data-col="4">Total Events <span class="sort-arrow">↕</span></th>
-          </tr>
-        </thead>
-        <tbody id="tableBody">
-          {% for c in campaigns %}
-          <tr
-            data-source="{{ c.UTM_Source|default:''|lower }}"
-            data-campaign="{{ c.Campaign_Display|default:''|lower }}"
-            data-score="{{ c.Total_Score|default:0 }}"
-            data-purchases="{{ c.Purchases|default:0 }}"
-            data-events="{{ c.Total_Events|default:0 }}">
-            <td>
-              {% with src=c.UTM_Source|default:''|lower %}
-              <span class="badge
-                {% if src == 'instagram' %}src-instagram
-                {% elif src == 'google' %}src-google
-                {% elif src == 'content creators' or src == 'content' %}src-content
-                {% elif src == 'direct' %}src-direct
-                {% elif src == 'meta' or src == 'facebook' %}src-meta
-                {% else %}src-default{% endif %}">
-                <span class="badge-dot"></span>
-                {{ c.Source_Display|default:"Unknown" }}
-              </span>
-              {% endwith %}
-            </td>
-            <td>{{ c.Campaign_Display|default:"—" }}</td>
-            <td><span class="score-chip"><span class="badge-dot"></span>{{ c.Total_Score|floatformat:2 }}</span></td>
-            <td><span class="metric">{{ c.Purchases }}</span></td>
-            <td><span class="metric">{{ c.Total_Events }}</span></td>
-          </tr>
-          {% empty %}
-          <tr>
-            <td colspan="5" class="empty-state">No campaign data found.</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+            <span class="count-tag" id="countTag">{{ campaigns|length }} campaigns</span>
+        </div>
+
+        <div class="data-viewport">
+            <div class="data-scroller" role="region" aria-label="cart dataset" tabindex="0">
+                <table class="orders" id="campaignsTable" role="table" aria-label="Campaign analytics dataset">
+                    <thead>
+                        <tr>
+                            <th data-col="0">Source <span class="sort-arrow">↕</span></th>
+                            <th data-col="1">Campaign <span class="sort-arrow">↕</span></th>
+                            <th data-col="2">Total Score <span class="sort-arrow">↕</span></th>
+                            <th data-col="3" class="sorted">Purchases <span class="sort-arrow">↓</span></th>
+                            <th data-col="4">Total Events <span class="sort-arrow">↕</span></th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                        {% for c in campaigns %}
+                        <tr data-source="{{ c.UTM_Source|default:''|lower }}"
+                            data-campaign="{{ c.UTM_Campaign|default:''|lower }}"
+                            data-score="{{ c.Total_Score|default:0 }}" data-purchases="{{ c.Purchases|default:0 }}"
+                            data-events="{{ c.Total_Events|default:0 }}">
+                            <td>
+                                {% with src=c.UTM_Source|default:''|lower %}
+                                <span class="badge
+                        {% if src == 'instagram' %}src-instagram
+                        {% elif src == 'google' %}src-google
+                        {% elif src == 'content creators' or src == 'content' %}src-content
+                        {% elif src == 'direct' %}src-direct
+                        {% elif src == 'meta' or src == 'facebook' %}src-meta
+                        {% else %}src-default{% endif %}">
+                                    <span class="badge-dot"></span>
+                                    {{ c.UTM_Source|default:"Unknown" }}
+                                </span>
+                                {% endwith %}
+                            </td>
+                            <td>{{ c.UTM_Campaign|default:"—" }}</td>
+                            <td><span class="score-chip"><span class="badge-dot"></span>{{ c.Total_Score|floatformat:2}}</span></td>
+                            <td><span class="metric">{{ c.Purchases }}</span></td>
+                            <td><span class="metric">{{ c.Total_Events }}</span></td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="empty-state">No campaign data found.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
-  </div>
 </div>
 
 {{ source_labels|json_script:"source-labels-data" }}
@@ -664,6 +673,7 @@
       const totalEvents = sourceEvents.reduce((sum, value) => sum + (Number(value) || 0), 0);
       totalPurchasesStat.textContent = totalPurchases.toLocaleString();
       totalEventsStat.textContent = totalEvents.toLocaleString();
+      const maxValue = Math.max(0, ...totalPurchases.map(Number), ...totalEvents.map(Number));
     }
 
     const sourceChart = new Chart(document.getElementById('sourceChart').getContext('2d'), {
@@ -722,6 +732,7 @@
           y: {
             beginAtZero: true,
             position: 'left',
+            max: maxValue + 5 || 1,
             grid: {
               color: 'rgba(0, 0, 0, 0.06)'
             },
@@ -745,6 +756,7 @@
           y1: {
             beginAtZero: true,
             position: 'right',
+            max: maxValue + 5 || 1,
             grid: {
               drawOnChartArea: false
             },
@@ -799,181 +811,111 @@
       }
     });
 
+
+    const searchInput = document.getElementById('searchInput');
+    const sourceFilter = document.getElementById('sourceFilter');
+    const countTag = document.getElementById('countTag');
+    const tbody = document.getElementById('tableBody');
+    const headers = document.querySelectorAll('table.orders th[data-col]');
+
+    const seen = new Set();
+    Array.from(sourceFilter.options).forEach(option => {
+        if (option.value === '') {
+            seen.add('');
+            return;
+        }
+
+        if (seen.has(option.value)) {
+            option.remove();
+        } else {
+            seen.add(option.value);
+        }
+    });
+
+    function applyFilter() {
+        const q = searchInput.value.toLowerCase().trim();
+        const src = sourceFilter.value.toLowerCase();
+        let visible = 0;
+
+        Array.from(tbody.querySelectorAll('tr[data-source]')).forEach(row => {
+            const matchSearch = !q ||
+                row.dataset.source.includes(q) ||
+                row.dataset.campaign.includes(q);
+
+            const matchSource = !src || row.dataset.source === src;
+            const show = matchSearch && matchSource;
+
+            row.style.display = show ? '' : 'none';
+            if (show) visible++;
+        });
+
+        let noRow = tbody.querySelector('.no-results-row');
+        if (visible === 0 && tbody.querySelectorAll('tr[data-source]').length > 0) {
+            if (!noRow) {
+                noRow = document.createElement('tr');
+                noRow.className = 'no-results-row';
+                noRow.innerHTML = '<td colspan="5" class="no-results">No campaigns match your filter.</td>';
+                tbody.appendChild(noRow);
+            }
+        } else if (noRow) {
+            noRow.remove();
+        }
+
+        countTag.textContent = visible + ' campaign' + (visible === 1 ? '' : 's');
+    }
+
     let sortCol = null;
     let sortAsc = false;
 
-    function renderTable(rows) {
-      if (!rows.length) {
-        countTag.textContent = '0 campaigns';
-        tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No campaigns found for this source.</td></tr>';
-        return;
-      }
-
-      tbody.innerHTML = rows.map(row => `
-        <tr
-          data-source="${escapeHtml((row.UTM_Source || '').toLowerCase())}"
-          data-campaign="${escapeHtml((row.Campaign_Display || '').toLowerCase())}"
-          data-score="${escapeHtml(row.Total_Score)}"
-          data-purchases="${escapeHtml(row.Purchases)}"
-          data-events="${escapeHtml(row.Total_Events)}">
-          <td>
-            <span class="badge ${badgeClassForSource(row.UTM_Source)}">
-              <span class="badge-dot"></span>
-              ${escapeHtml(row.Source_Display || 'Unknown')}
-            </span>
-          </td>
-          <td>${escapeHtml(row.Campaign_Display || '—')}</td>
-          <td><span class="score-chip"><span class="badge-dot"></span>${Number(row.Total_Score || 0).toFixed(2)}</span></td>
-          <td><span class="metric">${escapeHtml(row.Purchases)}</span></td>
-          <td><span class="metric">${escapeHtml(row.Total_Events)}</span></td>
-        </tr>
-      `).join('');
-    }
-
-    function applyFilter() {
-      const q = searchInput.value.toLowerCase().trim();
-      let visible = 0;
-
-      Array.from(tbody.querySelectorAll('tr[data-source]')).forEach(row => {
-        const matchSearch = !q || row.dataset.campaign.includes(q) || row.dataset.source.includes(q);
-        row.style.display = matchSearch ? '' : 'none';
-        if (matchSearch) visible++;
-      });
-
-      let noRow = tbody.querySelector('.no-results-row');
-      if (visible === 0 && tbody.querySelectorAll('tr[data-source]').length > 0) {
-        if (!noRow) {
-          noRow = document.createElement('tr');
-          noRow.className = 'no-results-row';
-          noRow.innerHTML = '<td colspan="5" class="no-results">No campaigns match your search.</td>';
-          tbody.appendChild(noRow);
-        }
-      } else if (noRow) {
-        noRow.remove();
-      }
-
-      countTag.textContent = visible + ' campaign' + (visible === 1 ? '' : 's');
-    }
-
     function sortTable(col) {
-      const rows = Array.from(tbody.querySelectorAll('tr[data-source]'));
-      if (!rows.length) return;
-
-      if (sortCol === col) {
-        sortAsc = !sortAsc;
-      } else {
-        sortCol = col;
-        sortAsc = col < 2;
-      }
-
-      headers.forEach(th => {
-        const arrow = th.querySelector('.sort-arrow');
-        if (parseInt(th.dataset.col, 10) === sortCol) {
-          th.classList.add('sorted');
-          arrow.textContent = sortAsc ? '↑' : '↓';
+        if (sortCol === col) {
+            sortAsc = !sortAsc;
         } else {
-          th.classList.remove('sorted');
-          arrow.textContent = '↕';
-        }
-      });
-
-      const keyMap = ['source', 'campaign', 'score', 'purchases', 'events'];
-      const key = keyMap[col];
-
-      rows.sort((a, b) => {
-        let va = a.dataset[key] || '';
-        let vb = b.dataset[key] || '';
-
-        if (key === 'score' || key === 'purchases' || key === 'events') {
-          va = parseFloat(va) || 0;
-          vb = parseFloat(vb) || 0;
-          return sortAsc ? va - vb : vb - va;
+            sortCol = col;
+            sortAsc = col < 2;
         }
 
-        return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
-      });
-
-      rows.forEach(row => tbody.appendChild(row));
-      applyFilter();
-    }
-
-    function updatePieChart(rows, sourceLabel) {
-      const labels = rows.map(row => row.Campaign_Display);
-      const purchases = rows.map(row => Number(row.Purchases) || 0);
-
-      campaignPieChart.data.labels = labels.length ? labels : ['No campaigns'];
-      campaignPieChart.data.datasets[0].data = purchases.length ? purchases : [1];
-      campaignPieChart.data.datasets[0].backgroundColor = (labels.length ? labels : ['fallback'])
-        .map((_, index) => piePalette[index % piePalette.length]);
-      campaignPieChart.update();
-
-      campaignChartLabel.textContent = `${sourceLabel} campaign purchases`;
-    }
-
-    function setActiveTab(source) {
-      Array.from(sourceTabs.querySelectorAll('.source-tab')).forEach(tab => {
-        tab.classList.toggle('active', tab.dataset.source === source);
-      });
-    }
-
-    async function loadSource(source) {
-      if (!source) return;
-
-      chartStatus.textContent = 'Loading source campaigns...';
-
-      try {
-        const url = new URL(window.location.href);
-        url.searchParams.set('format', 'json');
-        url.searchParams.set('source', source);
-
-        const response = await fetch(url.toString(), {
-          headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        headers.forEach(th => {
+            const arrow = th.querySelector('.sort-arrow');
+            if (parseInt(th.dataset.col, 10) === sortCol) {
+                th.classList.add('sorted');
+                arrow.textContent = sortAsc ? '↑' : '↓';
+            } else {
+                th.classList.remove('sorted');
+                arrow.textContent = '↕';
+            }
         });
 
-        if (!response.ok) {
-          throw new Error(`Request failed with ${response.status}`);
-        }
+        const rows = Array.from(tbody.querySelectorAll('tr[data-source]'));
+        const keyMap = ['source', 'campaign', 'score', 'purchases', 'events'];
+        const key = keyMap[col];
 
-        const payload = await response.json();
-        currentCampaignRows = payload.campaigns || [];
-        activeSource = payload.source || source;
-        activeSourceLabel = payload.source_label || source;
+        rows.sort((a, b) => {
+            let va = a.dataset[key] || '';
+            let vb = b.dataset[key] || '';
 
-        setActiveTab(activeSource);
-        updatePieChart(currentCampaignRows, activeSourceLabel);
-        renderTable(currentCampaignRows);
-        searchInput.value = '';
-        sortCol = null;
-        sortAsc = false;
-        sortTable(3);
-        chartStatus.textContent = `${payload.campaign_count || 0} campaigns loaded for ${activeSourceLabel}.`;
+            if (key === 'score' || key === 'purchases' || key === 'events') {
+                va = parseFloat(va) || 0;
+                vb = parseFloat(vb) || 0;
+                return sortAsc ? va - vb : vb - va;
+            }
 
-        const nextUrl = new URL(window.location.href);
-        nextUrl.searchParams.set('source', activeSource);
-        window.history.replaceState({}, '', nextUrl.toString());
-      } catch (error) {
-        chartStatus.textContent = 'Could not load campaigns for this source.';
-      }
+            return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+        });
+
+        rows.forEach(row => tbody.appendChild(row));
+        applyFilter();
     }
 
-    updateHeaderStats();
-    updatePieChart(currentCampaignRows, activeSourceLabel);
-    renderTable(currentCampaignRows);
-    sortTable(3);
-
     searchInput.addEventListener('input', applyFilter);
+    sourceFilter.addEventListener('change', applyFilter);
     headers.forEach(th => {
-      th.addEventListener('click', () => sortTable(parseInt(th.dataset.col, 10)));
+        th.addEventListener('click', () => sortTable(parseInt(th.dataset.col, 10)));
     });
 
-    Array.from(sourceTabs.querySelectorAll('.source-tab')).forEach(tab => {
-      tab.addEventListener('click', () => {
-        if (tab.dataset.source !== activeSource) {
-          loadSource(tab.dataset.source);
-        }
-      });
-    });
-  })();
+    applyFilter();
+    sortTable(3);
+  }) ();
 </script>
 
 {% endblock %}
