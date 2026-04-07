@@ -7655,6 +7655,7 @@ def update_tracked_customers(new_event, history_rows, customer_dict):
     row_dict["Visitor_ID"] = visitor_id
     row_dict["Customer_LTV"] = customer_ltv
     row_dict["Is_Anonymous"] = is_anonymous
+    row_dict["Customer_Info"] = customer_dict
 
     row_dict["Which_Update"] = "070426 customer info update"
 
