@@ -7679,7 +7679,7 @@ def view_purchase_campaigns(request):
     )
 
     labels = campaign_summary.apply(
-        lambda x: f"{x['UTM_Source']} | {x['UTM_Campaign']}", axis=1
+        lambda x: f"{x['UTM_Source']}", axis=1
     ).tolist()
 
     purchases = campaign_summary['Purchases'].tolist()
