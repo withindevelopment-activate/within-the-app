@@ -7678,9 +7678,7 @@ def view_purchase_campaigns(request):
         .sort_values(by='Total_Score', ascending=False)
     )
 
-    labels = campaign_summary.apply(
-        lambda x: f"{x['UTM_Source']}", axis=1
-    ).tolist()
+    labels = campaign_summary['UTM_Source'].tolist()
 
     purchases = campaign_summary['Purchases'].tolist()
     events = campaign_summary['Total_Events'].tolist()
