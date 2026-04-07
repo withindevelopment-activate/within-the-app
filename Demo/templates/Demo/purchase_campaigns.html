@@ -518,12 +518,11 @@
             <div class="filter-section">
                 <span class="stat-label" style="margin-top: 0;">Filter Sources:</span>
                 <div id="sourceCheckboxGroup" class="checkbox-group">
-                    {% regroup campaigns by UTM_Source as source_list %}
                     {% for source in source_list %}
-                        {% if source.grouper %}
+                        {% if source.value %}
                         <label class="checkbox-label">
-                            <input type="checkbox" class="source-check" value="{{ source.grouper|lower }}" checked>
-                            {{ source.grouper }}
+                            <input type="checkbox" class="source-check" value="{{ source.value|lower }}" checked>
+                            {{ source.label }}
                         </label>
                         {% endif %}
                     {% endfor %}
