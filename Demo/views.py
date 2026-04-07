@@ -7722,6 +7722,15 @@ def view_purchase_campaigns(request):
             'events': subset['Total_Events'].tolist()
         }
 
+    unique_sources = (
+        df['UTM_Source']
+        .dropna()
+        .str.strip()
+        .str.lower()
+        .unique()
+        .tolist()
+    )
+
     context = {
         "campaigns": campaign_summary.to_dict(orient="records"),
         # Chart 1 Data
@@ -7731,7 +7740,7 @@ def view_purchase_campaigns(request):
 
         
         # Chart 2 Data (The Dropdown & Mapping)
-        "source_list": source_summary['UTM_Source'].tolist(),
+        "source_list": unique_sources,
         "campaign_data_json": json.dumps(source_to_campaigns),
     }
 

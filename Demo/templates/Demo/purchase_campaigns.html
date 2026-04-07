@@ -519,10 +519,10 @@
                 <span class="stat-label" style="margin-top: 0;">Filter Sources:</span>
                 <div id="sourceCheckboxGroup" class="checkbox-group">
                     {% for source in source_list %}
-                        {% if source.value %}
+                        {% if source %}
                         <label class="checkbox-label">
-                            <input type="checkbox" class="source-check" value="{{ source.value|lower }}" checked>
-                            {{ source.label }}
+                            <input type="checkbox" class="source-check" value="{{ source|lower }}" checked>
+                            {{ source|title }}
                         </label>
                         {% endif %}
                     {% endfor %}
@@ -769,7 +769,7 @@
                                 rowCampaign.includes(q);
 
             // 2. Check Checkboxes (Match if the source is in the checked list)
-            const matchSource = checkedSources.length === 0 || checkedSources.includes(rowSource);
+            const matchSource = checkedSources.includes(rowSource);
 
             const show = matchSearch && matchSource;
 
