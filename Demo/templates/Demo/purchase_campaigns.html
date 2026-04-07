@@ -6,776 +6,974 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;700&display=swap"
-    rel="stylesheet">
+  rel="stylesheet">
 
 <style>
-    :root {
-        --ink: #0f0f0f;
-        --ink-2: #4a4a4a;
-        --ink-3: #8a8a8a;
-        --surface: #ffffff;
-        --surface-2: #f6f5f2;
-        --surface-3: #eeecea;
-        --border: rgba(0, 0, 0, 0.08);
-        --border-md: rgba(0, 0, 0, 0.13);
-        --accent: #534ab7;
-        --accent-soft: #eeedfe;
-        --accent-blue: #378add;
-        --accent-blue-soft: #e6f1fb;
-        --accent-red: #ff403d;
-        --accent-red-soft: #fff0ef;
-        --ff-head: 'Syne', sans-serif;
-        --ff-mono: 'DM Mono', monospace;
-        --radius-lg: 16px;
-        --radius-md: 10px;
-    }
+  :root {
+    --ink: #0f0f0f;
+    --ink-2: #4a4a4a;
+    --ink-3: #8a8a8a;
+    --surface: #ffffff;
+    --surface-2: #f6f5f2;
+    --surface-3: #eeecea;
+    --border: rgba(0, 0, 0, 0.08);
+    --border-md: rgba(0, 0, 0, 0.13);
+    --accent: #534ab7;
+    --accent-soft: #eeedfe;
+    --accent-blue: #378add;
+    --accent-blue-soft: #e6f1fb;
+    --accent-red: #ff403d;
+    --accent-red-soft: #fff0ef;
+    --accent-green: #639922;
+    --accent-green-soft: #eaf3de;
+    --ff-head: 'Syne', sans-serif;
+    --ff-mono: 'DM Mono', monospace;
+    --radius-lg: 16px;
+    --radius-md: 10px;
+  }
 
-    *,
-    *::before,
-    *::after {
-        box-sizing: border-box;
-    }
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
 
+  .campaign-page {
+    font-family: var(--ff-head);
+    color: var(--ink);
+    background: var(--surface-2);
+    min-height: 100vh;
+    padding: 2rem 2.5rem 4rem;
+  }
+
+  .page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.75rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 0.5px solid var(--border-md);
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  .page-header h1 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .page-subtitle {
+    margin-top: 0.35rem;
+    font-family: var(--ff-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-3);
+  }
+
+  .header-stats {
+    display: flex;
+    gap: 1.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .stat {
+    text-align: right;
+  }
+
+  .stat-val {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+    line-height: 1;
+  }
+
+  .stat-label {
+    font-family: var(--ff-mono);
+    font-size: 10px;
+    color: var(--ink-3);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 3px;
+  }
+
+  .stat-divider {
+    width: 0.5px;
+    height: 32px;
+    background: var(--border-md);
+  }
+
+  .charts-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.45fr) minmax(320px, 1fr);
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .chart-card,
+  .table-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+  }
+
+  .chart-card {
+    padding: 1.25rem;
+  }
+
+  .chart-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .chart-title {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .chart-copy {
+    margin-top: 0.25rem;
+    font-family: var(--ff-mono);
+    font-size: 10px;
+    color: var(--ink-3);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .chart-legend {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .legend-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-family: var(--ff-mono);
+    font-size: 10px;
+    color: var(--ink-2);
+    background: var(--surface-2);
+    border: 0.5px solid var(--border);
+  }
+
+  .legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .chart-wrap {
+    position: relative;
+    height: 360px;
+  }
+
+  .source-tabs {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+  }
+
+  .source-tab {
+    border: 0.5px solid var(--border-md);
+    background: var(--surface);
+    color: var(--ink-2);
+    border-radius: 999px;
+    padding: 7px 12px;
+    font-family: var(--ff-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .source-tab:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .source-tab.active {
+    background: var(--accent-soft);
+    border-color: rgba(83, 74, 183, 0.3);
+    color: var(--accent);
+  }
+
+  .chart-status {
+    margin-top: 0.75rem;
+    min-height: 16px;
+    font-family: var(--ff-mono);
+    font-size: 10px;
+    color: var(--ink-3);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 1rem;
+    border-bottom: 0.5px solid var(--border);
+    flex-wrap: wrap;
+  }
+
+  .search-wrap {
+    position: relative;
+    flex: 1;
+    min-width: 220px;
+    max-width: 360px;
+  }
+
+  .search-wrap svg {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 14px;
+    height: 14px;
+    stroke: var(--ink-3);
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+  }
+
+  .search-input {
+    width: 100%;
+    padding: 7px 10px 7px 32px;
+    font-family: var(--ff-mono);
+    font-size: 11px;
+    color: var(--ink);
+    background: var(--surface);
+    border: 0.5px solid var(--border-md);
+    border-radius: var(--radius-md);
+    outline: none;
+  }
+
+  .search-input::placeholder {
+    color: var(--ink-3);
+  }
+
+  .search-input:focus {
+    border-color: var(--accent);
+  }
+
+  .count-tag {
+    margin-left: auto;
+    font-family: var(--ff-mono);
+    font-size: 10px;
+    color: var(--ink-3);
+    padding: 5px 10px;
+    background: var(--surface-3);
+    border-radius: 6px;
+    border: 0.5px solid var(--border);
+  }
+
+  .table-scroll {
+    overflow-x: auto;
+  }
+
+  table.orders {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  table.orders thead {
+    background: var(--surface-2);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+
+  table.orders th {
+    text-align: left;
+    font-family: var(--ff-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-3);
+    font-weight: 400;
+    padding: 10px 16px;
+    border-bottom: 0.5px solid var(--border-md);
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.15s;
+  }
+
+  table.orders th:hover {
+    color: var(--ink-2);
+  }
+
+  table.orders th .sort-arrow {
+    display: inline-block;
+    margin-left: 4px;
+    opacity: 0.3;
+    font-size: 9px;
+  }
+
+  table.orders th.sorted .sort-arrow {
+    opacity: 1;
+    color: var(--accent);
+  }
+
+  table.orders td {
+    padding: 11px 16px;
+    border-bottom: 0.5px solid var(--border);
+    color: var(--ink);
+    vertical-align: middle;
+  }
+
+  table.orders tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  table.orders tbody tr:hover td {
+    background: var(--surface-2);
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 9px;
+    border-radius: 5px;
+    font-family: var(--ff-mono);
+    font-size: 10px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .badge-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .src-instagram {
+    background: var(--accent-soft);
+    color: #3c3489;
+  }
+
+  .src-instagram .badge-dot {
+    background: var(--accent);
+  }
+
+  .src-google {
+    background: var(--accent-blue-soft);
+    color: #0c447c;
+  }
+
+  .src-google .badge-dot {
+    background: var(--accent-blue);
+  }
+
+  .src-content {
+    background: var(--accent-green-soft);
+    color: #27500a;
+  }
+
+  .src-content .badge-dot {
+    background: var(--accent-green);
+  }
+
+  .src-direct {
+    background: #f1efe8;
+    color: #444441;
+  }
+
+  .src-direct .badge-dot {
+    background: #888780;
+  }
+
+  .src-meta {
+    background: #eef6ff;
+    color: #1c5290;
+  }
+
+  .src-meta .badge-dot {
+    background: #4d8cd7;
+  }
+
+  .src-default {
+    background: var(--surface-3);
+    color: var(--ink-2);
+  }
+
+  .src-default .badge-dot {
+    background: var(--ink-3);
+  }
+
+  .score-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-family: var(--ff-mono);
+    font-size: 10px;
+    background: var(--accent-red-soft);
+    color: #8c2b2a;
+    border: 0.5px solid rgba(255, 64, 61, 0.14);
+  }
+
+  .score-chip .badge-dot {
+    background: var(--accent-red);
+  }
+
+  .metric {
+    font-family: var(--ff-mono);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink);
+  }
+
+  .empty-state,
+  .no-results {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--ink-3);
+    font-family: var(--ff-mono);
+    font-size: 12px;
+  }
+
+  @media (max-width: 1024px) {
+    .charts-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 768px) {
     .campaign-page {
-        font-family: var(--ff-head);
-        color: var(--ink);
-        background: var(--surface-2);
-        min-height: 100vh;
-        padding: 2rem 2.5rem 4rem;
-    }
-
-    .page-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin-bottom: 1.75rem;
-        padding-bottom: 1.25rem;
-        border-bottom: 0.5px solid var(--border-md);
-        flex-wrap: wrap;
-        gap: 1rem;
-    }
-
-    .page-header h1 {
-        margin: 0;
-        font-size: 20px;
-        font-weight: 700;
-        letter-spacing: -0.02em;
-    }
-
-    .page-subtitle {
-        margin-top: 0.35rem;
-        font-family: var(--ff-mono);
-        font-size: 10px;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        color: var(--ink-3);
+      padding: 1.25rem 1rem 2rem;
     }
 
     .header-stats {
-        display: flex;
-        gap: 1.5rem;
-        align-items: center;
-        flex-wrap: wrap;
-    }
-
-    .stat {
-        text-align: right;
-    }
-
-    .stat-val {
-        font-size: 18px;
-        font-weight: 700;
-        letter-spacing: -0.02em;
-        color: var(--ink);
-        line-height: 1;
-    }
-
-    .stat-label {
-        font-family: var(--ff-mono);
-        font-size: 10px;
-        color: var(--ink-3);
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        margin-top: 3px;
-    }
-
-    .stat-divider {
-        width: 0.5px;
-        height: 32px;
-        background: var(--border-md);
-    }
-
-    .chart-card,
-    .table-card {
-        background: var(--surface);
-        border: 0.5px solid var(--border);
-        border-radius: var(--radius-lg);
-        overflow: hidden;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
-    }
-
-    .chart-card {
-        margin-bottom: 1rem;
-        padding: 1.25rem 1.25rem 1rem;
-    }
-
-    .chart-head {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 1rem;
-        margin-bottom: 1rem;
-        flex-wrap: wrap;
-    }
-
-    .chart-title {
-        font-size: 14px;
-        font-weight: 700;
-        letter-spacing: -0.02em;
-    }
-
-    .chart-legend {
-        display: flex;
-        gap: 0.75rem;
-        flex-wrap: wrap;
-    }
-
-    .legend-pill {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.45rem;
-        padding: 4px 10px;
-        border-radius: 999px;
-        font-family: var(--ff-mono);
-        font-size: 10px;
-        color: var(--ink-2);
-        background: var(--surface-2);
-        border: 0.5px solid var(--border);
-    }
-
-    .legend-dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        flex-shrink: 0;
-    }
-
-    .chart-wrap {
-        position: relative;
-        height: 420px;
-    }
-
-    .toolbar {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 1rem;
-        border-bottom: 0.5px solid var(--border);
-        flex-wrap: wrap;
-    }
-
-    .search-wrap {
-        position: relative;
-        flex: 1;
-        min-width: 220px;
-        max-width: 360px;
-    }
-
-    .search-wrap svg {
-        position: absolute;
-        left: 10px;
-        top: 50%;
-        transform: translateY(-50%);
-        width: 14px;
-        height: 14px;
-        stroke: var(--ink-3);
-        fill: none;
-        stroke-width: 2;
-        stroke-linecap: round;
-    }
-
-    .search-input,
-    .filter-select {
-        width: 100%;
-        padding: 7px 10px;
-        font-family: var(--ff-mono);
-        font-size: 11px;
-        color: var(--ink);
-        background: var(--surface);
-        border: 0.5px solid var(--border-md);
-        border-radius: var(--radius-md);
-        outline: none;
-    }
-
-    .search-input {
-        padding-left: 32px;
-    }
-
-    .search-input::placeholder {
-        color: var(--ink-3);
-    }
-
-    .search-input:focus,
-    .filter-select:focus {
-        border-color: var(--accent);
-    }
-
-    .filter-select {
-        width: auto;
-        min-width: 160px;
-        cursor: pointer;
+      width: 100%;
+      justify-content: space-between;
     }
 
     .count-tag {
-        margin-left: auto;
-        font-family: var(--ff-mono);
-        font-size: 10px;
-        color: var(--ink-3);
-        padding: 5px 10px;
-        background: var(--surface-3);
-        border-radius: 6px;
-        border: 0.5px solid var(--border);
+      margin-left: 0;
     }
 
-    .table-scroll {
-        overflow-x: auto;
+    .chart-wrap {
+      height: 300px;
     }
-
-    table.orders {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 13px;
-    }
-
-    table.orders thead {
-        background: var(--surface-2);
-        position: sticky;
-        top: 0;
-        z-index: 1;
-    }
-
-    table.orders th {
-        text-align: left;
-        font-family: var(--ff-mono);
-        font-size: 10px;
-        text-transform: uppercase;
-        letter-spacing: 0.06em;
-        color: var(--ink-3);
-        font-weight: 400;
-        padding: 10px 16px;
-        border-bottom: 0.5px solid var(--border-md);
-        white-space: nowrap;
-        cursor: pointer;
-        user-select: none;
-        transition: color 0.15s;
-    }
-
-    table.orders th:hover {
-        color: var(--ink-2);
-    }
-
-    table.orders th .sort-arrow {
-        display: inline-block;
-        margin-left: 4px;
-        opacity: 0.3;
-        font-size: 9px;
-    }
-
-    table.orders th.sorted .sort-arrow {
-        opacity: 1;
-        color: var(--accent);
-    }
-
-    table.orders td {
-        padding: 11px 16px;
-        border-bottom: 0.5px solid var(--border);
-        color: var(--ink);
-        vertical-align: middle;
-    }
-
-    table.orders tbody tr:last-child td {
-        border-bottom: none;
-    }
-
-    table.orders tbody tr {
-        transition: background 0.1s;
-    }
-
-    table.orders tbody tr:hover td {
-        background: var(--surface-2);
-    }
-
-    .badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        padding: 3px 9px;
-        border-radius: 5px;
-        font-family: var(--ff-mono);
-        font-size: 10px;
-        font-weight: 500;
-        white-space: nowrap;
-    }
-
-    .badge-dot {
-        width: 5px;
-        height: 5px;
-        border-radius: 50%;
-        flex-shrink: 0;
-    }
-
-    .src-instagram {
-        background: var(--accent-soft);
-        color: #3c3489;
-    }
-
-    .src-instagram .badge-dot {
-        background: var(--accent);
-    }
-
-    .src-google {
-        background: var(--accent-blue-soft);
-        color: #0c447c;
-    }
-
-    .src-google .badge-dot {
-        background: var(--accent-blue);
-    }
-
-    .src-content {
-        background: #eaf3de;
-        color: #27500a;
-    }
-
-    .src-content .badge-dot {
-        background: #639922;
-    }
-
-    .src-direct {
-        background: #f1efe8;
-        color: #444441;
-    }
-
-    .src-direct .badge-dot {
-        background: #888780;
-    }
-
-    .src-meta {
-        background: #eef6ff;
-        color: #1c5290;
-    }
-
-    .src-meta .badge-dot {
-        background: #4d8cd7;
-    }
-
-    .src-default {
-        background: var(--surface-3);
-        color: var(--ink-2);
-    }
-
-    .src-default .badge-dot {
-        background: var(--ink-3);
-    }
-
-    .metric {
-        font-family: var(--ff-mono);
-        font-size: 13px;
-        font-weight: 500;
-        color: var(--ink);
-    }
-
-    .metric-soft {
-        color: var(--ink-3);
-        font-size: 11px;
-    }
-
-    .score-chip {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.45rem;
-        padding: 3px 9px;
-        border-radius: 999px;
-        font-family: var(--ff-mono);
-        font-size: 10px;
-        background: var(--accent-red-soft);
-        color: #8c2b2a;
-        border: 0.5px solid rgba(255, 64, 61, 0.14);
-    }
-
-    .score-chip .badge-dot {
-        background: var(--accent-red);
-    }
-
-    .empty-state,
-    .no-results {
-        text-align: center;
-        padding: 4rem 2rem;
-        color: var(--ink-3);
-        font-family: var(--ff-mono);
-        font-size: 12px;
-    }
-
-    @media (max-width: 768px) {
-        .campaign-page {
-            padding: 1.25rem 1rem 2rem;
-        }
-
-        .header-stats {
-            width: 100%;
-            justify-content: space-between;
-        }
-
-        .count-tag {
-            margin-left: 0;
-        }
-
-        .chart-wrap {
-            height: 320px;
-        }
-    }
+  }
 </style>
 
-<div>
-    <div class="page-header">
+<div class="">
+  <div class="page-header">
+    <div>
+      <h1>Campaign Performance</h1>
+      <div class="page-subtitle">Source overview with campaign drilldown</div>
+    </div>
+    <div class="header-stats">
+      <div class="stat">
+        <div class="stat-val">{{ source_list|length }}</div>
+        <div class="stat-label">Sources</div>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat">
+        <div class="stat-val" id="totalPurchasesStat">0</div>
+        <div class="stat-label">Total purchases</div>
+      </div>
+      <div class="stat-divider"></div>
+      <div class="stat">
+        <div class="stat-val" id="totalEventsStat">0</div>
+        <div class="stat-label">Total events</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-head">
         <div>
-            <h1>Campaign Performance</h1>
-            <div class="page-subtitle">Purchases and event volume by source and campaign</div>
+          <div class="chart-title">Source Performance</div>
+          <div class="chart-copy">Purchases and total events by source</div>
         </div>
-        <div class="header-stats">
-            <div class="stat">
-                <div class="stat-val" id="campaignCount">{{ campaigns|length }}</div>
-                <div class="stat-label">Campaigns</div>
-            </div>
-            <div class="stat-divider"></div>
-            <div class="stat">
-                <div class="stat-val" id="totalPurchasesStat">0</div>
-                <div class="stat-label">Total purchases</div>
-            </div>
-            <div class="stat-divider"></div>
-            <div class="stat">
-                <div class="stat-val" id="totalEventsStat">0</div>
-                <div class="stat-label">Total events</div>
-            </div>
+        <div class="chart-legend">
+          <span class="legend-pill"><span class="legend-dot" style="background:#378add;"></span>Purchases</span>
+          <span class="legend-pill"><span class="legend-dot" style="background:#ff403d;"></span>Total Events</span>
         </div>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="sourceChart"></canvas>
+      </div>
     </div>
 
     <div class="chart-card">
-        <div class="chart-head">
-            <div class="chart-title">Campaign Trend View</div>
-            <div class="chart-legend">
-                <span class="legend-pill"><span class="legend-dot" style="background:#378add;"></span>Purchases</span>
-                <span class="legend-pill"><span class="legend-dot" style="background:#ff403d;"></span>Total
-                    Events</span>
-            </div>
+      <div class="chart-head">
+        <div>
+          <div class="chart-title">Campaign Mix</div>
+          <div class="chart-copy" id="campaignChartLabel">{{ selected_source_label }} campaign purchases</div>
         </div>
-        <div class="chart-wrap">
-            <canvas id="campaignChart"></canvas>
-        </div>
+      </div>
+
+      <div class="source-tabs" id="sourceTabs">
+        {% for source in source_list %}
+        <button
+          type="button"
+          class="source-tab{% if source.value == selected_source %} active{% endif %}"
+          data-source="{{ source.value }}">
+          {{ source.label }}
+        </button>
+        {% endfor %}
+      </div>
+
+      <div class="chart-wrap">
+        <canvas id="campaignPieChart"></canvas>
+      </div>
+      <div class="chart-status" id="chartStatus"></div>
+    </div>
+  </div>
+
+  <div class="table-card">
+    <div class="toolbar">
+      <div class="search-wrap">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input class="search-input" id="searchInput" type="text" placeholder="Search campaign...">
+      </div>
+
+      <span class="count-tag" id="countTag">{{ campaigns|length }} campaigns</span>
     </div>
 
-    <div class="data-wrap">
-        <div class="toolbar">
-            <div class="search-wrap">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                </svg>
-                <input class="search-input" id="searchInput" type="text" placeholder="Search source or campaign...">
-            </div>
-
-            <select class="filter-select" id="sourceFilter">
-                <option value="">All sources</option>
-                {% for c in campaigns %}
-                {% if c.UTM_Source %}
-                <option value="{{ c.UTM_Source|lower }}">{{ c.UTM_Source }}</option>
-                {% endif %}
-                {% endfor %}
-            </select>
-
-            <span class="count-tag" id="countTag">{{ campaigns|length }} campaigns</span>
-        </div>
-
-        <div class="data-viewport">
-            <div class="data-scroller" role="region" aria-label="cart dataset" tabindex="0">
-                <table class="orders" id="campaignsTable" role="table" aria-label="Campaign analytics dataset">
-                    <thead>
-                        <tr>
-                            <th data-col="0">Source <span class="sort-arrow">↕</span></th>
-                            <th data-col="1">Campaign <span class="sort-arrow">↕</span></th>
-                            <th data-col="2">Total Score <span class="sort-arrow">↕</span></th>
-                            <th data-col="3" class="sorted">Purchases <span class="sort-arrow">↓</span></th>
-                            <th data-col="4">Total Events <span class="sort-arrow">↕</span></th>
-                        </tr>
-                    </thead>
-                    <tbody id="tableBody">
-                        {% for c in campaigns %}
-                        <tr data-source="{{ c.UTM_Source|default:''|lower }}"
-                            data-campaign="{{ c.UTM_Campaign|default:''|lower }}"
-                            data-score="{{ c.Total_Score|default:0 }}" data-purchases="{{ c.Purchases|default:0 }}"
-                            data-events="{{ c.Total_Events|default:0 }}">
-                            <td>
-                                {% with src=c.UTM_Source|default:''|lower %}
-                                <span class="badge
-                        {% if src == 'instagram' %}src-instagram
-                        {% elif src == 'google' %}src-google
-                        {% elif src == 'content creators' or src == 'content' %}src-content
-                        {% elif src == 'direct' %}src-direct
-                        {% elif src == 'meta' or src == 'facebook' %}src-meta
-                        {% else %}src-default{% endif %}">
-                                    <span class="badge-dot"></span>
-                                    {{ c.UTM_Source|default:"Unknown" }}
-                                </span>
-                                {% endwith %}
-                            </td>
-                            <td>{{ c.UTM_Campaign|default:"—" }}</td>
-                            <td><span class="score-chip"><span class="badge-dot"></span>{{ c.Total_Score|floatformat:2}}</span></td>
-                            <td><span class="metric">{{ c.Purchases }}</span></td>
-                            <td><span class="metric">{{ c.Total_Events }}</span></td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="5" class="empty-state">No campaign data found.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+    <div class="table-scroll">
+      <table class="orders" id="campaignsTable" role="table" aria-label="Campaign analytics dataset">
+        <thead>
+          <tr>
+            <th data-col="0">Source <span class="sort-arrow">↕</span></th>
+            <th data-col="1">Campaign <span class="sort-arrow">↕</span></th>
+            <th data-col="2">Total Score <span class="sort-arrow">↕</span></th>
+            <th data-col="3" class="sorted">Purchases <span class="sort-arrow">↓</span></th>
+            <th data-col="4">Total Events <span class="sort-arrow">↕</span></th>
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          {% for c in campaigns %}
+          <tr
+            data-source="{{ c.UTM_Source|default:''|lower }}"
+            data-campaign="{{ c.Campaign_Display|default:''|lower }}"
+            data-score="{{ c.Total_Score|default:0 }}"
+            data-purchases="{{ c.Purchases|default:0 }}"
+            data-events="{{ c.Total_Events|default:0 }}">
+            <td>
+              {% with src=c.UTM_Source|default:''|lower %}
+              <span class="badge
+                {% if src == 'instagram' %}src-instagram
+                {% elif src == 'google' %}src-google
+                {% elif src == 'content creators' or src == 'content' %}src-content
+                {% elif src == 'direct' %}src-direct
+                {% elif src == 'meta' or src == 'facebook' %}src-meta
+                {% else %}src-default{% endif %}">
+                <span class="badge-dot"></span>
+                {{ c.Source_Display|default:"Unknown" }}
+              </span>
+              {% endwith %}
+            </td>
+            <td>{{ c.Campaign_Display|default:"—" }}</td>
+            <td><span class="score-chip"><span class="badge-dot"></span>{{ c.Total_Score|floatformat:2 }}</span></td>
+            <td><span class="metric">{{ c.Purchases }}</span></td>
+            <td><span class="metric">{{ c.Total_Events }}</span></td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="empty-state">No campaign data found.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
+  </div>
 </div>
 
+{{ source_labels|json_script:"source-labels-data" }}
+{{ source_purchases|json_script:"source-purchases-data" }}
+{{ source_events|json_script:"source-events-data" }}
+{{ campaigns|json_script:"initial-campaigns-data" }}
+{{ selected_source|json_script:"selected-source-data" }}
+{{ selected_source_label|json_script:"selected-source-label-data" }}
+
 <script>
-    (function () {
-        const labels = {{ chart_labels|safe }};
-    const purchases = {{ chart_purchases|safe }};
-    const events = {{ chart_events|safe }};
+  (function () {
+    const sourceLabels = JSON.parse(document.getElementById('source-labels-data').textContent);
+    const sourcePurchases = JSON.parse(document.getElementById('source-purchases-data').textContent);
+    const sourceEvents = JSON.parse(document.getElementById('source-events-data').textContent);
+    let currentCampaignRows = JSON.parse(document.getElementById('initial-campaigns-data').textContent);
+    let activeSource = JSON.parse(document.getElementById('selected-source-data').textContent);
+    let activeSourceLabel = JSON.parse(document.getElementById('selected-source-label-data').textContent);
 
-    const totalPurchases = purchases.reduce((sum, value) => sum + (Number(value) || 0), 0);
-    const totalEvents = events.reduce((sum, value) => sum + (Number(value) || 0), 0);
-    const maxValue = Math.max(0, ...purchases.map(Number), ...events.map(Number));
-
-    const purchaseStat = document.getElementById('totalPurchasesStat');
-    const eventStat = document.getElementById('totalEventsStat');
-    if (purchaseStat) purchaseStat.textContent = totalPurchases.toLocaleString();
-    if (eventStat) eventStat.textContent = totalEvents.toLocaleString();
-
-    const chartCanvas = document.getElementById('campaignChart');
-    if (chartCanvas) {
-        const ctx = chartCanvas.getContext('2d');
-
-        new Chart(ctx, {
-            data: {
-                labels: labels,
-                datasets: [
-                    {
-                        type: 'bar',
-                        label: 'Purchases',
-                        data: purchases,
-                        yAxisID: 'y',
-                        backgroundColor: 'rgba(55, 138, 221, 0.75)',
-                        borderColor: 'rgba(55, 138, 221, 1)',
-                        borderWidth: 1,
-                        borderRadius: 6
-                    },
-                    {
-                        type: 'line',
-                        label: 'Total Events',
-                        data: events,
-                        yAxisID: 'y1',
-                        borderColor: 'rgb(255, 64, 61)',
-                        backgroundColor: 'rgba(255, 64, 61, 0.18)',
-                        tension: 0.35,
-                        pointRadius: 3,
-                        pointHoverRadius: 5,
-                        fill: false
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                interaction: {
-                    mode: 'index',
-                    intersect: false
-                },
-                plugins: {
-                    legend: {
-                        display: false
-                    }
-                },
-                scales: {
-                    x: {
-                        grid: {
-                            display: false
-                        },
-                        ticks: {
-                            color: '#8a8a8a',
-                            font: {
-                                family: "'DM Mono', monospace",
-                                size: 10
-                            }
-                        }
-                    },
-                    y: {
-                        beginAtZero: true,
-                        min: 0,
-                        max: maxValue + 5 || 1,
-                        position: 'left',
-                        grid: {
-                            color: 'rgba(0, 0, 0, 0.06)'
-                        },
-                        ticks: {
-                            color: '#8a8a8a',
-                            font: {
-                                family: "'DM Mono', monospace",
-                                size: 10
-                            }
-                        },
-                        title: {
-                            display: true,
-                            text: 'Purchases',
-                            color: '#4a4a4a',
-                            font: {
-                                family: "'DM Mono', monospace",
-                                size: 10
-                            }
-                        }
-                    },
-                    y1: {
-                        beginAtZero: true,
-                        min: 0,
-                        max: maxValue + 5 || 1,
-                        position: 'right',
-                        grid: {
-                            drawOnChartArea: false
-                        },
-                        ticks: {
-                            color: '#8a8a8a',
-                            font: {
-                                family: "'DM Mono', monospace",
-                                size: 10
-                            }
-                        },
-                        title: {
-                            display: true,
-                            text: 'Events',
-                            color: '#4a4a4a',
-                            font: {
-                                family: "'DM Mono', monospace",
-                                size: 10
-                            }
-                        }
-                    }
-                }
-            }
-        });
-    }
-
+    const totalPurchasesStat = document.getElementById('totalPurchasesStat');
+    const totalEventsStat = document.getElementById('totalEventsStat');
     const searchInput = document.getElementById('searchInput');
-    const sourceFilter = document.getElementById('sourceFilter');
     const countTag = document.getElementById('countTag');
     const tbody = document.getElementById('tableBody');
     const headers = document.querySelectorAll('table.orders th[data-col]');
+    const chartStatus = document.getElementById('chartStatus');
+    const campaignChartLabel = document.getElementById('campaignChartLabel');
+    const sourceTabs = document.getElementById('sourceTabs');
 
-    const seen = new Set();
-    Array.from(sourceFilter.options).forEach(option => {
-        if (option.value === '') {
-            seen.add('');
-            return;
-        }
+    const piePalette = [
+      '#534ab7', '#378add', '#ff403d', '#639922', '#ba7517',
+      '#008a8a', '#bf5f82', '#78674d', '#1c5290', '#a35d2d'
+    ];
 
-        if (seen.has(option.value)) {
-            option.remove();
-        } else {
-            seen.add(option.value);
+    function badgeClassForSource(source) {
+      const value = (source || '').toLowerCase();
+      if (value === 'instagram') return 'src-instagram';
+      if (value === 'google') return 'src-google';
+      if (value === 'content creators' || value === 'content') return 'src-content';
+      if (value === 'direct') return 'src-direct';
+      if (value === 'meta' || value === 'facebook') return 'src-meta';
+      return 'src-default';
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function updateHeaderStats() {
+      const totalPurchases = sourcePurchases.reduce((sum, value) => sum + (Number(value) || 0), 0);
+      const totalEvents = sourceEvents.reduce((sum, value) => sum + (Number(value) || 0), 0);
+      totalPurchasesStat.textContent = totalPurchases.toLocaleString();
+      totalEventsStat.textContent = totalEvents.toLocaleString();
+    }
+
+    const sourceChart = new Chart(document.getElementById('sourceChart').getContext('2d'), {
+      data: {
+        labels: sourceLabels,
+        datasets: [
+          {
+            type: 'bar',
+            label: 'Purchases',
+            data: sourcePurchases,
+            yAxisID: 'y',
+            backgroundColor: 'rgba(55, 138, 221, 0.75)',
+            borderColor: 'rgba(55, 138, 221, 1)',
+            borderWidth: 1,
+            borderRadius: 6
+          },
+          {
+            type: 'line',
+            label: 'Total Events',
+            data: sourceEvents,
+            yAxisID: 'y1',
+            borderColor: 'rgb(255, 64, 61)',
+            backgroundColor: 'rgba(255, 64, 61, 0.18)',
+            tension: 0.35,
+            pointRadius: 3,
+            pointHoverRadius: 5,
+            fill: false
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+          mode: 'index',
+          intersect: false
+        },
+        plugins: {
+          legend: {
+            display: false
+          }
+        },
+        scales: {
+          x: {
+            grid: {
+              display: false
+            },
+            ticks: {
+              color: '#8a8a8a',
+              font: {
+                family: "'DM Mono', monospace",
+                size: 10
+              }
+            }
+          },
+          y: {
+            beginAtZero: true,
+            position: 'left',
+            grid: {
+              color: 'rgba(0, 0, 0, 0.06)'
+            },
+            ticks: {
+              color: '#8a8a8a',
+              font: {
+                family: "'DM Mono', monospace",
+                size: 10
+              }
+            },
+            title: {
+              display: true,
+              text: 'Purchases',
+              color: '#4a4a4a',
+              font: {
+                family: "'DM Mono', monospace",
+                size: 10
+              }
+            }
+          },
+          y1: {
+            beginAtZero: true,
+            position: 'right',
+            grid: {
+              drawOnChartArea: false
+            },
+            ticks: {
+              color: '#8a8a8a',
+              font: {
+                family: "'DM Mono', monospace",
+                size: 10
+              }
+            },
+            title: {
+              display: true,
+              text: 'Events',
+              color: '#4a4a4a',
+              font: {
+                family: "'DM Mono', monospace",
+                size: 10
+              }
+            }
+          }
         }
+      }
     });
 
-    function applyFilter() {
-        const q = searchInput.value.toLowerCase().trim();
-        const src = sourceFilter.value.toLowerCase();
-        let visible = 0;
-
-        Array.from(tbody.querySelectorAll('tr[data-source]')).forEach(row => {
-            const matchSearch = !q ||
-                row.dataset.source.includes(q) ||
-                row.dataset.campaign.includes(q);
-
-            const matchSource = !src || row.dataset.source === src;
-            const show = matchSearch && matchSource;
-
-            row.style.display = show ? '' : 'none';
-            if (show) visible++;
-        });
-
-        let noRow = tbody.querySelector('.no-results-row');
-        if (visible === 0 && tbody.querySelectorAll('tr[data-source]').length > 0) {
-            if (!noRow) {
-                noRow = document.createElement('tr');
-                noRow.className = 'no-results-row';
-                noRow.innerHTML = '<td colspan="5" class="no-results">No campaigns match your filter.</td>';
-                tbody.appendChild(noRow);
+    const campaignPieChart = new Chart(document.getElementById('campaignPieChart').getContext('2d'), {
+      type: 'pie',
+      data: {
+        labels: currentCampaignRows.map(row => row.Campaign_Display),
+        datasets: [{
+          data: currentCampaignRows.map(row => Number(row.Purchases) || 0),
+          backgroundColor: currentCampaignRows.map((_, index) => piePalette[index % piePalette.length]),
+          borderColor: '#ffffff',
+          borderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: {
+              boxWidth: 10,
+              color: '#4a4a4a',
+              font: {
+                family: "'DM Mono', monospace",
+                size: 10
+              }
             }
-        } else if (noRow) {
-            noRow.remove();
+          }
         }
-
-        countTag.textContent = visible + ' campaign' + (visible === 1 ? '' : 's');
-    }
+      }
+    });
 
     let sortCol = null;
     let sortAsc = false;
 
-    function sortTable(col) {
-        if (sortCol === col) {
-            sortAsc = !sortAsc;
-        } else {
-            sortCol = col;
-            sortAsc = col < 2;
-        }
+    function renderTable(rows) {
+      if (!rows.length) {
+        countTag.textContent = '0 campaigns';
+        tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No campaigns found for this source.</td></tr>';
+        return;
+      }
 
-        headers.forEach(th => {
-            const arrow = th.querySelector('.sort-arrow');
-            if (parseInt(th.dataset.col, 10) === sortCol) {
-                th.classList.add('sorted');
-                arrow.textContent = sortAsc ? '↑' : '↓';
-            } else {
-                th.classList.remove('sorted');
-                arrow.textContent = '↕';
-            }
-        });
-
-        const rows = Array.from(tbody.querySelectorAll('tr[data-source]'));
-        const keyMap = ['source', 'campaign', 'score', 'purchases', 'events'];
-        const key = keyMap[col];
-
-        rows.sort((a, b) => {
-            let va = a.dataset[key] || '';
-            let vb = b.dataset[key] || '';
-
-            if (key === 'score' || key === 'purchases' || key === 'events') {
-                va = parseFloat(va) || 0;
-                vb = parseFloat(vb) || 0;
-                return sortAsc ? va - vb : vb - va;
-            }
-
-            return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
-        });
-
-        rows.forEach(row => tbody.appendChild(row));
-        applyFilter();
+      tbody.innerHTML = rows.map(row => `
+        <tr
+          data-source="${escapeHtml((row.UTM_Source || '').toLowerCase())}"
+          data-campaign="${escapeHtml((row.Campaign_Display || '').toLowerCase())}"
+          data-score="${escapeHtml(row.Total_Score)}"
+          data-purchases="${escapeHtml(row.Purchases)}"
+          data-events="${escapeHtml(row.Total_Events)}">
+          <td>
+            <span class="badge ${badgeClassForSource(row.UTM_Source)}">
+              <span class="badge-dot"></span>
+              ${escapeHtml(row.Source_Display || 'Unknown')}
+            </span>
+          </td>
+          <td>${escapeHtml(row.Campaign_Display || '—')}</td>
+          <td><span class="score-chip"><span class="badge-dot"></span>${Number(row.Total_Score || 0).toFixed(2)}</span></td>
+          <td><span class="metric">${escapeHtml(row.Purchases)}</span></td>
+          <td><span class="metric">${escapeHtml(row.Total_Events)}</span></td>
+        </tr>
+      `).join('');
     }
 
+    function applyFilter() {
+      const q = searchInput.value.toLowerCase().trim();
+      let visible = 0;
+
+      Array.from(tbody.querySelectorAll('tr[data-source]')).forEach(row => {
+        const matchSearch = !q || row.dataset.campaign.includes(q) || row.dataset.source.includes(q);
+        row.style.display = matchSearch ? '' : 'none';
+        if (matchSearch) visible++;
+      });
+
+      let noRow = tbody.querySelector('.no-results-row');
+      if (visible === 0 && tbody.querySelectorAll('tr[data-source]').length > 0) {
+        if (!noRow) {
+          noRow = document.createElement('tr');
+          noRow.className = 'no-results-row';
+          noRow.innerHTML = '<td colspan="5" class="no-results">No campaigns match your search.</td>';
+          tbody.appendChild(noRow);
+        }
+      } else if (noRow) {
+        noRow.remove();
+      }
+
+      countTag.textContent = visible + ' campaign' + (visible === 1 ? '' : 's');
+    }
+
+    function sortTable(col) {
+      const rows = Array.from(tbody.querySelectorAll('tr[data-source]'));
+      if (!rows.length) return;
+
+      if (sortCol === col) {
+        sortAsc = !sortAsc;
+      } else {
+        sortCol = col;
+        sortAsc = col < 2;
+      }
+
+      headers.forEach(th => {
+        const arrow = th.querySelector('.sort-arrow');
+        if (parseInt(th.dataset.col, 10) === sortCol) {
+          th.classList.add('sorted');
+          arrow.textContent = sortAsc ? '↑' : '↓';
+        } else {
+          th.classList.remove('sorted');
+          arrow.textContent = '↕';
+        }
+      });
+
+      const keyMap = ['source', 'campaign', 'score', 'purchases', 'events'];
+      const key = keyMap[col];
+
+      rows.sort((a, b) => {
+        let va = a.dataset[key] || '';
+        let vb = b.dataset[key] || '';
+
+        if (key === 'score' || key === 'purchases' || key === 'events') {
+          va = parseFloat(va) || 0;
+          vb = parseFloat(vb) || 0;
+          return sortAsc ? va - vb : vb - va;
+        }
+
+        return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+      });
+
+      rows.forEach(row => tbody.appendChild(row));
+      applyFilter();
+    }
+
+    function updatePieChart(rows, sourceLabel) {
+      const labels = rows.map(row => row.Campaign_Display);
+      const purchases = rows.map(row => Number(row.Purchases) || 0);
+
+      campaignPieChart.data.labels = labels.length ? labels : ['No campaigns'];
+      campaignPieChart.data.datasets[0].data = purchases.length ? purchases : [1];
+      campaignPieChart.data.datasets[0].backgroundColor = (labels.length ? labels : ['fallback'])
+        .map((_, index) => piePalette[index % piePalette.length]);
+      campaignPieChart.update();
+
+      campaignChartLabel.textContent = `${sourceLabel} campaign purchases`;
+    }
+
+    function setActiveTab(source) {
+      Array.from(sourceTabs.querySelectorAll('.source-tab')).forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.source === source);
+      });
+    }
+
+    async function loadSource(source) {
+      if (!source) return;
+
+      chartStatus.textContent = 'Loading source campaigns...';
+
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.set('format', 'json');
+        url.searchParams.set('source', source);
+
+        const response = await fetch(url.toString(), {
+          headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+
+        if (!response.ok) {
+          throw new Error(`Request failed with ${response.status}`);
+        }
+
+        const payload = await response.json();
+        currentCampaignRows = payload.campaigns || [];
+        activeSource = payload.source || source;
+        activeSourceLabel = payload.source_label || source;
+
+        setActiveTab(activeSource);
+        updatePieChart(currentCampaignRows, activeSourceLabel);
+        renderTable(currentCampaignRows);
+        searchInput.value = '';
+        sortCol = null;
+        sortAsc = false;
+        sortTable(3);
+        chartStatus.textContent = `${payload.campaign_count || 0} campaigns loaded for ${activeSourceLabel}.`;
+
+        const nextUrl = new URL(window.location.href);
+        nextUrl.searchParams.set('source', activeSource);
+        window.history.replaceState({}, '', nextUrl.toString());
+      } catch (error) {
+        chartStatus.textContent = 'Could not load campaigns for this source.';
+      }
+    }
+
+    updateHeaderStats();
+    updatePieChart(currentCampaignRows, activeSourceLabel);
+    renderTable(currentCampaignRows);
+    sortTable(3);
+
     searchInput.addEventListener('input', applyFilter);
-    sourceFilter.addEventListener('change', applyFilter);
     headers.forEach(th => {
-        th.addEventListener('click', () => sortTable(parseInt(th.dataset.col, 10)));
+      th.addEventListener('click', () => sortTable(parseInt(th.dataset.col, 10)));
     });
 
-    applyFilter();
-    sortTable(3);
-  }) ();
+    Array.from(sourceTabs.querySelectorAll('.source-tab')).forEach(tab => {
+      tab.addEventListener('click', () => {
+        if (tab.dataset.source !== activeSource) {
+          loadSource(tab.dataset.source);
+        }
+      });
+    });
+  })();
 </script>
 
 {% endblock %}
