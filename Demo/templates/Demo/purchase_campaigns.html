@@ -760,8 +760,8 @@
         const rows = tbody.querySelectorAll('tr[data-source]');
 
         rows.forEach(row => {
-            const rowSource = row.getAttribute('data-source') || '';
-            const rowCampaign = row.getAttribute('data-campaign') || '';
+            const rowSource = (row.getAttribute('data-source') || '').toLowerCase();
+            const rowCampaign = (row.getAttribute('data-campaign') || '').toLowerCase();
 
             // 1. Check Search Input
             const matchSearch = q === '' || 
@@ -853,7 +853,6 @@
         applyFilter();
     }
 
-    searchInput.addEventListener('input', applyFilter);
     headers.forEach(th => {
         th.addEventListener('click', () => sortTable(parseInt(th.dataset.col, 10)));
     });
