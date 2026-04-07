@@ -7656,7 +7656,7 @@ def update_tracked_customers(new_event, history_rows, customer_dict):
     row_dict["Customer_LTV"] = customer_ltv
     row_dict["Is_Anonymous"] = is_anonymous
 
-    row_dict["Which_Update"] = "020426 campaign logging + hook"
+    row_dict["Which_Update"] = "070426 customer info update"
 
     df_to_upload = pd.DataFrame([row_dict])
 
