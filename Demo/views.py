@@ -7793,9 +7793,9 @@ def view_purchase_campaigns(request):
     context = {
         "campaigns": all_campaign_rows,
         "selected_campaigns": campaign_rows,
-        "source_labels": source_summary["Source_Display"].tolist(),
-        "source_purchases": [int(v) for v in source_summary["Purchases"].tolist()],
-        "source_events": [int(v) for v in source_summary["Total_Events"].tolist()],
+        "chart_labels": source_summary["Source_Display"].tolist(),
+        "chart_purchases": [int(v) for v in source_summary["Purchases"].tolist()],
+        "chart_events": [int(v) for v in source_summary["Total_Events"].tolist()],
         "source_list": [
             {"value": row["UTM_Source"], "label": row["Source_Display"]}
             for _, row in source_summary.iterrows()
