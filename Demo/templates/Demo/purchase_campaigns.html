@@ -128,6 +128,86 @@
         flex-wrap: wrap;
     }
 
+    .chart-metrics {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(280px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .progress-card {
+        padding: 1rem 1rem 0.9rem;
+        border: 0.5px solid var(--border);
+        border-radius: 14px;
+        background:
+            linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(246, 245, 242, 0.88));
+    }
+
+    .progress-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 0.7rem;
+    }
+
+    .progress-title {
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+    }
+
+    .progress-value {
+        font-family: var(--ff-mono);
+        font-size: 10px;
+        color: var(--ink-3);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        white-space: nowrap;
+    }
+
+    .progress-track {
+        display: flex;
+        height: 14px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: #edf1f4;
+        border: 0.5px solid rgba(15, 23, 42, 0.08);
+    }
+
+    .progress-segment {
+        height: 100%;
+        min-width: 0;
+        transition: width 0.2s ease;
+    }
+
+    .progress-segment + .progress-segment {
+        box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.8);
+    }
+
+    .progress-meta {
+        display: flex;
+        gap: 0.5rem 1rem;
+        flex-wrap: wrap;
+        margin-top: 0.7rem;
+    }
+
+    .progress-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        font-family: var(--ff-mono);
+        font-size: 10px;
+        color: var(--ink-2);
+    }
+
+    .progress-chip-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+
     .chart-title {
         font-size: 14px;
         font-weight: 700;
@@ -167,11 +247,26 @@
 
     .toolbar {
         display: flex;
-        align-items: center;
-        gap: 10px;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 14px;
         padding: 1rem;
         border-bottom: 0.5px solid var(--border);
         flex-wrap: wrap;
+    }
+
+    .toolbar-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.55rem;
+    }
+
+    .toolbar-label {
+        font-family: var(--ff-mono);
+        font-size: 10px;
+        color: var(--ink-3);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
     }
 
     .search-wrap {
@@ -179,6 +274,7 @@
         flex: 1;
         min-width: 220px;
         max-width: 360px;
+        width: min(360px, 100%);
     }
 
     .search-wrap svg {
@@ -461,6 +557,10 @@
             margin-left: 0;
         }
 
+        .chart-metrics {
+            grid-template-columns: 1fr;
+        }
+
         .chart-wrap {
             height: 320px;
         }
@@ -492,6 +592,26 @@
     </div>
 
     <div class="chart-card">
+        <div class="chart-metrics">
+            <div class="progress-card">
+                <div class="progress-head">
+                    <div class="progress-title">Source Purchase Share</div>
+                    <div class="progress-value" id="sourcePurchaseShareValue">0 total purchases</div>
+                </div>
+                <div class="progress-track" id="sourcePurchaseShareBar"></div>
+                <div class="progress-meta" id="sourcePurchaseShareMeta"></div>
+            </div>
+
+            <div class="progress-card">
+                <div class="progress-head">
+                    <div class="progress-title">Missing Campaign Share</div>
+                    <div class="progress-value" id="missingCampaignShareValue">0% excluding direct</div>
+                </div>
+                <div class="progress-track" id="missingCampaignShareBar"></div>
+                <div class="progress-meta" id="missingCampaignShareMeta"></div>
+            </div>
+        </div>
+
         <div class="chart-head">
             <div class="chart-title">Campaign Trend View</div>
             <div class="chart-legend">
@@ -507,16 +627,19 @@
 
     <div class="data-wrap">
         <div class="toolbar">
-            <div class="search-wrap">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                </svg>
-                <input class="search-input" id="searchInput" type="text" placeholder="Search source or campaign...">
+            <div class="toolbar-group">
+                <span class="toolbar-label">Search Campaigns</span>
+                <div class="search-wrap">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    <input class="search-input" id="searchInput" type="text" placeholder="Search source or campaign...">
+                </div>
             </div>
 
-            <div class="filter-section">
-                <span class="stat-label" style="margin-top: 0;">Filter Sources:</span>
+            <div class="toolbar-group">
+                <span class="toolbar-label">Filter Sources</span>
                 <div id="sourceCheckboxGroup" class="checkbox-group">
                     {% for source in source_list %}
                         {% if source %}
@@ -613,11 +736,108 @@ document.addEventListener('DOMContentLoaded', function () {
         const totalPurchases = purchases.reduce((sum, value) => sum + (Number(value) || 0), 0);
         const totalEvents = events.reduce((sum, value) => sum + (Number(value) || 0), 0);
         const maxValue = Math.max(0, ...events.map(Number));
+        const progressPalette = ['#0f766e', '#2563eb', '#f59e0b', '#ec4899', '#7c3aed', '#ef4444', '#64748b'];
 
         const purchaseStat = document.getElementById('totalPurchasesStat');
         const eventStat = document.getElementById('totalEventsStat');
         if (purchaseStat) purchaseStat.textContent = totalPurchases.toLocaleString();
         if (eventStat) eventStat.textContent = totalEvents.toLocaleString();
+
+        function normalizeText(value) {
+            return String(value || '').trim().toLowerCase();
+        }
+
+        function isMissingCampaignValue(value) {
+            const normalizedValue = normalizeText(value);
+            return normalizedValue === '' || normalizedValue === '—' || normalizedValue === '-' || normalizedValue === 'unknown' || normalizedValue === 'none';
+        }
+
+        function buildSegment(color, width, label) {
+            const segment = document.createElement('div');
+            segment.className = 'progress-segment';
+            segment.style.width = `${width}%`;
+            segment.style.background = color;
+            segment.title = label;
+            return segment;
+        }
+
+        function buildMetaChip(color, label) {
+            const chip = document.createElement('div');
+            chip.className = 'progress-chip';
+            chip.innerHTML = `<span class="progress-chip-dot" style="background:${color};"></span>${label}`;
+            return chip;
+        }
+
+        function renderSourcePurchaseShare() {
+            const bar = document.getElementById('sourcePurchaseShareBar');
+            const meta = document.getElementById('sourcePurchaseShareMeta');
+            const value = document.getElementById('sourcePurchaseShareValue');
+
+            if (!bar || !meta || !value) {
+                return;
+            }
+
+            const sourceTotals = labels.map((label, index) => ({
+                source: label || 'Unknown',
+                purchases: Number(purchases[index]) || 0
+            })).filter(item => item.purchases > 0);
+
+            bar.innerHTML = '';
+            meta.innerHTML = '';
+            value.textContent = `${totalPurchases.toLocaleString()} total purchases`;
+
+            if (!sourceTotals.length || totalPurchases <= 0) {
+                meta.appendChild(buildMetaChip('#cbd5e1', 'No purchase data'));
+                bar.appendChild(buildSegment('#e2e8f0', 100, 'No purchase data'));
+                return;
+            }
+
+            sourceTotals.forEach((item, index) => {
+                const color = progressPalette[index % progressPalette.length];
+                const percentage = (item.purchases / totalPurchases) * 100;
+                const label = `${item.source}: ${percentage.toFixed(1)}%`;
+                bar.appendChild(buildSegment(color, percentage, label));
+                meta.appendChild(buildMetaChip(color, `${item.source} ${percentage.toFixed(1)}%`));
+            });
+        }
+
+        function renderMissingCampaignShare() {
+            const bar = document.getElementById('missingCampaignShareBar');
+            const meta = document.getElementById('missingCampaignShareMeta');
+            const value = document.getElementById('missingCampaignShareValue');
+            const rows = Array.from(document.querySelectorAll('#tableBody tr[data-source]'));
+
+            if (!bar || !meta || !value) {
+                return;
+            }
+
+            const nonDirectRows = rows.filter(row => normalizeText(row.dataset.source) !== 'direct');
+            const nonDirectPurchases = nonDirectRows.reduce((sum, row) => sum + (parseFloat(row.dataset.purchases) || 0), 0);
+            const missingCampaignPurchases = nonDirectRows
+                .filter(row => isMissingCampaignValue(row.dataset.campaign))
+                .reduce((sum, row) => sum + (parseFloat(row.dataset.purchases) || 0), 0);
+            const trackedCampaignPurchases = Math.max(nonDirectPurchases - missingCampaignPurchases, 0);
+            const missingPercentage = nonDirectPurchases > 0 ? (missingCampaignPurchases / nonDirectPurchases) * 100 : 0;
+            const trackedPercentage = nonDirectPurchases > 0 ? (trackedCampaignPurchases / nonDirectPurchases) * 100 : 0;
+
+            bar.innerHTML = '';
+            meta.innerHTML = '';
+            value.textContent = `${missingPercentage.toFixed(1)}% excluding direct`;
+
+            if (nonDirectPurchases <= 0) {
+                bar.appendChild(buildSegment('#e2e8f0', 100, 'No non-direct purchase data'));
+                meta.appendChild(buildMetaChip('#cbd5e1', 'No non-direct purchase data'));
+                return;
+            }
+
+            bar.appendChild(buildSegment('#f97316', missingPercentage, `Missing campaign: ${missingPercentage.toFixed(1)}%`));
+            bar.appendChild(buildSegment('#cbd5e1', trackedPercentage, `Tracked campaign: ${trackedPercentage.toFixed(1)}%`));
+            meta.appendChild(buildMetaChip('#f97316', `Missing ${missingPercentage.toFixed(1)}%`));
+            meta.appendChild(buildMetaChip('#cbd5e1', `Tracked ${trackedPercentage.toFixed(1)}%`));
+        }
+
+        renderSourcePurchaseShare();
+        renderMissingCampaignShare();
 
         const chartCanvas = document.getElementById('campaignChart');
         if (chartCanvas) {
@@ -769,30 +989,21 @@ document.addEventListener('DOMContentLoaded', function () {
         const checkboxGroup = document.getElementById('sourceCheckboxGroup');
 
         function applyFilter() {
-            const q = searchInput.value.toLowerCase().trim();
-            
-            // Get all checked values from the checkbox group
+            const q = normalizeText(searchInput.value);
             const checkedSources = Array.from(document.querySelectorAll('.source-check:checked'))
-                    .map(cb => cb.value.trim().toLowerCase());
+                .map(cb => normalizeText(cb.value));
             
             let visible = 0;
             const rows = tbody.querySelectorAll('tr[data-source]');
 
             rows.forEach(row => {
-                const rowSource = (row.dataset.source || '').trim().toLowerCase();
-                const rowCampaign = (row.dataset.campaign || '').trim().toLowerCase();
-
-                // 1. Check Search Input
+                const rowSource = normalizeText(row.dataset.source);
+                const rowCampaign = normalizeText(row.dataset.campaign);
                 const matchSearch = q === '' || 
                                     rowSource.includes(q) || 
                                     rowCampaign.includes(q);
-
-                // 2. Check Checkboxes (Match if the source is in the checked list)
                 const matchSource = checkedSources.includes(rowSource);
-
-                const show = q  !== ''
-                                ? matchSearch
-                                : matchSearch && matchSource;
+                const show = matchSearch && matchSource;
 
                 row.style.display = show ? '' : 'none';
                 if (show) visible++;
