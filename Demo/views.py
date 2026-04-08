@@ -6593,6 +6593,11 @@ def view_tracked_customers(request):
     total_orders  = len(order_rows)
     total_revenue = sum(r["order_total"] for r in order_rows)
     avg_order     = round(total_revenue / total_orders, 2) if total_orders else 0
+    unique_sources = sorted({
+        str(r.get("purchase_source") or "").strip()
+        for r in order_rows
+        if str(r.get("purchase_source") or "").strip()
+    }, key=lambda value: value.lower())
 
     # ----------------------------
     # Helper functions
@@ -6767,6 +6772,7 @@ def view_tracked_customers(request):
         "total_orders":  total_orders,
         "total_revenue": round(total_revenue, 2),
         "avg_order":     avg_order,
+        "source_list":   unique_sources,
     }
 
     return render(

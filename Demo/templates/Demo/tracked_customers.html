@@ -160,6 +160,59 @@
     border-color: var(--accent);
   }
 
+  .toolbar {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 1rem;
+      border-bottom: 0.5px solid var(--border);
+      flex-wrap: wrap;
+  }
+
+  .toolbar-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.55rem;
+  }
+
+  .toolbar-group-wide {
+      flex: 1 1 100%;
+  }
+
+  .toolbar-label {
+      font-family: var(--ff-mono);
+      font-size: 10px;
+      color: var(--ink-3);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+  }
+
+  .checkbox-group {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+  }
+
+  .checkbox-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border: 0.5px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface);
+      font-family: var(--ff-mono);
+      font-size: 11px;
+      cursor: pointer;
+      color: var(--ink-2);
+  }
+
+  .checkbox-label input {
+      accent-color: var(--accent);
+  }
+
+
   .count-tag {
     margin-left: auto;
     font-family: var(--ff-mono);
@@ -403,14 +456,28 @@
         <div class="toolbar-group">
             <span class="toolbar-label">Filter Sources</span>
             <div id="sourceCheckboxGroup" class="checkbox-group">
-                {% for r in order_rows %}
-                    {% if r.purchase_source %}
+                {% for source in source_list %}
+                    {% if source %}
                     <label class="checkbox-label">
-                        <input type="checkbox" class="source-check" value="{{ r.purchase_source|lower }}" checked>
-                        {{ r.purchase_source }}
+                        <input type="checkbox" class="source-check" value="{{ source|lower }}" checked>
+                        {{ source }}
                     </label>
                     {% endif %}
                 {% endfor %}
+            </div>
+        </div>
+
+        <div class="toolbar-group toolbar-group-wide">
+            <span class="toolbar-label">Compare Attribution</span>
+            <div id="mismatchCheckboxGroup" class="checkbox-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="campaignMismatchCheck">
+                    Different Campaign
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="sourceMismatchCheck">
+                    Different Source
+                </label>
             </div>
         </div>
 
@@ -434,7 +501,10 @@
               {% for r in order_rows %}
               <tr data-order="{{ r.order_id|lower }}" data-customer="{{ r.customer_id|lower }}"
                 data-campaign="{{ r.purchase_campaign|lower }}" data-hook="{{ r.hook_campaign|lower }}"
+                data-hook-source="{{ r.hook_source|lower }}"
                 data-source="{{ r.purchase_source|lower }}" data-total="{{ r.order_total }}"
+                data-campaign-mismatch="{% if r.purchase_campaign|lower != r.hook_campaign|lower %}true{% else %}false{% endif %}"
+                data-source-mismatch="{% if r.purchase_source|lower != r.hook_source|lower %}true{% else %}false{% endif %}"
                 data-ts="{{ r.timestamp }}">
                 {# Order ID #}
                 <td><span class="order-id">#{{ r.order_id }}</span></td>
@@ -504,6 +574,9 @@
 
     const searchInput = document.getElementById('campaignSearchInput');
     const checkboxGroup = document.getElementById('sourceCheckboxGroup');
+    const mismatchCheckboxGroup = document.getElementById('mismatchCheckboxGroup');
+    const campaignMismatchCheck = document.getElementById('campaignMismatchCheck');
+    const sourceMismatchCheck = document.getElementById('sourceMismatchCheck');
     const countTag = document.getElementById('countTag');
     const tbody = document.getElementById('tableBody');
     const headers = document.querySelectorAll('table.orders th[data-col]');
@@ -512,27 +585,26 @@
     function applyFilter() {
       const q = normalizeText(searchInput ? searchInput.value : '');
       const checkedSources = Array.from(document.querySelectorAll('.source-check:checked'))
-                .map(cb => normalizeText(cb.value));
+        .map(cb => normalizeText(cb.value));
+      const onlyCampaignMismatch = Boolean(campaignMismatchCheck && campaignMismatchCheck.checked);
+      const onlySourceMismatch = Boolean(sourceMismatchCheck && sourceMismatchCheck.checked);
       let visible = 0;
-
-          row.dataset.order.includes(q) ||
-          row.dataset.customer.includes(q) ||
-          row.dataset.campaign.includes(q) ||
-          row.dataset.hook.includes(q);
 
       const rows = tbody.querySelectorAll('tr[data-source]');
       rows.forEach(row => {
           const rowSource = normalizeText(row.dataset.source);
-          const rowCampaign = normalizeText(row.dataset.campaign);
           const matchSearch = q === '' || 
-                              row.dataset.order.includes(q) ||
-                              row.dataset.customer.includes(q) ||
-                              row.dataset.campaign.includes(q) ||
-                              row.dataset.source.includes(q) ||
-                              row.dataset.hook.includes(q);
+                              normalizeText(row.dataset.order).includes(q) ||
+                              normalizeText(row.dataset.customer).includes(q) ||
+                              normalizeText(row.dataset.campaign).includes(q) ||
+                              normalizeText(row.dataset.source).includes(q) ||
+                              normalizeText(row.dataset.hook).includes(q) ||
+                              normalizeText(row.dataset.hookSource).includes(q);
           const matchSource = checkedSources.length === 0 ||
                               checkedSources.includes(rowSource);
-          const show = matchSearch && matchSource;
+          const matchCampaignMismatch = !onlyCampaignMismatch || row.dataset.campaignMismatch === 'true';
+          const matchSourceMismatch = !onlySourceMismatch || row.dataset.sourceMismatch === 'true';
+          const show = matchSearch && matchSource && matchCampaignMismatch && matchSourceMismatch;
 
           row.style.display = show ? '' : 'none';
           if (show) visible++;
@@ -562,6 +634,10 @@
     // Delegate change event to the checkbox container
     if (checkboxGroup) {
       checkboxGroup.addEventListener('change', applyFilter);
+    }
+
+    if (mismatchCheckboxGroup) {
+      mismatchCheckboxGroup.addEventListener('change', applyFilter);
     }
 
     /* ── Sort ── */
@@ -615,6 +691,7 @@
     });
 
     /* initial sort */
+    applyFilter();
     sortTable(5);
   })();
 </script>
