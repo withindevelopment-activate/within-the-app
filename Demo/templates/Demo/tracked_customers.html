@@ -508,14 +508,6 @@
     const tbody = document.getElementById('tableBody');
     const headers = document.querySelectorAll('table.orders th[data-col]');
 
-    /* ── De-duplicate source options ── */
-    const seen = new Set();
-    Array.from(sourceFilter.options).forEach(opt => {
-      if (opt.value === '') { seen.add(''); return; }
-      if (seen.has(opt.value)) opt.remove();
-      else seen.add(opt.value);
-    });
-
     /* ── Filter ── */
     function applyFilter() {
       const q = normalizeText(searchInput ? searchInput.value : '');
