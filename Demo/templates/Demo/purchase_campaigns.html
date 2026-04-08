@@ -588,9 +588,9 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     (function () {
-        const labels = JSON.parse('{{ source_labels|escapejs }}');
-        const purchases = JSON.parse('{{ source_purchases|escapejs }}');
-        const events = JSON.parse('{{ source_events|escapejs }}');
+        const labels = {{ source_labels|safe }};
+        const purchases = {{ source_purchases|safe }};
+        const events = {{ source_events|safe }};
 
         function getConversionRate(purchaseValue, eventValue) {
             if (eventValue <= 0) {
