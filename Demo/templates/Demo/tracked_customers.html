@@ -503,8 +503,6 @@
                 data-campaign="{{ r.purchase_campaign|lower }}" data-hook="{{ r.hook_campaign|lower }}"
                 data-hook-source="{{ r.hook_source|lower }}"
                 data-source="{{ r.purchase_source|lower }}" data-total="{{ r.order_total }}"
-                data-campaign-mismatch="{% if r.purchase_campaign|lower != r.hook_campaign|lower %}true{% else %}false{% endif %}"
-                data-source-mismatch="{% if r.purchase_source|lower != r.hook_source|lower %}true{% else %}false{% endif %}"
                 data-ts="{{ r.timestamp }}">
                 {# Order ID #}
                 <td><span class="order-id">#{{ r.order_id }}</span></td>
@@ -572,6 +570,16 @@
       return String(value || '').trim().toLowerCase();
     }
 
+    function hasMeaningfulValue(value) {
+      return normalizeText(value) !== '';
+    }
+
+    function isMeaningfulMismatch(leftValue, rightValue) {
+      const left = normalizeText(leftValue);
+      const right = normalizeText(rightValue);
+      return hasMeaningfulValue(left) && hasMeaningfulValue(right) && left !== right;
+    }
+
     const searchInput = document.getElementById('campaignSearchInput');
     const checkboxGroup = document.getElementById('sourceCheckboxGroup');
     const mismatchCheckboxGroup = document.getElementById('mismatchCheckboxGroup');
@@ -602,8 +610,8 @@
                               normalizeText(row.dataset.hookSource).includes(q);
           const matchSource = checkedSources.length === 0 ||
                               checkedSources.includes(rowSource);
-          const matchCampaignMismatch = !onlyCampaignMismatch || row.dataset.campaignMismatch === 'true';
-          const matchSourceMismatch = !onlySourceMismatch || row.dataset.sourceMismatch === 'true';
+          const matchCampaignMismatch = !onlyCampaignMismatch || isMeaningfulMismatch(row.dataset.hook, row.dataset.campaign);
+          const matchSourceMismatch = !onlySourceMismatch || isMeaningfulMismatch(row.dataset.hookSource, row.dataset.source);
           const show = matchSearch && matchSource && matchCampaignMismatch && matchSourceMismatch;
 
           row.style.display = show ? '' : 'none';
