@@ -386,28 +386,35 @@
       </div>
     </div>
   </div>
-  
-  {# ── Table ── #}
+
   <div class="data-wrap">
-    <div class="toolbar p-3">
-      <div class="search-wrap">
-        <svg viewBox="0 0 24 24">
-          <circle cx="11" cy="11" r="8" />
-          <line x1="21" y1="21" x2="16.65" y2="16.65" />
-        </svg>
-        <input class="search-input" id="searchInput" type="text" placeholder="Search order, customer, campaign…">
-      </div>
-  
-      <select class="filter-select" id="sourceFilter">
-        <option value="">All sources</option>
-        {% for r in order_rows %}
-        {% if r.purchase_source %}
-        <option value="{{ r.purchase_source|lower }}">{{ r.purchase_source }}</option>
-        {% endif %}
-        {% endfor %}
-      </select>
-  
-      <span class="count-tag" id="countTag">{{ total_orders }} orders</span>
+    <div class="toolbar">
+        <div class="toolbar-group">
+            <span class="toolbar-label">Search Campaigns</span>
+            <div class="search-wrap">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input class="search-input" id="campaignSearchInput" type="text" placeholder="Search source or campaign...">
+            </div>
+        </div>
+
+        <div class="toolbar-group">
+            <span class="toolbar-label">Filter Sources</span>
+            <div id="sourceCheckboxGroup" class="checkbox-group">
+                {% for r in order_rows %}
+                    {% if r.purchase_source %}
+                    <label class="checkbox-label">
+                        <input type="checkbox" class="source-check" value="{{ r.purchase_source|lower }}" checked>
+                        {{ r.purchase_source }}
+                    </label>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+
+        <span class="count-tag" id="countTag">{{ total_orders }} orders</span>
     </div>
     <div class="data-viewport">
       <div class="data-scroller" role="region" aria-label="Customers dataset" tabindex="0">
@@ -490,8 +497,13 @@
 </div>
 <script>
   (function () {
-    const searchInput = document.getElementById('searchInput');
-    const sourceFilter = document.getElementById('sourceFilter');
+
+    function normalizeText(value) {
+      return String(value || '').trim().toLowerCase();
+    }
+
+    const searchInput = document.getElementById('campaignSearchInput');
+    const checkboxGroup = document.getElementById('sourceCheckboxGroup');
     const countTag = document.getElementById('countTag');
     const tbody = document.getElementById('tableBody');
     const headers = document.querySelectorAll('table.orders th[data-col]');
@@ -506,22 +518,32 @@
 
     /* ── Filter ── */
     function applyFilter() {
-      const q = searchInput.value.toLowerCase().trim();
-      const src = sourceFilter.value.toLowerCase();
+      const q = normalizeText(searchInput ? searchInput.value : '');
+      const checkedSources = Array.from(document.querySelectorAll('.source-check:checked'))
+                .map(cb => normalizeText(cb.value));
       let visible = 0;
 
-      Array.from(tbody.querySelectorAll('tr[data-order]')).forEach(row => {
-        const matchSearch = !q ||
           row.dataset.order.includes(q) ||
           row.dataset.customer.includes(q) ||
           row.dataset.campaign.includes(q) ||
           row.dataset.hook.includes(q);
 
-        const matchSource = !src || row.dataset.source === src;
+      const rows = tbody.querySelectorAll('tr[data-source]');
+      rows.forEach(row => {
+          const rowSource = normalizeText(row.dataset.source);
+          const rowCampaign = normalizeText(row.dataset.campaign);
+          const matchSearch = q === '' || 
+                              row.dataset.order.includes(q) ||
+                              row.dataset.customer.includes(q) ||
+                              row.dataset.campaign.includes(q) ||
+                              row.dataset.source.includes(q) ||
+                              row.dataset.hook.includes(q);
+          const matchSource = checkedSources.length === 0 ||
+                              checkedSources.includes(rowSource);
+          const show = matchSearch && matchSource;
 
-        const show = matchSearch && matchSource;
-        row.style.display = show ? '' : 'none';
-        if (show) visible++;
+          row.style.display = show ? '' : 'none';
+          if (show) visible++;
       });
 
       /* no-results row */
@@ -540,8 +562,15 @@
       countTag.textContent = visible + ' order' + (visible !== 1 ? 's' : '');
     }
 
-    searchInput.addEventListener('input', applyFilter);
-    sourceFilter.addEventListener('change', applyFilter);
+    // New Listeners
+    if (searchInput) {
+      searchInput.addEventListener('input', applyFilter);
+    }
+    
+    // Delegate change event to the checkbox container
+    if (checkboxGroup) {
+      checkboxGroup.addEventListener('change', applyFilter);
+    }
 
     /* ── Sort ── */
     let sortCol = 5;    /* default: timestamp */
@@ -594,7 +623,7 @@
     });
 
     /* initial sort */
-    sortTable(4);
+    sortTable(5);
   })();
 </script>
 
