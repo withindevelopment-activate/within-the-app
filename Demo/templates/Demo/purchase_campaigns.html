@@ -634,7 +634,7 @@
                         <circle cx="11" cy="11" r="8"></circle>
                         <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                     </svg>
-                    <input class="search-input" id="searchInput" type="text" placeholder="Search source or campaign...">
+                    <input class="search-input" id="campaignSearchInput" type="text" placeholder="Search source or campaign...">
                 </div>
             </div>
 
@@ -982,14 +982,14 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         }
 
-        const searchInput = document.getElementById('searchInput');
+        const searchInput = document.getElementById('campaignSearchInput');
         const countTag = document.getElementById('countTag');
         const tbody = document.getElementById('tableBody');
         const headers = document.querySelectorAll('table.orders th[data-col]');
         const checkboxGroup = document.getElementById('sourceCheckboxGroup');
 
         function applyFilter() {
-            const q = normalizeText(searchInput.value);
+            const q = normalizeText(searchInput ? searchInput.value : '');
             const checkedSources = Array.from(document.querySelectorAll('.source-check:checked'))
                 .map(cb => normalizeText(cb.value));
             
@@ -1008,14 +1008,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 row.style.display = show ? '' : 'none';
                 if (show) visible++;
-                console.log({
-                    q,
-                    checkedSources,
-                    rowSource,
-                    rowCampaign,
-                    matchSearch,
-                    matchSource
-                });
             });
 
             // Update UI states
@@ -1040,7 +1032,9 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         // New Listeners
-        searchInput.addEventListener('input', applyFilter);
+        if (searchInput) {
+            searchInput.addEventListener('input', applyFilter);
+        }
         
         // Delegate change event to the checkbox container
         if (checkboxGroup) {
