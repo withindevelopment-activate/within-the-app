@@ -749,7 +749,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         function isMissingCampaignValue(value) {
             const normalizedValue = normalizeText(value);
-            return normalizedValue === '' || normalizedValue === '—' || normalizedValue === '-' || normalizedValue === 'unknown' || normalizedValue === 'none';
+            return normalizedValue === '' || normalizedValue === '—' || normalizedValue === '-' || normalizedValue === 'unknown' || normalizedValue === 'none' || normalizedValue === 'missing_campaign';
         }
 
         function buildSegment(color, width, label) {
@@ -1002,11 +1002,20 @@ document.addEventListener('DOMContentLoaded', function () {
                 const matchSearch = q === '' || 
                                     rowSource.includes(q) || 
                                     rowCampaign.includes(q);
-                const matchSource = checkedSources.includes(rowSource);
+                const matchSource = checkedSources.length === 0 ||
+                                    checkedSources.includes(rowSource);
                 const show = matchSearch && matchSource;
 
                 row.style.display = show ? '' : 'none';
                 if (show) visible++;
+            });
+            console.log({
+                q,
+                checkedSources,
+                rowSource,
+                rowCampaign,
+                matchSearch,
+                matchSource
             });
 
             // Update UI states
