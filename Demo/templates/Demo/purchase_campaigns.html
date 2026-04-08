@@ -495,8 +495,8 @@
         <div class="chart-head">
             <div class="chart-title">Campaign Trend View</div>
             <div class="chart-legend">
-                <span class="legend-pill"><span class="legend-dot" style="background:#378add;"></span>Purchases</span>
-                <span class="legend-pill"><span class="legend-dot" style="background:#ff403d;"></span>Total
+                <span class="legend-pill"><span class="legend-dot" style="background:#0f766e;"></span>Purchases</span>
+                <span class="legend-pill"><span class="legend-dot" style="background:#dbe4ec;"></span>Remaining
                     Events</span>
             </div>
         </div>
@@ -548,9 +548,10 @@
                     <tbody id="tableBody">
                         {% for c in campaigns %}
                         <tr 
-                        data-campaign="{{ c.UTM_Campaign|default:''|lower }}"
-                        data-source="{{ c.UTM_Source|default:''|lower }}"
-                            data-score="{{ c.Total_Score|default:0 }}" data-purchases="{{ c.Purchases|default:0 }}"
+                            data-campaign="{{ c.UTM_Campaign|default:''|lower }}"
+                            data-source="{{ c.UTM_Source|default:''|lower }}"
+                            data-score="{{ c.Total_Score|default:0 }}" 
+                            data-purchases="{{ c.Purchases|default:0 }}"
                             data-events="{{ c.Total_Events|default:0 }}">
                             <td>{{ c.UTM_Campaign|default:"—" }}</td>
                             <td>
@@ -585,281 +586,299 @@
 </div>
 
 <script>
+document.addEventListener('DOMContentLoaded', function () {
     (function () {
-        const labels = {{ source_labels|safe }};
-    const purchases = {{ source_purchases|safe }};
-    const events = {{ source_events|safe }};
+        const labels = JSON.parse('{{ source_labels|escapejs }}');
+        const purchases = JSON.parse('{{ source_purchases|escapejs }}');
+        const events = JSON.parse('{{ source_events|escapejs }}');
 
-    const totalPurchases = purchases.reduce((sum, value) => sum + (Number(value) || 0), 0);
-    const totalEvents = events.reduce((sum, value) => sum + (Number(value) || 0), 0);
-    const maxValue = Math.max(0, ...purchases.map(Number), ...events.map(Number));
+        function getConversionRate(purchaseValue, eventValue) {
+            if (eventValue <= 0) {
+                return 0;
+            }
 
-    const purchaseStat = document.getElementById('totalPurchasesStat');
-    const eventStat = document.getElementById('totalEventsStat');
-    if (purchaseStat) purchaseStat.textContent = totalPurchases.toLocaleString();
-    if (eventStat) eventStat.textContent = totalEvents.toLocaleString();
+            return (purchaseValue / eventValue) * 100;
+        }
 
-    const chartCanvas = document.getElementById('campaignChart');
-    if (chartCanvas) {
-        const ctx = chartCanvas.getContext('2d');
+        const conversionRates = events.map((eventValue, index) =>
+            getConversionRate(Number(purchases[index]) || 0, Number(eventValue) || 0)
+        );
+        const remainingEvents = events.map((eventValue, index) => {
+            const purchaseValue = Number(purchases[index]) || 0;
+            const totalEventsForSource = Number(eventValue) || 0;
 
-        new Chart(ctx, {
-            data: {
-                labels: labels,
-                datasets: [
-                    {
-                        type: 'bar',
-                        label: 'Purchases',
-                        data: purchases,
-                        yAxisID: 'y',
-                        backgroundColor: 'rgba(55, 138, 221, 0.75)',
-                        borderColor: 'rgba(55, 138, 221, 1)',
-                        borderWidth: 1,
-                        borderRadius: 6
+            return Math.max(totalEventsForSource - purchaseValue, 0);
+        });
+
+        const totalPurchases = purchases.reduce((sum, value) => sum + (Number(value) || 0), 0);
+        const totalEvents = events.reduce((sum, value) => sum + (Number(value) || 0), 0);
+        const maxValue = Math.max(0, ...events.map(Number));
+
+        const purchaseStat = document.getElementById('totalPurchasesStat');
+        const eventStat = document.getElementById('totalEventsStat');
+        if (purchaseStat) purchaseStat.textContent = totalPurchases.toLocaleString();
+        if (eventStat) eventStat.textContent = totalEvents.toLocaleString();
+
+        const chartCanvas = document.getElementById('campaignChart');
+        if (chartCanvas) {
+            const ctx = chartCanvas.getContext('2d');
+
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Purchases',
+                            data: purchases,
+                            backgroundColor: 'rgba(15, 118, 110, 0.88)',
+                            borderColor: 'rgba(15, 118, 110, 1)',
+                            borderWidth: 1,
+                            borderRadius: {
+                                topLeft: 0,
+                                topRight: 0,
+                                bottomLeft: 8,
+                                bottomRight: 8
+                            },
+                            stack: 'events',
+                            borderSkipped: false
+                        },
+                        {
+                            label: 'Remaining Events',
+                            data: remainingEvents,
+                            backgroundColor: 'rgba(219, 228, 236, 0.95)',
+                            borderColor: 'rgba(191, 204, 217, 1)',
+                            borderWidth: 1,
+                            borderRadius: {
+                                topLeft: 8,
+                                topRight: 8,
+                                bottomLeft: 0,
+                                bottomRight: 0
+                            },
+                            stack: 'events',
+                            borderSkipped: false
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
                     },
-                    {
-                        type: 'line',
-                        label: 'Total Events',
-                        data: events,
-                        yAxisID: 'y1',
-                        borderColor: 'rgb(255, 64, 61)',
-                        backgroundColor: 'rgba(255, 64, 61, 0.18)',
-                        tension: 0.35,
-                        pointRadius: 3,
-                        pointHoverRadius: 5,
-                        fill: false
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                interaction: {
-                    mode: 'index',
-                    intersect: false
-                },
-                plugins: {
-                    legend: {
-                        display: false
-                    }
-                },
-                scales: {
-                    x: {
-                        grid: {
+                    plugins: {
+                        legend: {
                             display: false
                         },
-                        ticks: {
-                            color: '#8a8a8a',
-                            font: {
-                                family: "'DM Mono', monospace",
-                                size: 10
+                        tooltip: {
+                            callbacks: {
+                                label: function (context) {
+                                    const index = context.dataIndex;
+                                    const purchaseValue = Number(purchases[index]) || 0;
+                                    const eventValue = Number(events[index]) || 0;
+                                    const lines = [];
+
+                                    if (context.dataset.label === 'Purchases') {
+                                        lines.push(`Purchases: ${purchaseValue.toLocaleString()}`);
+                                    } else {
+                                        lines.push(`Remaining Events: ${remainingEvents[index].toLocaleString()}`);
+                                    }
+
+                                    lines.push(`Total Events: ${eventValue.toLocaleString()}`);
+                                    lines.push(`Conversion Rate: ${conversionRates[index].toFixed(2)}%`);
+
+                                    return lines;
+                                }
                             }
                         }
                     },
-                    y: {
-                        beginAtZero: true,
-                        min: 0,
-                        max: maxValue + 5 || 1,
-                        position: 'left',
-                        grid: {
-                            color: 'rgba(0, 0, 0, 0.06)'
-                        },
-                        ticks: {
-                            color: '#8a8a8a',
-                            font: {
-                                family: "'DM Mono', monospace",
-                                size: 10
+                    scales: {
+                        x: {
+                            stacked: true,
+                            grid: {
+                                display: false
+                            },
+                            ticks: {
+                                color: '#8a8a8a',
+                                font: {
+                                    family: "'DM Mono', monospace",
+                                    size: 10
+                                }
                             }
                         },
-                        title: {
-                            display: true,
-                            text: 'Purchases',
-                            color: '#4a4a4a',
-                            font: {
-                                family: "'DM Mono', monospace",
-                                size: 10
-                            }
-                        }
-                    },
-                    y1: {
-                        beginAtZero: true,
-                        min: 0,
-                        max: maxValue + 5 || 1,
-                        position: 'right',
-                        grid: {
-                            drawOnChartArea: false
-                        },
-                        ticks: {
-                            color: '#8a8a8a',
-                            font: {
-                                family: "'DM Mono', monospace",
-                                size: 10
-                            }
-                        },
-                        title: {
-                            display: true,
-                            text: 'Events',
-                            color: '#4a4a4a',
-                            font: {
-                                family: "'DM Mono', monospace",
-                                size: 10
+                        y: {
+                            stacked: true,
+                            beginAtZero: true,
+                            min: 0,
+                            max: maxValue + 5 || 1,
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.06)'
+                            },
+                            ticks: {
+                                color: '#8a8a8a',
+                                font: {
+                                    family: "'DM Mono', monospace",
+                                    size: 10
+                                }
+                            },
+                            title: {
+                                display: true,
+                                text: 'Events',
+                                color: '#4a4a4a',
+                                font: {
+                                    family: "'DM Mono', monospace",
+                                    size: 10
+                                }
                             }
                         }
                     }
                 }
-            }
-        });
-    }
+            });
+        }
 
-    function computeConversionRates() {
-        const rows = tbody.querySelectorAll('tr[data-source]');
+        function computeConversionRates() {
+            const rows = tbody.querySelectorAll('tr[data-source]');
 
-        rows.forEach(row => {
-            const purchases = parseFloat(row.dataset.purchases) || 0;
-            const events = parseFloat(row.dataset.events) || 0;
+            rows.forEach(row => {
+                const purchases = parseFloat(row.dataset.purchases) || 0;
+                const events = parseFloat(row.dataset.events) || 0;
+                const conversion = getConversionRate(purchases, events);
 
-            let conversion = 0;
+                // Store it (useful for sorting later)
+                row.dataset.conversion = conversion;
 
-            if (events > 0) {
-                conversion = (purchases / events) * 100;
-            }
+                // Render it
+                const cell = row.querySelector('.conversion-cell');
+                if (cell) {
+                    cell.textContent = conversion.toFixed(2) + '%';
 
-            // Store it (useful for sorting later)
-            row.dataset.conversion = conversion;
-
-            // Render it
-            const cell = row.querySelector('.conversion-cell');
-            if (cell) {
-                cell.textContent = conversion.toFixed(2) + '%';
-
-                if (conversion > 10) {
-                    cell.style.color = '#16a34a'; // strong
-                } else if (conversion > 3) {
-                    cell.style.color = '#ca8a04'; // medium
-                } else {
-                    cell.style.color = '#dc2626'; // weak
+                    if (conversion > 30) {
+                        cell.style.color = '#16a34a'; // strong
+                    } else if (conversion > 10) {
+                        cell.style.color = '#ca8a04'; // medium
+                    } else {
+                        cell.style.color = '#dc2626'; // weak
+                    }
                 }
-            }
-        });
-    }
-
-    const searchInput = document.getElementById('searchInput');
-    const countTag = document.getElementById('countTag');
-    const tbody = document.getElementById('tableBody');
-    const headers = document.querySelectorAll('table.orders th[data-col]');
-    const checkboxGroup = document.getElementById('sourceCheckboxGroup');
-
-    function applyFilter() {
-        const q = searchInput.value.toLowerCase().trim();
-        
-        // Get all checked values from the checkbox group
-        const checkedSources = Array.from(document.querySelectorAll('.source-check:checked'))
-                                    .map(cb => cb.value);
-        
-        let visible = 0;
-        const rows = tbody.querySelectorAll('tr[data-source]');
-
-        rows.forEach(row => {
-            const rowSource = (row.getAttribute('data-source') || '').toLowerCase();
-            const rowCampaign = (row.getAttribute('data-campaign') || '').toLowerCase();
-
-            // 1. Check Search Input
-            const matchSearch = q === '' || 
-                                rowSource.includes(q) || 
-                                rowCampaign.includes(q);
-
-            // 2. Check Checkboxes (Match if the source is in the checked list)
-            const matchSource = checkedSources.includes(rowSource);
-
-            const show = matchSearch && matchSource;
-
-            row.style.display = show ? '' : 'none';
-            if (show) visible++;
-        });
-
-        // Update UI states
-        updateNoResults(visible, rows.length);
-        if (countTag) {
-            countTag.textContent = `${visible} campaign${visible === 1 ? '' : 's'}`;
+            });
         }
-    }
 
-    function updateNoResults(visible, totalRows) {
-        let noRow = tbody.querySelector('.no-results-row');
-        if (visible === 0 && totalRows > 0) {
-            if (!noRow) {
-                noRow = document.createElement('tr');
-                noRow.className = 'no-results-row';
-                noRow.innerHTML = '<td colspan="6" class="no-results" style="text-align:center; padding:3rem; color:var(--ink-3);">No campaigns match your selection.</td>';
-                tbody.appendChild(noRow);
+        const searchInput = document.getElementById('searchInput');
+        const countTag = document.getElementById('countTag');
+        const tbody = document.getElementById('tableBody');
+        const headers = document.querySelectorAll('table.orders th[data-col]');
+        const checkboxGroup = document.getElementById('sourceCheckboxGroup');
+
+        function applyFilter() {
+            const q = searchInput.value.toLowerCase().trim();
+            
+            // Get all checked values from the checkbox group
+            const checkedSources = Array.from(document.querySelectorAll('.source-check:checked'))
+                                        .map(cb => cb.value);
+            
+            let visible = 0;
+            const rows = tbody.querySelectorAll('tr[data-source]');
+
+            rows.forEach(row => {
+                const rowSource = (row.dataset.source || '').trim().toLowerCase();
+                const rowCampaign = (row.dataset.campaign || '').trim().toLowerCase();
+
+                // 1. Check Search Input
+                const matchSearch = q === '' || 
+                                    rowSource.includes(q) || 
+                                    rowCampaign.includes(q);
+
+                // 2. Check Checkboxes (Match if the source is in the checked list)
+                const matchSource = checkedSources.includes(rowSource);
+
+                const show = matchSearch && matchSource;
+
+                row.style.display = show ? '' : 'none';
+                if (show) visible++;
+            });
+
+            // Update UI states
+            updateNoResults(visible, rows.length);
+            if (countTag) {
+                countTag.textContent = `${visible} campaign${visible === 1 ? '' : 's'}`;
             }
-        } else if (noRow) {
-            noRow.remove();
         }
-    }
 
-    // New Listeners
-    searchInput.addEventListener('input', applyFilter);
-    
-    // Delegate change event to the checkbox container
-    if (checkboxGroup) {
-        checkboxGroup.addEventListener('change', applyFilter);
-    }
+        function updateNoResults(visible, totalRows) {
+            let noRow = tbody.querySelector('.no-results-row');
+            if (visible === 0 && totalRows > 0) {
+                if (!noRow) {
+                    noRow = document.createElement('tr');
+                    noRow.className = 'no-results-row';
+                    noRow.innerHTML = '<td colspan="6" class="no-results" style="text-align:center; padding:3rem; color:var(--ink-3);">No campaigns match your selection.</td>';
+                    tbody.appendChild(noRow);
+                }
+            } else if (noRow) {
+                noRow.remove();
+            }
+        }
 
-    // Ensure the initial count is correct on load
-    computeConversionRates();
-    applyFilter();
+        // New Listeners
+        searchInput.addEventListener('input', applyFilter);
+        
+        // Delegate change event to the checkbox container
+        if (checkboxGroup) {
+            checkboxGroup.addEventListener('change', applyFilter);
+        }
 
-    let sortCol = null;
-    let sortAsc = false;
+        let sortCol = null;
+        let sortAsc = false;
 
-    function sortTable(col) {
-        if (sortCol === col) {
-            sortAsc = !sortAsc;
-        } else {
-            sortCol = col;
-            sortAsc = col < 2;
+        function sortTable(col) {
+            if (sortCol === col) {
+                sortAsc = !sortAsc;
+            } else {
+                sortCol = col;
+                sortAsc = col < 2;
+            }
+
+            headers.forEach(th => {
+                const arrow = th.querySelector('.sort-arrow');
+                if (parseInt(th.dataset.col, 10) === sortCol) {
+                    th.classList.add('sorted');
+                    arrow.textContent = sortAsc ? '↑' : '↓';
+                } else {
+                    th.classList.remove('sorted');
+                    arrow.textContent = '↕';
+                }
+            });
+
+            const rows = Array.from(tbody.querySelectorAll('tr[data-source]'));
+            const keyMap = ['campaign', 'source', 'score', 'purchases', 'events', 'conversion'];
+            const key = keyMap[col];
+
+            rows.sort((a, b) => {
+                let va = a.dataset[key] || '';
+                let vb = b.dataset[key] || '';
+
+                if (key === 'score' || key === 'purchases' || key === 'events' || key === 'conversion') {
+                    va = parseFloat(va) || 0;
+                    vb = parseFloat(vb) || 0;
+                    return sortAsc ? va - vb : vb - va;
+                }
+
+                return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+            });
+
+            rows.forEach(row => tbody.appendChild(row));
         }
 
         headers.forEach(th => {
-            const arrow = th.querySelector('.sort-arrow');
-            if (parseInt(th.dataset.col, 10) === sortCol) {
-                th.classList.add('sorted');
-                arrow.textContent = sortAsc ? '↑' : '↓';
-            } else {
-                th.classList.remove('sorted');
-                arrow.textContent = '↕';
-            }
+            th.addEventListener('click', () => sortTable(parseInt(th.dataset.col, 10)));
         });
 
-        const rows = Array.from(tbody.querySelectorAll('tr[data-source]'));
-        const keyMap = ['campaign', 'source', 'score', 'purchases', 'events', 'conversion'];
-        const key = keyMap[col];
-
-        rows.sort((a, b) => {
-            let va = a.dataset[key] || '';
-            let vb = b.dataset[key] || '';
-
-            if (key === 'score' || key === 'purchases' || key === 'events' || key === 'conversion') {
-                va = parseFloat(va) || 0;
-                vb = parseFloat(vb) || 0;
-                return sortAsc ? va - vb : vb - va;
-            }
-
-            return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
-        });
-
-        rows.forEach(row => tbody.appendChild(row));
+        // Ensure the initial count is correct on load
+        computeConversionRates();
         applyFilter();
-    }
-
-    headers.forEach(th => {
-        th.addEventListener('click', () => sortTable(parseInt(th.dataset.col, 10)));
-    });
-
-    applyFilter();
-    sortTable(3);
-  }) ();
+        sortTable(3);
+    }) ();
+});
 </script>
 
 {% endblock %}
