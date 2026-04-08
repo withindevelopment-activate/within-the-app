@@ -680,13 +680,11 @@ document.addEventListener('DOMContentLoaded', function () {
                                     const lines = [];
 
                                     if (context.dataset.label === 'Purchases') {
-                                        lines.push(`Purchases: ${purchaseValue.toLocaleString()}`);
+                                        lines.push(`Purchases: ${purchaseValue.toLocaleString()}`)
                                     } else {
-                                        lines.push(`Remaining Events: ${remainingEvents[index].toLocaleString()}`);
+                                        lines.push(`Total Events: ${eventValue.toLocaleString()}`);
+                                        lines.push(`Conversion Rate: ${conversionRates[index].toFixed(2)}%`);
                                     }
-
-                                    lines.push(`Total Events: ${eventValue.toLocaleString()}`);
-                                    lines.push(`Conversion Rate: ${conversionRates[index].toFixed(2)}%`);
 
                                     return lines;
                                 }
@@ -711,7 +709,7 @@ document.addEventListener('DOMContentLoaded', function () {
                             stacked: true,
                             beginAtZero: true,
                             min: 0,
-                            max: maxValue + 5 || 1,
+                            max: (maxValue + maxValue / 5).toFixed(0) || 1,
                             grid: {
                                 color: 'rgba(0, 0, 0, 0.06)'
                             },
@@ -775,7 +773,7 @@ document.addEventListener('DOMContentLoaded', function () {
             
             // Get all checked values from the checkbox group
             const checkedSources = Array.from(document.querySelectorAll('.source-check:checked'))
-                                        .map(cb => cb.value);
+                    .map(cb => cb.value.trim().toLowerCase());
             
             let visible = 0;
             const rows = tbody.querySelectorAll('tr[data-source]');
@@ -792,7 +790,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 // 2. Check Checkboxes (Match if the source is in the checked list)
                 const matchSource = checkedSources.includes(rowSource);
 
-                const show = matchSearch && matchSource;
+                const show = q  !== ''
+                                ? matchSearch
+                                : matchSearch && matchSource;
 
                 row.style.display = show ? '' : 'none';
                 if (show) visible++;
