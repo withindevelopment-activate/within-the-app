@@ -657,7 +657,7 @@
         sortAsc = !sortAsc;
       } else {
         sortCol = col;
-        sortAsc = col !== 4; /* total defaults desc, others asc */
+        sortAsc = ![4, 5].includes(col); /* total defaults desc, others asc */
       }
 
       headers.forEach(th => {
