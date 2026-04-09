@@ -6318,7 +6318,7 @@ def events_table_view(request):
         date_end = date_end.replace("T", " ")
     session_search = request.GET.get("session_id", "")
     visitor_search = request.GET.get("visitor_id", "")
-    # sort_field = request.GET.get("sort_by", "Distinct_ID")
+    sort_field = request.GET.get("sort_by", "Distinct_ID")
     timezone_search = request.GET.get("timezone", "")
     number_search = request.GET.get("number_search", "")
     sleecid = request.GET.get("sleecid", "")
@@ -6388,7 +6388,7 @@ def events_table_view(request):
             "Cookie_ID", "Customer_ID",  "Customer_Mobile","Screen_Resolution","Order_ID","Attribution_Type","Page_URL","Referrer_Platform"
             ],
         filters=filters,
-        # order_by=sort_field,
+        order_by=sort_field,
         limit=limit,
     )
 
@@ -6438,7 +6438,7 @@ def events_table_view(request):
         "source": source,
         'sleecid': sleecid,
         "number_search": number_search,
-        # "sort_field": sort_field,
+        "sort_field": sort_field,
         "timezone_search": timezone_search,
         "utm_source_labels": json.dumps(list(to_pct(Counter(utm_sources)).keys())),
         "utm_source_values": json.dumps(list(to_pct(Counter(utm_sources)).values())),
