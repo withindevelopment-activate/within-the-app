@@ -6551,7 +6551,7 @@ def view_tracked_customers(request):
 
         for order_id, order_data in per_purchase.items():
             order_data  = ensure_dict(order_data)
-            order_total = safe_float(order_data.get("order_total", 0))
+            order_total = safe_float(order_data.get("order_total_all", 0))
             timestamp   = str(order_data.get("timestamp", "")).strip()
             campaigns   = ensure_dict(order_data.get("campaigns"))
 
@@ -7285,20 +7285,46 @@ def update_tracked_customers(new_event, history_rows, customer_dict):
 
     def extract_order_total(details):
         try:
+            overall_total = 0
+            total_w_vat = 0
+            order_products = []
+
             if isinstance(details, str):
                 details = ast.literal_eval(details)
-            if not isinstance(details, dict):
-                return 0.0
 
-            invoice = details.get("order", {}).get("payment", {}).get("invoice", [])
+            if not isinstance(details, dict):
+                return [], 0.0, 0.0
+
+            order = details.get("order", {})
+
+            # -------------------------
+            # Extract totals
+            invoice = order.get("payment", {}).get("invoice", [])
             for item in invoice:
                 if item.get("code") == "sub_totals_after_vat":
-                    return round(float(item.get("value", 0)), 2)
+                    total_w_vat = round(float(item.get("value", 0)), 2)
+
+                if item.get("code") == "total":
+                    overall_total = round(float(item.get("value", 0)), 2)
+
+            # -------------------------
+            # Extract products
+            products = order.get("products", [])
+
+            for p in products:
+                order_products.append({
+                    "name": p.get("name"),
+                    "sku": p.get("sku"),
+                    "quantity": p.get("quantity"),
+                    "price": round(float(p.get("price", 0)), 2)
+                })
+
+            return order_products, total_w_vat, overall_total
 
         except Exception as e:
             print("Error extracting order total:", e)
 
-        return 0.0
+        return [], 0.0, 0.0
 
     # -------------------------------
     # Hook campaign detection
@@ -7324,29 +7350,49 @@ def update_tracked_customers(new_event, history_rows, customer_dict):
         return None, None'''
 
     def determine_hook_campaign(history_rows, current_event):
-        earliest_row = None
-        earliest_id = float("inf")
+        earliest_campaign_row = None
+        earliest_campaign_id = float("inf")
+
+        earliest_source_row = None
+        earliest_source_id = float("inf")
 
         rows = history_rows + [current_event]
 
         for r in rows:
 
-            campaign = str(r.get("UTM_Campaign") or "").strip()
-
-            if not campaign:
+            if not isinstance(r, dict):
                 continue
 
-            distinct_id = r.get("Distinct_ID", float("inf"))
+            campaign = str(r.get("UTM_Campaign") or "").strip()
+            source = str(r.get("UTM_Source") or "").strip()
 
-            if distinct_id < earliest_id:
-                earliest_id = distinct_id
-                earliest_row = r
+            try:
+                distinct_id = float(r.get("Distinct_ID"))
+            except (TypeError, ValueError):
+                distinct_id = float("inf")
 
-        if earliest_row:
-            source = str(earliest_row.get("UTM_Source") or "").strip() or "unknown"
-            campaign = str(earliest_row.get("UTM_Campaign")).strip()
+            # Track earliest campaign row
+            if campaign:
+                if distinct_id < earliest_campaign_id:
+                    earliest_campaign_id = distinct_id
+                    earliest_campaign_row = r
 
+            # Track earliest source row -- used only if no campaign exists
+            if source:
+                if distinct_id < earliest_source_id:
+                    earliest_source_id = distinct_id
+                    earliest_source_row = r
+
+        # Priority 1 >> campaign exists
+        if earliest_campaign_row:
+            source = str(earliest_campaign_row.get("UTM_Source") or "").strip() or "unknown"
+            campaign = str(earliest_campaign_row.get("UTM_Campaign") or "").strip()
             return campaign, source
+
+        # Priority 2 >> only source exists
+        if earliest_source_row:
+            source = str(earliest_source_row.get("UTM_Source") or "").strip()
+            return "missing_campaign", source
 
         return None, None
 
@@ -7354,6 +7400,7 @@ def update_tracked_customers(new_event, history_rows, customer_dict):
     # Campaign event logging
 
     def log_campaign_event(event, row, details):
+
         event_type = event.get("Event_Type")
 
         if event_type not in ["purchase", "add_to_cart"]:
@@ -7364,6 +7411,32 @@ def update_tracked_customers(new_event, history_rows, customer_dict):
 
         score = 1 if event_type == "purchase" else 0.25
         order_id = event.get("Order_ID")
+
+        # ----------------------------------
+        # DUPLICATE CHECK -- ONLY FOR ATC
+        if event_type == "add_to_cart":
+
+            try:
+
+                existing = fetch_data_from_supabase_specific(
+                    "Campaign_Event_Log",
+                    filters={
+                        "Customer_ID": row.get("Customer_ID"),
+                        "UTM_Source": source,
+                        "UTM_Campaign": campaign
+                    }
+                )
+
+                if existing is not None and len(existing) > 0:
+                    print(
+                        f"[DUPE SKIPPED] ATC already logged for "
+                        f"Customer_ID={row.get('Customer_ID')} "
+                        f"Source={source} Campaign={campaign}"
+                    )
+                    return
+
+            except Exception as e:
+                print("Duplicate check failed:", e)
 
         products = []
 
@@ -7587,23 +7660,37 @@ def update_tracked_customers(new_event, history_rows, customer_dict):
 
     elif event_type == "purchase":
         row["Purchases"] = int(row.get("Purchases", 0)) + 1
-        order_total = extract_order_total(details)
+        order_prods, order_total_w_vat, overall_total = extract_order_total(details)
         order_id = extract_order_id(details)
         purchase_campaign_key = extract_campaign_key(new_event).lower()
-        purchase_entry = {"timestamp": now, "order_total": order_total, "campaigns": {}}
+        purchase_entry = {"timestamp": now, "order_total_all": overall_total, "order_total_w_vat": order_total_w_vat, "product_items": order_prods,"campaigns": {}}
 
         for camp, data in atc_dict["pending"].items():
             if camp.lower() == purchase_campaign_key:
                 continue
-            credit = order_total * 0.25
+            credit = overall_total * 0.25
             purchase_entry["campaigns"][camp] = {
                 "type": "atc",
                 "credit": credit
             }
 
+            # Move to history
+            # -----------------------------
+            history_entry = atc_dict["history"].get(camp, {
+                "count": 0,
+                "events": [],
+                "utm_source": data.get("utm_source"),
+                "utm_campaign": data.get("utm_campaign")
+            })
+
+            history_entry["count"] += data.get("count", 0)
+            history_entry["events"].extend(data.get("events", []))
+
+            atc_dict["history"][camp] = history_entry
+
         purchase_entry["campaigns"][purchase_campaign_key] = {
             "type": "purchase",
-            "credit": order_total
+            "credit": overall_total
         }
         per_purchase_dict[str(order_id)] = purchase_entry
         atc_dict["pending"] = {}
@@ -7614,8 +7701,8 @@ def update_tracked_customers(new_event, history_rows, customer_dict):
             "total_revenue": 0,
             "orders": []
         })
-        purchase_entry_existing["total_revenue"] += order_total
-        purchase_entry_existing["orders"].append({"order_id": order_id, "timestamp": now, "revenue": order_total})
+        purchase_entry_existing["total_revenue"] += overall_total
+        purchase_entry_existing["orders"].append({"order_id": order_id, "timestamp": now, "revenue": overall_total})
         purchase_dict[purchase_campaign_key] = purchase_entry_existing
 
     # --- Track UNKNOWN_CAMPAIGN by Attribution_Type ---
