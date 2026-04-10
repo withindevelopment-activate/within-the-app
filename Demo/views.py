@@ -7423,7 +7423,8 @@ def update_tracked_customers(new_event, history_rows, customer_dict):
                     filters={
                         "Customer_ID": row.get("Customer_ID"),
                         "UTM_Source": source,
-                        "UTM_Campaign": campaign
+                        "UTM_Campaign": campaign, 
+                        "Event_Type": "add_to_cart"
                     }
                 )
 
@@ -7485,7 +7486,7 @@ def update_tracked_customers(new_event, history_rows, customer_dict):
             "Is_Hook_Campaign": campaign == hook_campaign,
             "Timestamp": get_uae_current_date(),
             "Maunal": False,
-            "Which_Update": "070426 1054AM"
+            "Which_Update": "1000426 15:00"
         }
 
         print("Logging campaign event:", row_log)
@@ -7598,7 +7599,7 @@ def update_tracked_customers(new_event, history_rows, customer_dict):
             "Hook_Campaign": None,
             "Hook_Source": None,
             "Hook_Timestamp": None,
-            "Which_Update": "070426 1054AM"
+            "Which_Update": "1000426 15:00"
         })
 
         customer_df = pd.concat([customer_df, pd.DataFrame([row])], ignore_index=True)
@@ -7750,7 +7751,7 @@ def update_tracked_customers(new_event, history_rows, customer_dict):
     row_dict["Is_Anonymous"] = is_anonymous
     row_dict["Customer_Info"] = customer_dict
 
-    row_dict["Which_Update"] = "070426 customer info update"
+    row_dict["Which_Update"] = "1000426 15:00 updates"
 
     df_to_upload = pd.DataFrame([row_dict])
 
