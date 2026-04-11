@@ -57,12 +57,12 @@
           <div class="date-range-wrap">
               <div class="date-pill">
                   <span class="date-pill-label">From</span>
-                  <input type="datetime-local" id="dateFrom">
+                  <input type="date" id="dateFrom">
               </div>
               <span class="date-arrow">→</span>
               <div class="date-pill">
                   <span class="date-pill-label">To</span>
-                  <input type="datetime-local" id="dateTo">
+                  <input type="date" id="dateTo">
               </div>
               <button class="date-clear" id="dateClear">✕ clear</button>
           </div>
@@ -237,24 +237,36 @@
 
     /* ── Filter ── */
     function applyFilter() {
+      function parseDateOnly(val) {
+        if (!val) return null;
+        const [y, m, d] = val.split('-').map(Number);
+        return new Date(y, m - 1, d).getTime();
+      }
+
+      function getRowDate(ts) {
+        if (!ts) return null;
+        const d = new Date(ts);
+        return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+      }
+
       const q = normalizeText(searchInput ? searchInput.value : '');
       const checkedSources = Array.from(document.querySelectorAll('.source-check:checked'))
         .map(cb => normalizeText(cb.value));
       const onlyCampaignMismatch = Boolean(campaignMismatchCheck && campaignMismatchCheck.checked);
       const onlySourceMismatch = Boolean(sourceMismatchCheck && sourceMismatchCheck.checked);
 
-      const fromVal = dateFrom && dateFrom.value ? new Date(dateFrom.value).getTime() : null;
-      const toVal = dateTo && dateTo.value ? new Date(dateTo.value).getTime() : null;
+      const fromVal = parseDateOnly(dateFrom && dateFrom.value);
+      const toVal   = parseDateOnly(dateTo && dateTo.value);
 
       let visible = 0;
 
       const rows = tbody.querySelectorAll('tr[data-source]');
       rows.forEach(row => {
           const rowSource = normalizeText(row.dataset.source);
-          const rowTs = row.dataset.ts ? new Date(row.dataset.ts).getTime() : null;
+          const rowDate = getRowDate(row.dataset.ts);
           const matchDate = (
-          (!fromVal || (rowTs && rowTs >= fromVal)) &&
-          (!toVal   || (rowTs && rowTs <= toVal))
+            (!fromVal || (rowDate !== null && rowDate >= fromVal)) &&
+            (!toVal   || (rowDate !== null && rowDate <= toVal))
           );
           const matchSearch = q === '' || 
                               normalizeText(row.dataset.order).includes(q) ||
