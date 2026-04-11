@@ -726,7 +726,7 @@ table.orders tbody tr:hover td {
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
-.date-pill input[type="datetime-local"] {
+.date-pill input[type="date"] {
   font-family: var(--ff-mono);
   font-size: 11px;
   color: var(--ink);
@@ -756,6 +756,124 @@ table.orders tbody tr:hover td {
 .date-clear:hover {
   background: var(--surface-3);
   color: var(--ink-2);
+}
+
+/* ── Searchable Product Select ─────────────────────────── */
+.product-select-wrap {
+    position: relative;
+    min-width: 160px;
+    font-family: inherit;
+}
+
+.product-select-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 5px 10px;
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 6px;
+    background: var(--surface, #fff);
+    color: var(--ink-1, #1a1a1a);
+    font-size: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    user-select: none;
+    transition: border-color 0.15s;
+}
+
+.product-select-trigger:hover {
+    border-color: var(--accent, #0f766e);
+}
+
+.product-select-trigger.open {
+    border-color: var(--accent, #0f766e);
+    box-shadow: 0 0 0 2px rgba(15,118,110,0.15);
+}
+
+.product-select-trigger .chevron {
+    flex-shrink: 0;
+    transition: transform 0.2s;
+    color: var(--ink-3, #8a8a8a);
+}
+
+.product-select-trigger.open .chevron {
+    transform: rotate(180deg);
+}
+
+.product-select-dropdown {
+    display: none;
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 200;
+    min-width: 220px;
+    background: var(--surface, #fff);
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.10);
+    overflow: hidden;
+}
+
+.product-select-dropdown.open {
+    display: flex;
+    flex-direction: column;
+}
+
+.product-search-input {
+    padding: 8px 10px;
+    border: none;
+    border-bottom: 1px solid var(--border, #e2e8f0);
+    font-size: 12px;
+    outline: none;
+    background: var(--surface-2, #f8fafc);
+    color: var(--ink-1, #1a1a1a);
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.product-options-list {
+    list-style: none;
+    margin: 0;
+    padding: 4px 0;
+    max-height: 180px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.product-options-list li {
+    padding: 7px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--ink-1, #1a1a1a);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: background 0.1s;
+}
+
+.product-options-list li:hover,
+.product-options-list li.highlighted {
+    background: var(--surface-2, #f0faf9);
+    color: var(--accent, #0f766e);
+}
+
+.product-options-list li.selected {
+    font-weight: 600;
+    color: var(--accent, #0f766e);
+}
+
+.product-options-list li.no-match {
+    color: var(--ink-3, #8a8a8a);
+    cursor: default;
+    font-style: italic;
+}
+
+.product-options-list li.no-match:hover {
+    background: none;
+    color: var(--ink-3, #8a8a8a);
 }
 
 @media (max-width: 768px) {
