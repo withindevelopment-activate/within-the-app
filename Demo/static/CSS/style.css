@@ -207,6 +207,7 @@ nav {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
+  align-items: center;
   gap: 14px;
   padding: 1rem;
   border-bottom: 0.5px solid var(--border);
@@ -565,7 +566,7 @@ table.orders tbody tr:hover td {
 
 .search-wrap svg {
   position: absolute;
-  left: 10px;
+  right: 10px;
   top: 50%;
   transform: translateY(-50%);
   width: 14px;
