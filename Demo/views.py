@@ -6538,6 +6538,7 @@ def view_tracked_customers(request):
         customer_id  = str(row.get("Customer_ID") or row.get("Visitor_ID") or "—").strip()
         hook_campaign = str(row.get("Hook_Campaign", "")).strip()
         hook_source   = str(row.get("Hook_Source",   "")).strip()
+        hook_timestamp = pd.to_datetime(row.get("Hook_Timestamp"), errors="coerce")
 
         # Sanitise nulls
         if hook_campaign.lower() in ("nan", "none", ""):
@@ -6551,9 +6552,26 @@ def view_tracked_customers(request):
 
         for order_id, order_data in per_purchase.items():
             order_data  = ensure_dict(order_data)
-            order_total = safe_float(order_data.get("order_total_all", 0))
-            timestamp   = str(order_data.get("timestamp", "")).strip()
+            order_total = safe_float(
+                order_data["order_total_all"]
+                if "order_total_all" in order_data
+                else order_data.get("order_total", 0)
+            )
             campaigns   = ensure_dict(order_data.get("campaigns"))
+            ## ORDER TIMES -- 
+            timestamp = order_data.get("timestamp")
+            order_time = pd.to_datetime(timestamp, errors="coerce")
+
+            ### TIME TO PURCHASE
+            time_to_purchase_minutes = None
+            time_to_purchase_days = None
+
+            if pd.notna(hook_timestamp) and pd.notna(order_time):
+
+                delta = order_time - hook_timestamp
+
+                time_to_purchase_minutes = round(delta.total_seconds() / 60, 2)
+                time_to_purchase_days = round(delta.total_seconds() / 86400, 2)
 
             # Find the purchase-type campaign (primary attribution)
             purchase_source   = ""
@@ -6584,6 +6602,8 @@ def view_tracked_customers(request):
                 "hook_source":      hook_source,
                 "order_total":      order_total,
                 "timestamp":        timestamp,
+                "time_to_purchase_minutes": time_to_purchase_minutes,
+                "time_to_purchase_days": time_to_purchase_days,
             })
 
     # Sort newest first
@@ -7350,6 +7370,7 @@ def update_tracked_customers(new_event, history_rows, customer_dict):
         return None, None'''
 
     def determine_hook_campaign(history_rows, current_event):
+
         earliest_campaign_row = None
         earliest_campaign_id = float("inf")
 
@@ -7387,14 +7408,16 @@ def update_tracked_customers(new_event, history_rows, customer_dict):
         if earliest_campaign_row:
             source = str(earliest_campaign_row.get("UTM_Source") or "").strip() or "unknown"
             campaign = str(earliest_campaign_row.get("UTM_Campaign") or "").strip()
-            return campaign, source
+            hook_timestamp = earliest_campaign_row.get("Last_Updated")
+            return campaign, source, hook_timestamp
 
         # Priority 2 >> only source exists
         if earliest_source_row:
             source = str(earliest_source_row.get("UTM_Source") or "").strip()
-            return "missing_campaign", source
+            hook_timestamp = earliest_source_row.get("Last_Updated")
+            return "missing_campaign", source, hook_timestamp
 
-        return None, None
+        return None, None, None
 
     # -------------------------------
     # Campaign event logging
@@ -7609,13 +7632,13 @@ def update_tracked_customers(new_event, history_rows, customer_dict):
     # Assign hook campaign -- only once per customer
 
     if not row.get("Hook_Campaign"):
-        hook_campaign, hook_source = determine_hook_campaign(history_rows, new_event)
+        hook_campaign, hook_source, hook_timestamp = determine_hook_campaign(history_rows, new_event)
         if hook_campaign:
             print("Assigning Hook Campaign:", hook_campaign, hook_source)
 
             row["Hook_Campaign"] = hook_campaign
             row["Hook_Source"] = hook_source
-            row["Hook_Timestamp"] = now
+            row["Hook_Timestamp"] = hook_timestamp
 
     # -------------------------------
     # Load dict fields
@@ -7779,6 +7802,16 @@ def view_purchase_campaigns(request):
     df['Event_Type'] = df['Event_Type'].str.strip().str.lower().astype(str)
     df['Score'] = df['Score'].astype(float)
 
+    # --- Remove duplicate Add To Cart events ---
+    atc = df[df['Event_Type'] == 'add_to_cart']
+    others = df[df['Event_Type'] != 'add_to_cart']
+
+    atc = atc.drop_duplicates(
+        subset=['Customer_ID', 'UTM_Source', 'UTM_Campaign']
+    )
+
+    df = pd.concat([atc, others], ignore_index=True)
+
     # --- Create purchase flag ---
     df['Is_Purchase'] = (df['Event_Type'] == 'purchase').astype(int)
 
@@ -7833,7 +7866,7 @@ def view_purchase_campaigns(request):
         "source_events": source_summary['Total_Events'].tolist(),
 
         
-        # Chart 2 Data (The Dropdown & Mapping)
+        # Chart 2 Data  -- The Dropdown & Mapping 
         "source_list": unique_sources,
         "campaign_data_json": json.dumps(source_to_campaigns),
     }
