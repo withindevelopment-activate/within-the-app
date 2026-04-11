@@ -4,422 +4,7 @@
 
 {% block content %}
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;700&display=swap"
-  rel="stylesheet">
-<style>
-  :root {
-    /* Main Palette - Forced Light Mode */
-    --ink: #0f0f0f;
-    --ink-2: #4a4a4a;
-    --ink-3: #8a8a8a;
-    --surface: #ffffff;
-    --surface-2: #f6f5f2;
-    --surface-3: #eeecea;
-    --border: rgba(0, 0, 0, 0.08);
-    --border-md: rgba(0, 0, 0, 0.13);
-    --accent: #534AB7;
-
-    /* Typography & Radius */
-    --ff-head: 'Syne', sans-serif;
-    --ff-mono: 'DM Mono', monospace;
-    --radius-lg: 16px;
-    --radius-md: 10px;
-  }
-
-  /* Global Resets */
-  *,
-  *::before,
-  *::after {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-  }
-
-  .page {
-    font-family: var(--ff-head);
-    color: var(--ink);
-    background: var(--surface-2);
-    min-height: 100vh;
-    padding: 2rem 2.5rem 4rem;
-  }
-
-  /* ── Header ── */
-  .page-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 1.75rem;
-    padding-bottom: 1.25rem;
-    border-bottom: 0.5px solid var(--border-md);
-    flex-wrap: wrap;
-    gap: 1rem;
-  }
-
-  .page-header h1 {
-    font-size: 20px;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-  }
-
-  .header-stats {
-    display: flex;
-    gap: 1.5rem;
-    align-items: center;
-  }
-
-  .stat {
-    text-align: right;
-  }
-
-  .stat-val {
-    font-size: 18px;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    color: var(--ink);
-    line-height: 1;
-  }
-
-  .stat-label {
-    font-family: var(--ff-mono);
-    font-size: 10px;
-    color: var(--ink-3);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-top: 3px;
-  }
-
-  .stat-divider {
-    width: 0.5px;
-    height: 32px;
-    background: var(--border-md);
-  }
-
-  /* ── Toolbar ── */
-  .toolbar {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 1rem;
-    flex-wrap: wrap;
-  }
-
-  .search-wrap {
-    position: relative;
-    flex: 1;
-    min-width: 200px;
-    max-width: 340px;
-  }
-
-  .search-wrap svg {
-    position: absolute;
-    left: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 14px;
-    height: 14px;
-    stroke: var(--ink-3);
-    fill: none;
-    stroke-width: 2;
-    stroke-linecap: round;
-  }
-
-  .search-input {
-    width: 100%;
-    padding: 7px 10px 7px 32px;
-    font-family: var(--ff-mono);
-    font-size: 11px;
-    color: var(--ink);
-    background: var(--surface);
-    border: 0.5px solid var(--border-md);
-    border-radius: var(--radius-md);
-    outline: none;
-  }
-
-  .search-input::placeholder {
-    color: var(--ink-3);
-  }
-
-  .search-input:focus {
-    border-color: var(--accent);
-  }
-
-  .filter-select {
-    padding: 7px 10px;
-    font-family: var(--ff-mono);
-    font-size: 11px;
-    color: var(--ink);
-    background: var(--surface);
-    border: 0.5px solid var(--border-md);
-    border-radius: var(--radius-md);
-    outline: none;
-    cursor: pointer;
-  }
-
-  .filter-select:focus {
-    border-color: var(--accent);
-  }
-
-  .toolbar {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 14px;
-      padding: 1rem;
-      border-bottom: 0.5px solid var(--border);
-      flex-wrap: wrap;
-  }
-
-  .toolbar-group {
-      display: flex;
-      flex-direction: column;
-      gap: 0.55rem;
-  }
-
-  .toolbar-group-wide {
-      flex: 1 1 100%;
-  }
-
-  .toolbar-label {
-      font-family: var(--ff-mono);
-      font-size: 10px;
-      color: var(--ink-3);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-  }
-
-  .checkbox-group {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-  }
-
-  .checkbox-label {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 10px;
-      border: 0.5px solid var(--border);
-      border-radius: 999px;
-      background: var(--surface);
-      font-family: var(--ff-mono);
-      font-size: 11px;
-      cursor: pointer;
-      color: var(--ink-2);
-  }
-
-  .checkbox-label input {
-      accent-color: var(--accent);
-  }
-
-
-  .count-tag {
-    margin-left: auto;
-    font-family: var(--ff-mono);
-    font-size: 10px;
-    color: var(--ink-3);
-    padding: 5px 10px;
-    background: var(--surface-3);
-    border-radius: 6px;
-    border: 0.5px solid var(--border);
-  }
-
-  /* ── Table card ── */
-  .table-card {
-    background: var(--surface);
-    border: 0.5px solid var(--border);
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
-  }
-
-  .table-scroll {
-    overflow-x: auto;
-  }
-
-  table.orders {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 13px;
-  }
-
-  table.orders thead {
-    background: var(--surface-2);
-    position: sticky;
-    top: 0;
-    z-index: 1;
-  }
-
-  table.orders th {
-    text-align: left;
-    font-family: var(--ff-mono);
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--ink-3);
-    font-weight: 400;
-    padding: 10px 16px;
-    border-bottom: 0.5px solid var(--border-md);
-    white-space: nowrap;
-    cursor: pointer;
-    user-select: none;
-    transition: color 0.15s;
-  }
-
-  table.orders th:hover {
-    color: var(--ink-2);
-  }
-
-  table.orders th .sort-arrow {
-    display: inline-block;
-    margin-left: 4px;
-    opacity: 0.3;
-    font-size: 9px;
-  }
-
-  table.orders th.sorted .sort-arrow {
-    opacity: 1;
-    color: var(--accent);
-  }
-
-  table.orders td {
-    padding: 11px 16px;
-    border-bottom: 0.5px solid var(--border);
-    color: var(--ink);
-    vertical-align: middle;
-  }
-
-  table.orders tbody tr:last-child td {
-    border-bottom: none;
-  }
-
-  table.orders tbody tr {
-    transition: background 0.1s;
-  }
-
-  table.orders tbody tr:hover td {
-    background: var(--surface-2);
-  }
-
-  /* ── Badges ── */
-  .badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 3px 9px;
-    border-radius: 5px;
-    font-family: var(--ff-mono);
-    font-size: 10px;
-    font-weight: 500;
-    white-space: nowrap;
-  }
-
-  .badge-dot {
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-
-  /* Adjusted for Light Surface */
-  .src-instagram {
-    background: #EEEDFE;
-    color: #3C3489;
-  }
-
-  .src-instagram .badge-dot {
-    background: #534AB7;
-  }
-
-  .src-google {
-    background: #E6F1FB;
-    color: #0C447C;
-  }
-
-  .src-google .badge-dot {
-    background: #378ADD;
-  }
-
-  .src-content {
-    background: #EAF3DE;
-    color: #27500A;
-  }
-
-  .src-content .badge-dot {
-    background: #639922;
-  }
-
-  .src-direct {
-    background: #F1EFE8;
-    color: #444441;
-  }
-
-  .src-direct .badge-dot {
-    background: #888780;
-  }
-
-  .src-default {
-    background: var(--surface-3);
-    color: var(--ink-2);
-  }
-
-  .src-default .badge-dot {
-    background: var(--ink-3);
-  }
-
-  .badge-hook {
-    background: #FFF3E6;
-    color: #854F0B;
-    border: 0.5px solid rgba(213, 127, 11, 0.2);
-  }
-
-  .badge-hook .badge-dot {
-    background: #BA7517;
-  }
-
-  .badge-anon {
-    background: var(--surface-3);
-    color: var(--ink-3);
-    font-size: 9px;
-    padding: 2px 6px;
-    border-radius: 3px;
-    vertical-align: middle;
-    margin-left: 4px;
-  }
-
-  /* ── UI Elements ── */
-  .order-total {
-    font-family: var(--ff-mono);
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--ink);
-  }
-
-  .ts {
-    font-family: var(--ff-mono);
-    font-size: 10px;
-    color: var(--ink-3);
-    white-space: nowrap;
-  }
-
-  .order-id {
-    font-family: var(--ff-mono);
-    font-size: 11px;
-    color: var(--ink-2);
-  }
-
-  .empty-state,
-  .no-results {
-    text-align: center;
-    padding: 4rem 2rem;
-    color: var(--ink-3);
-    font-family: var(--ff-mono);
-    font-size: 12px;
-  }
-</style>
 <div class="mt-5">
-
-  {# ── Page header ── #}
   <div class="page-header">
     <h1>Orders</h1>
     <div class="header-stats">
@@ -467,6 +52,22 @@
             </div>
         </div>
 
+        <div class="toolbar-group">
+          <span class="toolbar-label">Date range</span>
+          <div class="date-range-wrap">
+              <div class="date-pill">
+                  <span class="date-pill-label">From</span>
+                  <input type="datetime-local" id="dateFrom">
+              </div>
+              <span class="date-arrow">→</span>
+              <div class="date-pill">
+                  <span class="date-pill-label">To</span>
+                  <input type="datetime-local" id="dateTo">
+              </div>
+              <button class="date-clear" id="dateClear">✕ clear</button>
+          </div>
+        </div>
+
         <div class="toolbar-group toolbar-group-wide">
             <span class="toolbar-label">Compare Attribution</span>
             <div id="mismatchCheckboxGroup" class="checkbox-group">
@@ -495,6 +96,7 @@
                 <th data-col="3">Hook campaign <span class="sort-arrow">↕</span></th>
                 <th data-col="4">Order total <span class="sort-arrow">↕</span></th>
                 <th data-col="5" class="sorted">Timestamp <span class="sort-arrow">↓</span></th>
+                <th data-col="6">Time to purchase <span class="sort-arrow">↕</span></th>
               </tr>
             </thead>
             <tbody id="tableBody">
@@ -503,7 +105,7 @@
                 data-campaign="{{ r.purchase_campaign|lower }}" data-hook="{{ r.hook_campaign|lower }}"
                 data-hook-source="{{ r.hook_source|lower }}"
                 data-source="{{ r.purchase_source|lower }}" data-total="{{ r.order_total }}"
-                data-ts="{{ r.timestamp }}">
+                data-ts="{{ r.timestamp }}" data-ttp="{{ r.time_to_purchase_minutes }}">
                 {# Order ID #}
                 <td><span class="order-id">#{{ r.order_id }}</span></td>
 
@@ -550,10 +152,14 @@
 
                 {# Timestamp #}
                 <td><span class="ts">{{ r.timestamp|default:"—" }}</span></td>
+
+                {# Time to purchase #}
+                <td><span class="ttp" data-minutes="{{ r.time_to_purchase_minutes }}"></span></td>
+
               </tr>
               {% empty %}
               <tr>
-                <td colspan="6" class="empty-state">No orders found.</td>
+                <td colspan="7" class="empty-state">No orders found.</td>
               </tr>
               {% endfor %}
             </tbody>
@@ -580,6 +186,46 @@
       return hasMeaningfulValue(left) && hasMeaningfulValue(right) && left !== right;
     }
 
+    // Format minutes into "+Xd H:MM:SS"
+    function formatTTP(minutes) {
+      if (minutes === null || minutes === "" || isNaN(parseFloat(minutes))) return "—";
+      const totalSec = Math.round(parseFloat(minutes) * 60);
+      if (totalSec < 0) return "—";
+      const d = Math.floor(totalSec / 86400);
+      const h = Math.floor((totalSec % 86400) / 3600);
+      const m = Math.floor((totalSec % 3600) / 60);
+      const s = totalSec % 60;
+      const hms = `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+      return d > 0 ? `+${d}d ${hms}` : `+${hms}`;
+    }
+
+    // Render all TTP spans on load
+    document.querySelectorAll('.ttp').forEach(el => {
+      const mins = el.dataset.minutes;
+      const formatted = formatTTP(mins);
+      if (formatted !== "—") {
+        el.innerHTML = `<span class="ttp-badge">${formatted}</span>`;
+      } else {
+        el.textContent = "—";
+        el.style.color = "var(--ink-3)";
+        el.style.fontFamily = "var(--ff-mono)";
+        el.style.fontSize = "11px";
+      }
+    });
+
+    // Date filter
+    const dateFrom = document.getElementById('dateFrom');
+    const dateTo = document.getElementById('dateTo');
+    const dateClear = document.getElementById('dateClear');
+
+    if (dateFrom) dateFrom.addEventListener('change', applyFilter);
+    if (dateTo) dateTo.addEventListener('change', applyFilter);
+    if (dateClear) dateClear.addEventListener('click', () => {
+      dateFrom.value = '';
+      dateTo.value = '';
+      applyFilter();
+    });
+
     const searchInput = document.getElementById('campaignSearchInput');
     const checkboxGroup = document.getElementById('sourceCheckboxGroup');
     const mismatchCheckboxGroup = document.getElementById('mismatchCheckboxGroup');
@@ -596,11 +242,20 @@
         .map(cb => normalizeText(cb.value));
       const onlyCampaignMismatch = Boolean(campaignMismatchCheck && campaignMismatchCheck.checked);
       const onlySourceMismatch = Boolean(sourceMismatchCheck && sourceMismatchCheck.checked);
+
+      const fromVal = dateFrom && dateFrom.value ? new Date(dateFrom.value).getTime() : null;
+      const toVal = dateTo && dateTo.value ? new Date(dateTo.value).getTime() : null;
+
       let visible = 0;
 
       const rows = tbody.querySelectorAll('tr[data-source]');
       rows.forEach(row => {
           const rowSource = normalizeText(row.dataset.source);
+          const rowTs = row.dataset.ts ? new Date(row.dataset.ts).getTime() : null;
+          const matchDate = (
+          (!fromVal || (rowTs && rowTs >= fromVal)) &&
+          (!toVal   || (rowTs && rowTs <= toVal))
+          );
           const matchSearch = q === '' || 
                               normalizeText(row.dataset.order).includes(q) ||
                               normalizeText(row.dataset.customer).includes(q) ||
@@ -612,7 +267,7 @@
                               checkedSources.includes(rowSource);
           const matchCampaignMismatch = !onlyCampaignMismatch || isMeaningfulMismatch(row.dataset.hook, row.dataset.campaign);
           const matchSourceMismatch = !onlySourceMismatch || isMeaningfulMismatch(row.dataset.hookSource, row.dataset.source);
-          const show = matchSearch && matchSource && matchCampaignMismatch && matchSourceMismatch;
+          const show = matchSearch && matchSource && matchCampaignMismatch && matchSourceMismatch && matchDate;
 
           row.style.display = show ? '' : 'none';
           if (show) visible++;
@@ -624,7 +279,7 @@
         if (!noRow) {
           noRow = document.createElement('tr');
           noRow.className = 'no-results-row';
-          noRow.innerHTML = '<td colspan="6" class="no-results">No orders match your filter.</td>';
+          noRow.innerHTML = '<td colspan="7" class="no-results">No orders match your filter.</td>';
           tbody.appendChild(noRow);
         }
       } else {
@@ -649,7 +304,7 @@
     }
 
     /* ── Sort ── */
-    let sortCol = 5;    /* default: timestamp */
+    let sortCol = null;    /* default: timestamp */
     let sortAsc = false;
 
     function sortTable(col) {
@@ -657,7 +312,7 @@
         sortAsc = !sortAsc;
       } else {
         sortCol = col;
-        sortAsc = ![4, 5].includes(col); /* total defaults desc, others asc */
+        sortAsc = ![4, 5, 6].includes(col); /* total defaults desc, others asc */
       }
 
       headers.forEach(th => {
@@ -673,7 +328,7 @@
 
       const rows = Array.from(tbody.querySelectorAll('tr[data-order]'));
 
-      const keyMap = ['order', 'customer', 'campaign', 'hook', 'total', 'ts'];
+      const keyMap = ['order', 'customer', 'campaign', 'hook', 'total', 'ts', 'ttp'];
       const key = keyMap[col];
 
       rows.sort((a, b) => {
@@ -681,6 +336,12 @@
         let vb = b.dataset[key] || '';
 
         if (key === 'total') {
+          va = parseFloat(va) || 0;
+          vb = parseFloat(vb) || 0;
+          return sortAsc ? va - vb : vb - va;
+        }
+
+        if (key === 'total' || key === 'ttp') {
           va = parseFloat(va) || 0;
           vb = parseFloat(vb) || 0;
           return sortAsc ? va - vb : vb - va;
