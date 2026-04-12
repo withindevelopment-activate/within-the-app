@@ -7886,7 +7886,14 @@ def view_purchase_campaigns(request):
     access_token = tokens['access_token']
     store_id = tokens['store_id']
 
-    zid_product_list = fetch_product_name_skus(authorization, access_token, store_id)
+    # zid_product_list = fetch_product_name_skus(authorization, access_token, store_id) 
+    # Not directly calling the function that fetches anymore due to timeout error, 
+    # rather would call it and store them in zid_product_list + create a function that updates that list in the background when a webhook says a new product is created or a product is altered.
+    
+
+    ## Calling the list fromt he db
+    products_df = fetch_data_from_supabase("zid_product_list")
+    zid_product_list = products_df["Product_Combo"].tolist()
 
     context = {
         "campaigns": campaign_summary.to_dict(orient="records"),
