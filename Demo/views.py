@@ -8136,7 +8136,7 @@ def view_purchase_campaigns(request):
                 }]
             }
 
-            spend_resp = requests.post(spend_tik_url, headers=headers, params=spend_tik_params)
+            spend_resp = requests.get(spend_tik_url, headers=headers, params=spend_tik_params)
             spend_data = spend_resp.json()
             spend_list = spend_data.get("data", {}).get("list", [])
             total_spend = sum(float(item.get("metrics", {}).get("spend", 0)) for item in spend_list)
