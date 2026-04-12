@@ -262,7 +262,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
 
-            fetch('{% url "update_campaign_products" %}', {
+            fetch('{% url "Demo:update_campaign_products" %}', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
