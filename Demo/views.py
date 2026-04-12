@@ -8156,9 +8156,6 @@ def view_purchase_campaigns(request):
     
     meta_url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/{meta_account_id}/ads"
     meta_creative_url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/{meta_account_id}/adcreatives"
-
-    if start_time and end_time:
-        params["time_range"] = json.dumps({"since": start_time, "until": end_time})
     
     meta_params = {
         "fields": "name,creative{id},insights.time_range({\"since\":\""+start_time+"\",\"until\":\""+end_time+"\"}){spend}",
