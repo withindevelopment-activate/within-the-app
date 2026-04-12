@@ -8136,13 +8136,13 @@ def view_purchase_campaigns(request):
                 }]
             }
 
-            spend_resp = requests.post(spend_tik_url, headers=headers, json=spend_tik_params)
+            spend_resp = requests.post(spend_tik_url, headers=headers, params=spend_tik_params)
             spend_data = spend_resp.json()
             spend_list = spend_data.get("data", {}).get("list", [])
             total_spend = sum(float(item.get("metrics", {}).get("spend", 0)) for item in spend_list)
 
-            campaign = utm_ad_tiktok.get("utm_campaign", "unknown")
-            sources_spend["tiktok"][campaign] = sources_spend["tiktok"].get(campaign, 0) + total_spend
+            tiktok_camp_key = utm_ad_tiktok.get("utm_campaign", "missing_campaign")
+            sources_spend["tiktok"][tiktok_camp_key] = sources_spend["tiktok"].get(tiktok_camp_key, 0) + total_spend
 
 
     # META
