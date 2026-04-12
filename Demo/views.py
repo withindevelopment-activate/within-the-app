@@ -24,7 +24,7 @@ from Demo.supporting_files.supporting_functions import get_uae_current_date, det
 # Marketing Report functions
 from Demo.supporting_files.marketing_report import create_general_analysis, create_product_percentage_amount_spent, landing_performance_5_async, column_check
 # Webhook function imports
-from Demo.supporting_files.hook_tasks import track_price_changes, process_zid_order_logic, initial_fetch_products
+from Demo.supporting_files.hook_tasks import track_price_changes, process_zid_order_logic, initial_fetch_products, fetch_product_name_skus
 ## import the save tracking heler functions
 from Demo.supporting_files.save_tracking_helpers import *
 
@@ -49,6 +49,25 @@ supabase: Client = create_client(url, key)
     # Add optional parameters if they exist
     query_string = '&'.join([f'{k}={v}' for k, v in params.items()])
     return redirect(f'{settings.ZID_AUTH_URL}?{query_string}')'''
+
+def get_latest_token():
+    """Fetch the most recent token from the database by highest Distinct_ID."""
+    res = supabase.table("tokens") \
+        .select("*") \
+        .order("Distinct_ID", desc=True) \
+        .limit(1) \
+        .execute()
+
+    if not res.data:
+        raise ValueError("No tokens found in database")
+    
+    token_row = res.data[0]
+    return {
+        "access_token": token_row["Access"],
+        "authorization_token": token_row["Authorization"],
+        "refresh_token": token_row["Refresh"],
+        "store_id": token_row["Store_ID"]
+    }
 
 def zid_login(request):
     params = {
@@ -128,6 +147,8 @@ def zid_callback(request):
 
         tokens_df = pd.DataFrame([tokens])
         batch_insert_to_supabase(tokens_df, 'tokens')
+
+        #initial_fetch_products(authorization_token, access_token, store_id)
 
         # ### Subscribe to the products webhook --
         # print("Creating the product webhook")
@@ -7858,6 +7879,15 @@ def view_purchase_campaigns(request):
         .tolist()
     )
 
+    ## Get the list of products
+    ## Get the latest tokens
+    tokens = get_latest_token()
+    authorization = tokens["authorization_token"]
+    access_token = tokens['access_token']
+    store_id = tokens['store_id']
+
+    zid_product_list = fetch_product_name_skus(authorization, access_token, store_id)
+
     context = {
         "campaigns": campaign_summary.to_dict(orient="records"),
         # Chart 1 Data
@@ -7869,6 +7899,7 @@ def view_purchase_campaigns(request):
         # Chart 2 Data  -- The Dropdown & Mapping 
         "source_list": unique_sources,
         "campaign_data_json": json.dumps(source_to_campaigns),
+        "zid_product_list": zid_product_list
     }
 
     return render(request, "Demo/purchase_campaigns.html", context)

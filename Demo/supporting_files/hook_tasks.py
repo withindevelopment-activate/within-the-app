@@ -230,6 +230,91 @@ def initial_fetch_products(auth_token, token, store_id):
 
     return f"Initial product sync complete: {len(all_products)} products stored"
 
+
+
+##
+def fetch_product_name_skus(auth_token, token, store_id):
+
+    headers = {
+        "Authorization": f"Bearer {auth_token}",
+        "X-MANAGER-TOKEN": token,
+        "accept": "application/json",
+        "Accept-Language": "all-languages",
+        "Store-Id": str(store_id),
+        "Role": "Manager",
+    }
+
+    page = 1
+    per_page = 50
+    total_count = None
+
+    product_list = []
+
+    while True:
+
+        res = requests.get(
+            f"{settings.ZID_API_BASE}/products",
+            headers=headers,
+            params={"page": page, "per_page": per_page},
+            timeout=15
+        )
+
+        res.raise_for_status()
+        data = res.json()
+
+        products = data.get("results", [])
+        if not products:
+            break
+
+        if total_count is None:
+            total_count = data.get("count", len(products))
+
+        for product in products:
+
+            if not product.get("is_published"):
+                continue
+
+            name_obj = product.get("name", {})
+            product_name = name_obj.get("ar") or name_obj.get("en") or "Unnamed"
+
+            # If product has variants
+            if product.get("structure") == "parent":
+
+                try:
+                    parent_id = product.get("id")
+
+                    res_var = requests.get(
+                        f"{settings.ZID_API_BASE}/products/{parent_id}",
+                        headers=headers,
+                        timeout=10
+                    )
+
+                    res_var.raise_for_status()
+                    product_data = res_var.json()
+
+                    variants = product_data.get("variants", [])
+
+                    for v in variants:
+                        sku = str(v.get("sku", "")).strip()
+                        if sku:
+                            product_list.append(f"{product_name}_{sku}")
+
+                except Exception:
+                    continue
+
+            else:
+                sku = str(product.get("sku", "")).strip()
+                if sku:
+                    product_list.append(f"{product_name}_{sku}")
+
+        if len(product_list) >= total_count:
+            break
+
+        page += 1
+
+    return product_list
+
+
 # Function to fetch and store orders
 def fetch_new_orders(auth_token, token, store_id, batch_size=10, max_pages=10000):
     """

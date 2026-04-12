@@ -99,10 +99,11 @@
                         <tr>
                             <th data-col="0">Campaign <span class="sort-arrow">↕</span></th>
                             <th data-col="1">Source <span class="sort-arrow">↕</span></th>
-                            <th data-col="2">Total Score <span class="sort-arrow">↕</span></th>
-                            <th data-col="3" class="sorted">Purchases <span class="sort-arrow">↓</span></th>
-                            <th data-col="4">Total Events <span class="sort-arrow">↕</span></th>
-                            <th data-col="5">Conversion % <span class="sort-arrow">↕</span></th>
+                            <th data-col="2">Product <span class="sort-arrow">↕</span></th>
+                            <th data-col="3">Total Score <span class="sort-arrow">↕</span></th>
+                            <th data-col="4" class="sorted">Purchases <span class="sort-arrow">↓</span></th>
+                            <th data-col="5">Total Events <span class="sort-arrow">↕</span></th>
+                            <th data-col="6">Conversion % <span class="sort-arrow">↕</span></th>
                         </tr>
                     </thead>
                     <tbody id="tableBody">
@@ -128,6 +129,22 @@
                                 </span>
                                 {% endwith %}
                             </td>
+                            <td>
+                                <div class="product-select-wrap" id="product-select-row-{{ forloop.counter0 }}">
+                                    <div class="product-select-trigger" tabindex="0">
+                                        <span class="selected-label">Select product…</span>
+                                        <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                                    </div>
+                                    <div class="product-select-dropdown">
+                                        <input class="product-search-input" type="text" placeholder="Search products…" autocomplete="off">
+                                        <ul class="product-options-list">
+                                            {% for product in zid_product_list %}
+                                            <li data-value="{{ product }}">{{ product }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                </div>
+                            </td>
                             <td><span class="score-chip"><span class="badge-dot"></span>{{ c.Total_Score|floatformat:2}}</span></td>
                             <td><span class="metric">{{ c.Purchases }}</span></td>
                             <td><span class="metric">{{ c.Total_Events }}</span></td>
@@ -135,7 +152,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="6" class="empty-state">No campaign data found.</td>
+                            <td colspan="7" class="empty-state">No campaign data found.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -501,7 +518,7 @@ document.addEventListener('DOMContentLoaded', function () {
             });
 
             const rows = Array.from(tbody.querySelectorAll('tr[data-source]'));
-            const keyMap = ['campaign', 'source', 'score', 'purchases', 'events', 'conversion'];
+            const keyMap = ['campaign', 'source', 'product', 'score', 'purchases', 'events', 'conversion'];
             const key = keyMap[col];
 
             rows.sort((a, b) => {
@@ -529,6 +546,91 @@ document.addEventListener('DOMContentLoaded', function () {
         applyFilter();
         sortTable(3);
     }) ();
+
+    // ── Searchable Product Selects ───────────────────────────
+    (function initProductSelects() {
+        const productData = {{ zid_product_list|safe }};
+
+        document.querySelectorAll('.product-select-wrap').forEach(function(wrap) {
+            const trigger = wrap.querySelector('.product-select-trigger');
+            const dropdown = wrap.querySelector('.product-select-dropdown');
+            const searchInput = wrap.querySelector('.product-search-input');
+            const optionsList = wrap.querySelector('.product-options-list');
+            const selectedLabel = wrap.querySelector('.selected-label');
+            let selectedValue = null;
+
+            function openDropdown() {
+                dropdown.classList.add('open');
+                trigger.classList.add('open');
+                searchInput.value = '';
+                renderOptions('');
+                searchInput.focus();
+            }
+
+            function closeDropdown() {
+                dropdown.classList.remove('open');
+                trigger.classList.remove('open');
+            }
+
+            function renderOptions(query) {
+                const q = query.trim().toLowerCase();
+                const filtered = q
+                    ? productData.filter(p => String(p).toLowerCase().includes(q))
+                    : productData;
+
+                optionsList.innerHTML = '';
+
+                if (!filtered.length) {
+                    const li = document.createElement('li');
+                    li.className = 'no-match';
+                    li.textContent = 'No products found';
+                    optionsList.appendChild(li);
+                    return;
+                }
+
+                filtered.forEach(function(product) {
+                    const li = document.createElement('li');
+                    li.textContent = product;
+                    li.dataset.value = product;
+                    if (product === selectedValue) li.classList.add('selected');
+                    li.addEventListener('mousedown', function(e) {
+                        e.preventDefault(); // prevent blur before click
+                        selectedValue = product;
+                        selectedLabel.textContent = product;
+                        // Store on the row for sorting/filtering if needed
+                        const row = wrap.closest('tr');
+                        if (row) row.dataset.product = String(product).toLowerCase();
+                        closeDropdown();
+                    });
+                    optionsList.appendChild(li);
+                });
+            }
+
+            trigger.addEventListener('click', function() {
+                const isOpen = dropdown.classList.contains('open');
+                // Close all other open dropdowns
+                document.querySelectorAll('.product-select-dropdown.open').forEach(d => {
+                    d.classList.remove('open');
+                    d.closest('.product-select-wrap').querySelector('.product-select-trigger').classList.remove('open');
+                });
+                if (!isOpen) openDropdown();
+            });
+
+            searchInput.addEventListener('input', function() {
+                renderOptions(this.value);
+            });
+
+            // Close on outside click
+            document.addEventListener('click', function(e) {
+                if (!wrap.contains(e.target)) closeDropdown();
+            });
+
+            // Keyboard: close on Escape
+            searchInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') closeDropdown();
+            });
+        });
+    })();
 });
 </script>
 
