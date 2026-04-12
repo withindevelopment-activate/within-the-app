@@ -7711,15 +7711,17 @@ def update_tracked_customers(new_event, history_rows, customer_dict):
         purchase_entry = {"timestamp": now, "order_total_all": overall_total, "order_total_w_vat": order_total_w_vat, "product_items": order_prods,"campaigns": {}}
 
         for camp, data in atc_dict["pending"].items():
-            if camp.lower() == purchase_campaign_key:
-                continue
-            credit = overall_total * 0.25
-            purchase_entry["campaigns"][camp] = {
-                "type": "atc",
-                "credit": credit
-            }
+            # Give credit ONLY if different campaign than purchase one
+            if camp.lower() != purchase_campaign_key:
 
-            # Move to history
+                credit = overall_total * 0.25
+
+                purchase_entry["campaigns"][camp] = {
+                    "type": "atc",
+                    "credit": credit
+                }
+
+            # Move to history -- all of them even if the atc campaign matches the purchase one
             # -----------------------------
             history_entry = atc_dict["history"].get(camp, {
                 "count": 0,
@@ -7910,3 +7912,23 @@ def view_purchase_campaigns(request):
     }
 
     return render(request, "Demo/purchase_campaigns.html", context)
+
+
+### A FUNCTION TO HANDLE THE INCOMING PRODUCT LIST CHANGE FOR THE UTM_Source/Campaign
+def update_campaign_products(request):
+
+    data = json.loads(request.body)
+    campaigns = data.get("campaigns", [])
+
+    for c in campaigns:
+
+        source = c.get("UTM_Source")
+        campaign = c.get("UTM_Campaign")
+        products = c.get("Products", [])
+
+        print(source, campaign, products)
+
+        # Call the Logs Campaign? Or create a different db for each product source and campaign combo?
+
+
+    return JsonResponse({"status": "success"})

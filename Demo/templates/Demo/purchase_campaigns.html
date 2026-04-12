@@ -93,6 +93,9 @@
         </div>
 
         <div class="data-viewport">
+            <button id="save-campaign-products" class="btn-primary">
+                Save Campaign Products
+            </button>
             <div class="data-scroller" role="region" aria-label="cart dataset" tabindex="0">
                 <table class="orders" id="campaignsTable" role="table" aria-label="Campaign analytics dataset">
                     <thead>
@@ -164,6 +167,71 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+
+    // The AJAX call to store selected products for the UTM_source/Camapign
+    const saveBtn = document.getElementById('save-campaign-products');
+
+    if (saveBtn) {
+
+        saveBtn.addEventListener('click', function () {
+
+            const changedRows = document.querySelectorAll('#campaignsTable tbody tr.changed');
+
+            const payload = Array.from(changedRows).map(row => {
+
+                const campaign = row.dataset.campaign || '';
+                const source = row.dataset.source || '';
+
+                let products = [];
+                try {
+                    products = JSON.parse(row.dataset.products || "[]");
+                } catch {}
+
+                return {
+                    UTM_Source: source,
+                    UTM_Campaign: campaign,
+                    Products: products
+                };
+
+            });
+
+            if (!payload.length) {
+                alert("No changes detected.");
+                return;
+            }
+
+            fetch('{% url "update_campaign_products" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({ campaigns: payload })
+            })
+            .then(res => res.json())
+            .then(data => {
+
+                if (data.status === "success") {
+                    alert("Products updated successfully");
+
+                    document.querySelectorAll('#campaignsTable tbody tr.changed')
+                        .forEach(row => row.classList.remove('changed'));
+                } 
+                else {
+                    alert("Error saving changes");
+                }
+
+            })
+            .catch(err => {
+                console.error(err);
+                alert("Server error");
+            });
+
+        });
+
+    }
+
+    
     (function () {
         const labels = {{ source_labels|safe }};
         const purchases = {{ source_purchases|safe }};
@@ -557,7 +625,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const searchInput = wrap.querySelector('.product-search-input');
             const optionsList = wrap.querySelector('.product-options-list');
             const selectedLabel = wrap.querySelector('.selected-label');
-            let selectedValue = null;
+            let selectedValues = []; // changed to list to allow multiple product selection
 
             function openDropdown() {
                 dropdown.classList.add('open');
@@ -594,13 +662,26 @@ document.addEventListener('DOMContentLoaded', function () {
                     li.dataset.value = product;
                     if (product === selectedValue) li.classList.add('selected');
                     li.addEventListener('mousedown', function(e) {
-                        e.preventDefault(); // prevent blur before click
-                        selectedValue = product;
-                        selectedLabel.textContent = product;
-                        // Store on the row for sorting/filtering if needed
+                        e.preventDefault();
+
+                        if (selectedValues.includes(product)) {
+                            selectedValues = selectedValues.filter(p => p !== product);
+                            li.classList.remove('selected');
+                        } else {
+                            selectedValues.push(product);
+                            li.classList.add('selected');
+                        }
+
+                        selectedLabel.textContent = selectedValues.length
+                            ? selectedValues.join(', ')
+                            : 'Select product…';
+
                         const row = wrap.closest('tr');
-                        if (row) row.dataset.product = String(product).toLowerCase();
-                        closeDropdown();
+
+                        if (row) {
+                            row.dataset.products = JSON.stringify(selectedValues);
+                            row.classList.add('changed');
+                        }
                     });
                     optionsList.appendChild(li);
                 });
