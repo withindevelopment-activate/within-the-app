@@ -7442,19 +7442,216 @@ def update_tracked_customers(new_event, history_rows, customer_dict):
 
     # -------------------------------
     # Campaign event logging
+    def clean_sku(sku):
+        if not sku:
+            return None
 
+        sku = str(sku).strip()
+
+        if sku.endswith("-OM"):
+            sku = sku[:-3]  # remove last 3 chars
+
+        return sku
+    
     def log_campaign_event(event, row, details):
+        """
+        This function both adds a log for the atc and purchases with atc dupe prevention for the same aource and camapign 
+        AND it updated the Campaign_Purchase_vs_Advertised database bby updating the dicts for purchases and atcs for the said source and its campaign
+        """
 
         event_type = event.get("Event_Type")
 
         if event_type not in ["purchase", "add_to_cart"]:
             return
 
-        campaign = str(event.get("UTM_Campaign")).strip() or "MISSING_CAMPAIGN"
-        source = str(event.get("UTM_Source")).strip() or "unknown"
+        campaign = (event.get("UTM_Campaign") or "MISSING_CAMPAIGN").strip().lower()
+        source = (event.get("UTM_Source") or "unknown").strip().lower()
 
         score = 1 if event_type == "purchase" else 0.25
         order_id = event.get("Order_ID")
+
+        # ----------------------------------
+        # PRODUCT EXTRACTION
+        products = []
+
+        try:
+
+            if event_type == "add_to_cart":
+
+                sku = details.get("sku")
+                name = details.get("name")
+
+                if sku:
+                    products.append({
+                        "sku": sku,
+                        "name": name,
+                        "qty": 1
+                    })
+
+            elif event_type == "purchase":
+
+                items = details.get("items", [])
+
+                for i in items:
+
+                    sku = i.get("item_sku")
+                    name = i.get("item_name")
+                    qty = int(i.get("quantity", 1))
+
+                    if sku:
+                        products.append({
+                            "sku": sku,
+                            "name": name,
+                            "qty": qty
+                        })
+
+        except Exception as e:
+            print("Product extraction error:", e)
+
+        print("Extracted products:", products)
+
+        # ----------------------------------
+        # UPDATE Campaign_Purchase_vs_Advertised
+        try:
+
+            existing = fetch_data_from_supabase_specific(
+                "Campaign_Purchase_vs_Advertised",
+                filters={
+                    "Source": source,
+                    "Campaign": campaign
+                }
+            )
+
+            if existing is not None and len(existing) > 0:
+                entry = existing.iloc[0].to_dict()
+            else:
+                entry = {
+                    'Distinct_ID': int(get_next_id_from_supabase_compatible_all(
+                        name='Campaign_Purchase_vs_Advertised',
+                        column='Distinct_ID'
+                    )),
+                    'Source': source,
+                    'Campaign': campaign,
+                    'Products_Sold': {},
+                    'Products_Advertised': {},
+                    'Products_ATC': {},
+                    'Ad_Quality': None,
+                    'Which_Update': '120426'
+                }
+
+            products_sold = entry.get("Products_Sold") or {}
+            products_atc = entry.get("Products_ATC") or {}
+
+            # -----------------------------
+            # PURCHASE UPDATE
+            if event_type == "purchase":
+
+                for p in products:
+
+                    sku = clean_sku(p["sku"])
+                    name = p["name"]
+                    qty = p["qty"]
+
+                    if sku not in products_sold:
+
+                        products_sold[sku] = {
+                            "product_name": name,
+                            "quantity": 0,
+                            "orders_count": 0,
+                            "order_ids": []
+                        }
+
+                    products_sold[sku]["quantity"] += qty
+
+                    if order_id not in products_sold[sku]["order_ids"]:
+                        products_sold[sku]["order_ids"].append(order_id)
+                        products_sold[sku]["orders_count"] += 1
+
+            # -----------------------------
+            # ATC UPDATE
+            if event_type == "add_to_cart":
+
+                for p in products:
+
+                    sku = clean_sku(p["sku"])
+                    name = p["name"]
+
+                    if sku not in products_atc:
+
+                        products_atc[sku] = {
+                            "product_name": name,
+                            "atc_count": 0
+                        }
+
+                    products_atc[sku]["atc_count"] += 1
+
+            entry["Products_Sold"] = products_sold
+            entry["Products_ATC"] = products_atc
+
+            # ----------------------------------
+            # AD QUALITY CALCULATION 
+
+            versions = entry.get("Products_Advertised") or []
+
+            latest = versions[-1] if versions else {}
+
+            advertised_skus = set(clean_sku(s) for s in latest.get("skus", []))
+
+            total_sold_value = 0
+            matched_sold_value = 0
+
+            total_atc_value = 0
+            matched_atc_value = 0
+
+            # -----------------------------
+            # SOLD QUALITY
+            for sku, data in products_sold.items():
+
+                qty = data.get("quantity", 0)
+                total_sold_value += qty
+
+                if sku in advertised_skus:
+                    matched_sold_value += qty
+
+            # -----------------------------
+            # ATC QUALITY
+            for sku, data in products_atc.items():
+
+                atc_count = data.get("atc_count", 0)
+                total_atc_value += atc_count
+
+                if sku in advertised_skus:
+                    matched_atc_value += atc_count
+
+            # -----------------------------
+            # SAFE DIVISION
+            sold_quality = (
+                matched_sold_value / total_sold_value
+                if total_sold_value > 0 else 0
+            )
+
+            atc_quality = (
+                matched_atc_value / total_atc_value
+                if total_atc_value > 0 else 0
+            )
+
+            # -----------------------------
+            # FINAL AD QUALITY SCORE (weighted)
+            ad_quality = round(
+                (sold_quality * 0.7) + (atc_quality * 0.3),
+                4
+            )
+
+            entry["Ad_Quality"] = ad_quality
+
+            upsert_partial(
+                pd.DataFrame([entry]),
+                "Campaign_Purchase_vs_Advertised",
+                "Distinct_ID"
+            )
+
+        except Exception as e:
+            print("Campaign_Purchase_vs_Advertised update failed:", e)
 
         # ----------------------------------
         # DUPLICATE CHECK -- ONLY FOR ATC
@@ -7467,7 +7664,7 @@ def update_tracked_customers(new_event, history_rows, customer_dict):
                     filters={
                         "Customer_ID": row.get("Customer_ID"),
                         "UTM_Source": source,
-                        "UTM_Campaign": campaign, 
+                        "UTM_Campaign": campaign,
                         "Event_Type": "add_to_cart"
                     }
                 )
@@ -7483,36 +7680,7 @@ def update_tracked_customers(new_event, history_rows, customer_dict):
             except Exception as e:
                 print("Duplicate check failed:", e)
 
-        products = []
-
-        try:
-
-            # -----------------------------
-            # ADD TO CART
-            if event_type == "add_to_cart":
-
-                sku = details.get("sku")
-
-                if sku:
-                    products = [sku]
-
-            # -----------------------------
-            # PURCHASE
-            elif event_type == "purchase":
-
-                items = details.get("items", [])
-
-                products = [
-                    i.get("item_sku")
-                    for i in items
-                    if i.get("item_sku")
-                ]
-
-        except Exception as e:
-            print("Product extraction error:", e)
-
-        print("Extracted products:", products)
-
+        # ----------------------------------
         hook_campaign = row.get("Hook_Campaign")
 
         row_log = {
@@ -7526,11 +7694,11 @@ def update_tracked_customers(new_event, history_rows, customer_dict):
             "Event_Type": event_type,
             "Score": score,
             "Order_ID": order_id,
-            "Products": products,
+            "Products": [p["sku"] for p in products],
             "Is_Hook_Campaign": campaign == hook_campaign,
             "Timestamp": get_uae_current_date(),
             "Maunal": False,
-            "Which_Update": "1000426 15:00"
+            "Which_Update": "1200426 11:00"
         }
 
         print("Logging campaign event:", row_log)
@@ -7655,7 +7823,7 @@ def update_tracked_customers(new_event, history_rows, customer_dict):
     if not row.get("Hook_Campaign"):
         hook_campaign, hook_source, hook_timestamp = determine_hook_campaign(history_rows, new_event)
         if hook_campaign:
-            print("Assigning Hook Campaign:", hook_campaign, hook_source)
+            print("Assigning Hook Campaign:", hook_campaign, hook_source, hook_timestamp)
 
             row["Hook_Campaign"] = hook_campaign
             row["Hook_Source"] = hook_source
@@ -7924,11 +8092,80 @@ def update_campaign_products(request):
 
         source = c.get("UTM_Source")
         campaign = c.get("UTM_Campaign")
-        products = c.get("Products", [])
+        skus = c.get("Products", []) or []
 
-        print(source, campaign, products)
+        if not source or not campaign:
+            continue
 
-        # Call the Logs Campaign? Or create a different db for each product source and campaign combo?
+        print(source, campaign, skus)
 
+        # ----------------------------------
+        # FETCH EXISTING RECORD
+        existing = fetch_data_from_supabase_specific(
+            "Campaign_Purchase_vs_Advertised",
+            filters={
+                "Source": source,
+                "Campaign": campaign
+            }
+        )
+
+        if existing is not None and len(existing) > 0:
+            entry = existing.iloc[0].to_dict()
+        else:
+            entry = {
+                "Distinct_ID": int(get_next_id_from_supabase_compatible_all(
+                    name="Campaign_Purchase_vs_Advertised",
+                    column="Distinct_ID"
+                )),
+                "Source": source,
+                "Campaign": campaign,
+                "Products_Sold": {},
+                "Products_ATC": {},
+                "Products_Advertised": [],
+                "Ad_Quality": None,
+                "Which_Update": "120426"
+            }
+
+        # ----------------------------------
+        # CURRENT VERSION LIST
+        versions = entry.get("Products_Advertised") or []
+
+        # next version number
+        next_version = len(versions) + 1
+
+        # ----------------------------------
+        # BUILD PRODUCT MAP (SKU -> name)
+        # If you only have SKU, we store SKU as fallback name too
+        product_map = {}
+
+        for sku in skus:
+            if "_" in sku:
+                # heuristic split: "Name_SKU"
+                name = sku.split("_")[0]
+            else:
+                name = sku
+
+            product_map[sku] = name
+
+        # ----------------------------------
+        # NEW VERSION OBJECT
+        new_version = {
+            "version": next_version,
+            "timestamp": get_uae_current_date(),
+            "skus": list(product_map.keys()),
+            "products": product_map
+        }
+
+        versions.append(new_version)
+
+        entry["Products_Advertised"] = versions
+
+        # ----------------------------------
+        # UPSERT BACK
+        upsert_partial(
+            pd.DataFrame([entry]),
+            "Campaign_Purchase_vs_Advertised",
+            "Distinct_ID"
+        )
 
     return JsonResponse({"status": "success"})
