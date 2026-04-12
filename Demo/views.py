@@ -7982,7 +7982,7 @@ def update_tracked_customers(new_event, history_rows, customer_dict):
 ############################################################################################
 ############################################################################################
 def view_purchase_campaigns(request):
-
+    import urllib.parse
     # Fetch data
     df = fetch_data_from_supabase("Campaign_Event_Log")
 
@@ -7992,6 +7992,219 @@ def view_purchase_campaigns(request):
     df['UTM_Campaign'] = df['UTM_Campaign'].str.strip().str.lower().astype(str)
     df['Event_Type'] = df['Event_Type'].str.strip().str.lower().astype(str)
     df['Score'] = df['Score'].astype(float)
+
+    today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    yesterday = today - timedelta(days=1)
+    seven_days_ago = today - timedelta(days=7)
+
+    
+    start_time = request.GET.get("start_time", seven_days_ago.strftime("%Y-%m-%d"))
+    end_time = request.GET.get("end_time", yesterday.strftime("%Y-%m-%d"))
+
+    tz_offset_minutes = int(request.GET.get("tz_offset", 0))  # in minutes
+    from_dt = datetime.strptime(start_time, "%Y-%m-%d") if start_time else datetime.now() - timedelta(days=8)
+    to_dt = datetime.strptime(end_time, "%Y-%m-%d") if end_time else (datetime.now())
+
+    # Adjust start/end for user's timezone
+    from_dt = from_dt.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(minutes=tz_offset_minutes)
+    to_dt = to_dt.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(minutes=tz_offset_minutes)
+
+    if from_dt > to_dt:
+        from_dt, to_dt = to_dt, from_dt
+
+    # Attach timezone offset instead of Z
+    snap_start_time = from_dt.isoformat(timespec="milliseconds") + 'Z'
+    snap_end_time = to_dt.isoformat(timespec="milliseconds") + 'Z'
+    
+    #Snapchat 
+    snap_params = {
+        "fields": "impressions,spend,conversion_purchases,conversion_purchases_value",
+        "granularity": "DAY",
+        "start_time": snap_start_time,
+        "end_time": snap_end_time,
+    }
+
+    # Step 1: Get org & ad account
+    organization_id = request.session.get("snap_org_id")
+    if not organization_id:
+        return redirect("Demo:snapchat_select_organization")
+
+    ad_account_id = request.session.get("snap_ad_account_id")
+    if not ad_account_id:
+        return redirect("Demo:snapchat_select_account", org_id=organization_id)
+
+    # Step 2: Get campaigns
+    creatives_data = snapchat_api_call(request, f"adaccounts/{ad_account_id}/creatives")
+    raw_creatives = creatives_data.get("creatives", [])
+    sources_spend = {"snapchat": {}, "tiktok": {}, "meta": {}}
+    utm_ad_snapchat = {}
+    for creative in raw_creatives:
+        utm_ad_snapchat["id"] = creative.get("id")
+        props = creative.get("web_view_properties")
+        if not props:
+            continue # Skip if it's not a web view creative
+            
+        url = props.get("url", "").lower().strip()
+        utm_ad_snapchat["url_utm"] = url
+    
+        # Parse UTMs for THIS specific creative
+        parsed_url = urlparse(url)
+        params = parse_qs(parsed_url.query)
+        
+        # Safely extract source and campaign
+        source = params.get("utm_source", [None])[0]
+        campaign = params.get("utm_campaign", [None])[0]
+        
+        utm_ad_snapchat["utm_source"] = source.lower() if source else ""
+        utm_ad_snapchat["utm_campaign"] = campaign.lower() if campaign else ""
+
+        # --- MATCHING LOGIC ---
+        # Check if this creative's UTMs exist in your Supabase log
+        match = df[
+            (df['UTM_Source'] == utm_ad_snapchat["utm_source"]) & 
+            (df['UTM_Campaign'] == utm_ad_snapchat["utm_campaign"])
+        ]
+
+        if not match.empty:
+            creative_stats = snapchat_api_call(request, f"creatives/{creative['id']}/stats", params=snap_params)
+            raw_creatives_stats = creative_stats.get("timeseries_stats", [])
+            creative_stats_dict = raw_creatives_stats[0] if raw_creatives_stats else {}
+            creative_timeseries = creative_stats_dict.get("timeseries_stat", [])
+            total_micros = sum(
+                day.get("stats", {}).get("spend", 0)
+                for day in creative_timeseries
+            )
+            spend = total_micros / 1_000_000 * 3.79
+
+            camp_key = utm_ad_snapchat.get("utm_campaign", "missing_campaign")
+            sources_spend["snapchat"][camp_key] = sources_spend["snapchat"].get(camp_key, 0) + spend
+
+    # TikTok
+
+    access_token = request.session.get("tiktok_access_token")
+    advertiser_id = request.session.get("tiktok_advertiser_id")
+
+    if not access_token:
+        return redirect("Demo:tiktok_login")
+    if not advertiser_id:
+        return HttpResponse("No advertiser selected", status=400)
+    
+    url = f"{API_BASE}/ad/get/"
+    Tiktok_params = {"advertiser_id": advertiser_id, "page_size": 50, "page": 1}
+    headers = {"Access-Token": access_token}
+
+    resp = requests.get(url, headers=headers, params=Tiktok_params)
+    resp_data = resp.json()
+
+    utm_ad_tiktok = {}
+    
+    ad_list = resp_data.get("data", {}).get("list", [])
+    for ad in ad_list:
+        utm_ad_tiktok["id"] = ad.get("ad_id")
+        tiktok_utms = ad.get("utm_params", [])
+        extracted_dict = {
+            item["key"]: urllib.parse.unquote(item["value"]) 
+            for item in tiktok_utms
+        }
+        utm_ad_tiktok["utm_source"] = extracted_dict.get("utm_source", "").lower().strip()
+        utm_ad_tiktok["utm_campaign"] = extracted_dict.get("utm_campaign", "").lower().strip()
+
+        match = df[
+            (df['UTM_Source'] == utm_ad_tiktok["utm_source"]) & 
+            (df['UTM_Campaign'] == utm_ad_tiktok["utm_campaign"])
+        ]
+
+        if not match.empty:
+            spend_tik_url = f"{API_BASE}/report/integrated/get/"
+            spend_tik_params = {
+                "advertiser_id": advertiser_id,
+                "dimensions": ["ad_id"],
+                "service_type": "AUCTION",
+                "report_type": "BASIC",
+                "data_level": "AUCTION_AD",
+                "metrics": ["spend"],
+                "start_time": start_time,
+                "end_time": end_time,
+                "filters": [{
+                    "field_name": "ad_ids",
+                    "field_type": "IN",
+                    "field_value": f"[\"{utm_ad_tiktok['id']}\"]"
+                }]
+            }
+
+            spend_resp = requests.post(spend_tik_url, headers=headers, json=spend_tik_params)
+            spend_data = spend_resp.json()
+            spend_list = spend_data.get("data", {}).get("list", [])
+            total_spend = sum(float(item.get("metrics", {}).get("spend", 0)) for item in spend_list)
+
+            campaign = utm_ad_tiktok.get("utm_campaign", "unknown")
+            sources_spend["tiktok"][campaign] = sources_spend["tiktok"].get(campaign, 0) + total_spend
+
+
+    # META
+    meta_token = request.session.get("meta_access_token")
+    meta_account_id = request.session.get("meta_ad_account_id")
+
+    if not meta_token:
+        return redirect("Demo:meta_login")
+    if not meta_account_id:
+        return redirect("Demo:meta_select_ad_account")
+    
+    meta_url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/{meta_account_id}/ads"
+    meta_creative_url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/{meta_account_id}/adcreatives"
+
+    if start_time and end_time:
+        params["time_range"] = json.dumps({"since": start_time, "until": end_time})
+    
+    meta_params = {
+        "fields": "name,creative{id},insights.time_range({\"since\":\""+start_time+"\",\"until\":\""+end_time+"\"}){spend}",
+        "filtering": json.dumps([{
+            "field": "ad.effective_status",
+            "operator": "IN",
+            "value": ["ACTIVE"]
+        }])
+    }
+
+    meta_creative_params = {
+        "fields": "name,id,object_story_spec",
+        "limit": 100
+    }
+
+    ad_meta_dict = {}
+
+    meta_resp = requests.get(meta_url, headers={"Authorization": f"Bearer {meta_token}"}, params=meta_params)
+    meta_data = meta_resp.json()
+    ad_meta_list = meta_data.get("data",[])
+    for ad in ad_meta_list:
+        creative_id = ad.get("creative", {}).get("id")
+        if creative_id:
+            ad_meta_dict[creative_id] = {
+                "spend": ad.get("insights", {}).get("data", [{}])[0].get("spend", 0)
+            }
+
+    meta_creative_resp = requests.get(meta_creative_url, headers={"Authorization": f"Bearer {meta_token}"}, params=meta_creative_params)
+    meta_creative_data = meta_creative_resp.json()
+    creative_meta_list = meta_creative_data.get("data", [])
+    for creative in creative_meta_list:
+        creative_id = creative.get("id")
+        link_data = creative.get("object_story_spec", {}).get("link_data", {})
+        url = link_data.get("link") or link_data.get("call_to_action", {}).get("value", {}).get("link", "")
+        
+        if not url:
+            continue
+        parsed_url = urlparse(url)
+        utm_params = parse_qs(parsed_url.query)
+        source = utm_params.get("utm_source", [None])[0]
+        campaign = utm_params.get("utm_campaign", [None])[0]
+        source = source.lower().strip() if source else ""
+        campaign = campaign.lower().strip() if campaign else ""
+        match = df[
+            (df['UTM_Source'] == source) &
+            (df['UTM_Campaign'] == campaign)
+        ]
+        if not match.empty:
+            spend = float(ad_meta_dict.get(creative_id, {}).get("spend", 0))
+            sources_spend["meta"][campaign] = sources_spend["meta"].get(campaign, 0) + spend
 
     # --- Remove duplicate Add To Cart events ---
     atc = df[df['Event_Type'] == 'add_to_cart']
@@ -8065,8 +8278,14 @@ def view_purchase_campaigns(request):
     products_df = fetch_data_from_supabase("zid_product_list")
     zid_product_list = products_df["Product_Combo"].tolist()
 
+    campaigns_list = campaign_summary.to_dict(orient="records")
+    for record in campaigns_list:
+        source = record["UTM_Source"]
+        camp   = record["UTM_Campaign"]
+        record["Spend"] = sources_spend.get(source, {}).get(camp, 0)
+
     context = {
-        "campaigns": campaign_summary.to_dict(orient="records"),
+        "campaigns": campaigns_list,
         # Chart 1 Data
         "source_labels": source_summary['UTM_Source'].tolist(),
         "source_purchases": source_summary['Purchases'].tolist(),

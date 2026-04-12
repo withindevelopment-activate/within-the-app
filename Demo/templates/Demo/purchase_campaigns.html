@@ -26,6 +26,15 @@
                 <div class="stat-label">Total events</div>
             </div>
         </div>
+        <div class="date-filter">
+            <label class="toolbar-label">Date Range</label>
+            <div class="date-inputs">
+                <input type="date" id="startDateInput" class="date-input">
+                <span class="date-sep">→</span>
+                <input type="date" id="endDateInput" class="date-input">
+                <button id="applyDateBtn" class="btn-primary">Apply</button>
+            </div>
+        </div>
     </div>
 
     <div class="chart-card">
@@ -107,6 +116,7 @@
                             <th data-col="4" class="sorted">Purchases <span class="sort-arrow">↓</span></th>
                             <th data-col="5">Total Events <span class="sort-arrow">↕</span></th>
                             <th data-col="6">Conversion % <span class="sort-arrow">↕</span></th>
+                            <th data-col="7">Spend <span class="sort-arrow">↕</span></th>
                         </tr>
                     </thead>
                     <tbody id="tableBody">
@@ -152,10 +162,11 @@
                             <td><span class="metric">{{ c.Purchases }}</span></td>
                             <td><span class="metric">{{ c.Total_Events }}</span></td>
                             <td class="metric conversion-cell"></td>
+                            <td><span class="metric">{{ c.Spend|floatformat:2 }}</span></td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="7" class="empty-state">No campaign data found.</td>
+                            <td colspan="8" class="empty-state">No campaign data found.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -164,7 +175,58 @@
         </div>
     </div>
 </div>
+<script>
+(function initDateFilter() {
+    const startInput = document.getElementById('startDateInput');
+    const endInput = document.getElementById('endDateInput');
+    const applyBtn = document.getElementById('applyDateBtn');
 
+    // Helper: format Date to YYYY-MM-DD
+    function fmt(d) {
+        return d.toISOString().split('T')[0];
+    }
+
+    // Default: last 7 days, excluding today
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(today.getDate() - 7);
+
+    // Read from URL params if already set, otherwise use defaults
+    const urlParams = new URLSearchParams(window.location.search);
+    startInput.value = urlParams.get('start_time') || fmt(sevenDaysAgo);
+    endInput.value   = urlParams.get('end_time')   || fmt(yesterday);
+
+    // Cap end date at yesterday (no today)
+    endInput.max = fmt(yesterday);
+    startInput.max = fmt(yesterday);
+
+    applyBtn.addEventListener('click', function () {
+        const start = startInput.value;
+        const end = endInput.value;
+
+        if (!start || !end) {
+            alert('Please select both dates.');
+            return;
+        }
+        if (start > end) {
+            alert('Start date must be before end date.');
+            return;
+        }
+
+        // Pass timezone offset so the backend adjusts correctly
+        const tzOffset = -new Date().getTimezoneOffset(); // minutes ahead of UTC
+        const params = new URLSearchParams({
+            start_time: start,
+            end_time: end,
+            tz_offset: tzOffset
+        });
+
+        window.location.href = `${window.location.pathname}?${params.toString()}`;
+    });
+})();
+</script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
 
@@ -545,7 +607,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (!noRow) {
                     noRow = document.createElement('tr');
                     noRow.className = 'no-results-row';
-                    noRow.innerHTML = '<td colspan="6" class="no-results" style="text-align:center; padding:3rem; color:var(--ink-3);">No campaigns match your selection.</td>';
+                    noRow.innerHTML = '<td colspan="8" class="no-results" style="text-align:center; padding:3rem; color:var(--ink-3);">No campaigns match your selection.</td>';
                     tbody.appendChild(noRow);
                 }
             } else if (noRow) {
