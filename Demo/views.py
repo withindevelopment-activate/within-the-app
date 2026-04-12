@@ -8024,6 +8024,10 @@ def view_purchase_campaigns(request):
         "end_time": snap_end_time,
     }
 
+    snap_access_token = request.session.get("snapchat_access_token")
+    if not snap_access_token:
+        return redirect("Demo:snapchat_login")
+
     # Step 1: Get org & ad account
     organization_id = request.session.get("snap_org_id")
     if not organization_id:
@@ -8081,17 +8085,17 @@ def view_purchase_campaigns(request):
 
     # TikTok
 
-    access_token = request.session.get("tiktok_access_token")
+    tiktok_access_token = request.session.get("tiktok_access_token")
     advertiser_id = request.session.get("tiktok_advertiser_id")
 
-    if not access_token:
+    if not tiktok_access_token:
         return redirect("Demo:tiktok_login")
     if not advertiser_id:
         return HttpResponse("No advertiser selected", status=400)
     
     url = f"{API_BASE}/ad/get/"
     Tiktok_params = {"advertiser_id": advertiser_id, "page_size": 50, "page": 1}
-    headers = {"Access-Token": access_token}
+    headers = {"Access-Token": tiktok_access_token}
 
     resp = requests.get(url, headers=headers, params=Tiktok_params)
     resp_data = resp.json()
