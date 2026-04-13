@@ -6237,7 +6237,7 @@ def meta_campaigns(request):
     tokens = get_latest_token()
     meta_access_token = tokens["meta"]
     token = meta_access_token
-    account_id = token["meta_ad_account_id"]
+    account_id = request.session.get("meta_ad_account_id") or tokens['meta_ad_account_id']
 
     if not token:
         return redirect("Demo:meta_login")
@@ -8361,7 +8361,7 @@ def view_purchase_campaigns(request):
             'events': subset['Total_Events'].tolist()
         }
     campaigns_list = campaign_summary.to_dict(orient="records")
-    
+
     if check_all_tokens == True:
         print("[Purchase Campaigns] Campaign summary with spend before adding spend:", campaigns_list)
         for record in campaigns_list:
@@ -8388,6 +8388,7 @@ def view_purchase_campaigns(request):
     ## Calling the list fromt he db
     products_df = fetch_data_from_supabase("zid_product_list")
     zid_product_list = products_df["Product_Combo"].tolist()
+    print("[Purchase Campaigns] Fetched product list from db:", zid_product_list)
 
 
     context = {
