@@ -145,17 +145,18 @@
                                 {% endwith %}
                             </td>
                             <td>
+                                <!-- Product select: options are rendered by JS from productData -->
                                 <div class="product-select-wrap" id="product-select-row-{{ forloop.counter0 }}">
                                     <div class="product-select-trigger" tabindex="0">
-                                        <span class="selected-label">Select product…</span>
-                                        <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                                        <span class="selected-label placeholder">— Select Product —</span>
+                                        <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                            <polyline points="6 9 12 15 18 9"/>
+                                        </svg>
                                     </div>
                                     <div class="product-select-dropdown">
                                         <input class="product-search-input" type="text" placeholder="Search products…" autocomplete="off">
                                         <ul class="product-options-list">
-                                            {% for product in zid_product_list %}
-                                            <li data-value="{{ product }}">{{ product }}</li>
-                                            {% endfor %}
+                                            <!-- Populated by JS -->
                                         </ul>
                                     </div>
                                 </div>
@@ -188,8 +189,6 @@ const tokens = {{ tokens|safe }};
 const campaigns = {{ campaigns|safe }};
 const productList = {{ zid_product_list|safe }};
 console.log("Tokens available in template:", tokens);
-console.log("Campaigns available in template:", campaigns);
-console.log("Product list available in template:", productList);
 
 (function initDateFilter() {
     const startInput = document.getElementById('startDateInput');
@@ -700,13 +699,96 @@ document.addEventListener('DOMContentLoaded', function () {
     (function initProductSelects() {
         const productData = {{ zid_product_list|safe }};
 
-        document.querySelectorAll('.product-select-wrap').forEach(function(wrap) {
+        document.querySelectorAll('.product-select-wrap').forEach(function (wrap) {
             const trigger = wrap.querySelector('.product-select-trigger');
             const dropdown = wrap.querySelector('.product-select-dropdown');
             const searchInput = wrap.querySelector('.product-search-input');
             const optionsList = wrap.querySelector('.product-options-list');
             const selectedLabel = wrap.querySelector('.selected-label');
-            let selectedValues = []; // changed to list to allow multiple product selection
+            let selectedValues = [];
+
+            function updateTriggerLabel() {
+                if (selectedValues.length === 0) {
+                    selectedLabel.textContent = '— Select Product —';
+                    selectedLabel.classList.add('placeholder');
+                } else if (selectedValues.length === 1) {
+                    selectedLabel.textContent = selectedValues[0];
+                    selectedLabel.classList.remove('placeholder');
+                } else {
+                    selectedLabel.textContent = `${selectedValues.length} products selected`;
+                    selectedLabel.classList.remove('placeholder');
+                }
+            }
+
+            function renderOptions(query) {
+                const q = query.trim().toLowerCase();
+                const filtered = q
+                    ? productData.filter(p => String(p).toLowerCase().includes(q))
+                    : productData;
+
+                optionsList.innerHTML = '';
+
+                // "Clear all" row (only if something is selected)
+                if (selectedValues.length > 0) {
+                    const clearLi = document.createElement('li');
+                    clearLi.className = 'clear-option';
+                    clearLi.innerHTML = `<span>✕ Clear all</span>`;
+                    clearLi.addEventListener('mousedown', function (e) {
+                        e.preventDefault();
+                        selectedValues = [];
+                        updateTriggerLabel();
+                        const row = wrap.closest('tr');
+                        if (row) {
+                            row.dataset.products = '[]';
+                            row.classList.add('changed');
+                        }
+                        renderOptions(searchInput.value);
+                    });
+                    optionsList.appendChild(clearLi);
+                }
+
+                if (!filtered.length) {
+                    const li = document.createElement('li');
+                    li.className = 'no-match';
+                    li.textContent = 'No products found';
+                    optionsList.appendChild(li);
+                    return;
+                }
+
+                filtered.forEach(function (product) {
+                    const li = document.createElement('li');
+                    const isSelected = selectedValues.includes(product);
+                    li.dataset.value = product;
+                    if (isSelected) li.classList.add('selected');
+
+                    li.innerHTML = `
+                        <span class="option-check">${isSelected ? '✓' : ''}</span>
+                        <span class="option-label">${product}</span>
+                    `;
+
+                    li.addEventListener('mousedown', function (e) {
+                        e.preventDefault();
+                        if (selectedValues.includes(product)) {
+                            selectedValues = selectedValues.filter(p => p !== product);
+                            li.classList.remove('selected');
+                            li.querySelector('.option-check').textContent = '';
+                        } else {
+                            selectedValues.push(product);
+                            li.classList.add('selected');
+                            li.querySelector('.option-check').textContent = '✓';
+                        }
+                        updateTriggerLabel();
+                        const row = wrap.closest('tr');
+                        if (row) {
+                            row.dataset.products = JSON.stringify(selectedValues);
+                            row.classList.add('changed');
+                        }
+                        // Re-render to move clear button to top
+                        renderOptions(searchInput.value);
+                    });
+                    optionsList.appendChild(li);
+                });
+            }
 
             function openDropdown() {
                 dropdown.classList.add('open');
@@ -721,56 +803,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 trigger.classList.remove('open');
             }
 
-            function renderOptions(query) {
-                const q = query.trim().toLowerCase();
-                const filtered = q
-                    ? productData.filter(p => String(p).toLowerCase().includes(q))
-                    : productData;
+            // Init label
+            updateTriggerLabel();
 
-                optionsList.innerHTML = '';
-
-                if (!filtered.length) {
-                    const li = document.createElement('li');
-                    li.className = 'no-match';
-                    li.textContent = 'No products found';
-                    optionsList.appendChild(li);
-                    return;
-                }
-
-                filtered.forEach(function(product) {
-                    const li = document.createElement('li');
-                    li.textContent = product;
-                    li.dataset.value = product;
-                    if (product === selectedValue) li.classList.add('selected');
-                    li.addEventListener('mousedown', function(e) {
-                        e.preventDefault();
-
-                        if (selectedValues.includes(product)) {
-                            selectedValues = selectedValues.filter(p => p !== product);
-                            li.classList.remove('selected');
-                        } else {
-                            selectedValues.push(product);
-                            li.classList.add('selected');
-                        }
-
-                        selectedLabel.textContent = selectedValues.length
-                            ? selectedValues.join(', ')
-                            : 'Select product…';
-
-                        const row = wrap.closest('tr');
-
-                        if (row) {
-                            row.dataset.products = JSON.stringify(selectedValues);
-                            row.classList.add('changed');
-                        }
-                    });
-                    optionsList.appendChild(li);
-                });
-            }
-
-            trigger.addEventListener('click', function() {
+            trigger.addEventListener('click', function () {
                 const isOpen = dropdown.classList.contains('open');
-                // Close all other open dropdowns
                 document.querySelectorAll('.product-select-dropdown.open').forEach(d => {
                     d.classList.remove('open');
                     d.closest('.product-select-wrap').querySelector('.product-select-trigger').classList.remove('open');
@@ -778,17 +815,15 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (!isOpen) openDropdown();
             });
 
-            searchInput.addEventListener('input', function() {
+            searchInput.addEventListener('input', function () {
                 renderOptions(this.value);
             });
 
-            // Close on outside click
-            document.addEventListener('click', function(e) {
+            document.addEventListener('click', function (e) {
                 if (!wrap.contains(e.target)) closeDropdown();
             });
 
-            // Keyboard: close on Escape
-            searchInput.addEventListener('keydown', function(e) {
+            searchInput.addEventListener('keydown', function (e) {
                 if (e.key === 'Escape') closeDropdown();
             });
         });

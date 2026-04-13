@@ -4833,7 +4833,8 @@ def snapchat_callback(request):
         request.session["snapchat_token_expires_at"] = expiry_datetime.isoformat()
 
         ## Add them to database
-        store_id = request.session.get("store_id")
+        tokens = get_latest_token()
+        store_id = request.session.get("store_id") or tokens['store_id']
         if not store_id:
             return HttpResponse("No store_id found in session", status=400)
 
@@ -6151,7 +6152,7 @@ def meta_callback(request):
         ## Save the access token to the db
         ## Add them to database
         tokens = get_latest_token()
-        store_id = request.session.get("store_id") or tokens["meta"]
+        store_id = request.session.get("store_id") or tokens['store_id']
         if not store_id:
             return HttpResponse("No store_id found in session", status=400)
 
