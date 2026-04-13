@@ -4906,9 +4906,8 @@ def snapchat_api_call(request, endpoint, method="GET", params=None, data=None, j
     - params = query string dict
     - data/json_data = request body
     """
-    # access_token = request.session.get("snapchat_access_token")
     tokens = get_latest_token()
-    access_token = tokens['snapchat']
+    access_token = request.session.get("snapchat_access_token") or tokens['snapchat']
 
     # Parse expiry from ISO string
     expires_at_str = request.session.get("snapchat_token_expires_at")
