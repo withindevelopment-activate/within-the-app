@@ -8046,7 +8046,7 @@ def view_purchase_campaigns(request):
         return redirect("Demo:snapchat_login")
 
     # Step 1: Get org & ad account
-    organization_id = request.session.get("snap_org_id")
+    organization_id = request.session.get("snap_org_id") or "d08d96ef-367b-41ef-abfc-3fb0c5b605a4"
     if not organization_id:
         return redirect("Demo:snapchat_select_organization")
 
