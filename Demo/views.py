@@ -8360,8 +8360,9 @@ def view_purchase_campaigns(request):
             'purchases': subset['Purchases'].tolist(),
             'events': subset['Total_Events'].tolist()
         }
+    campaigns_list = campaign_summary.to_dict(orient="records")
+    
     if check_all_tokens == True:
-        campaigns_list = campaign_summary.to_dict(orient="records")
         print("[Purchase Campaigns] Campaign summary with spend before adding spend:", campaigns_list)
         for record in campaigns_list:
             source = record["UTM_Source"]
