@@ -4909,6 +4909,8 @@ def snapchat_api_call(request, endpoint, method="GET", params=None, data=None, j
     """
     tokens = get_latest_token()
     access_token = request.session.get("snapchat_access_token") or tokens['snapchat']
+    if not access_token:
+        return redirect("Demo:snapchat_login")
 
     # Parse expiry from ISO string
     expires_at_str = request.session.get("snapchat_token_expires_at")
@@ -8125,196 +8127,204 @@ def view_purchase_campaigns(request):
     if not snap_access_token or not tiktok_access_token or not meta_access_token:
         check_all_tokens = False
     if check_all_tokens == True:
-        if not snap_access_token:
-            return redirect("Demo:snapchat_login")
+        try:
+            if not snap_access_token:
+                return redirect("Demo:snapchat_login")
 
-        # Step 1: Get org & ad account
-        organization_id = request.session.get("snap_org_id") or tokens['snap_org_id']
-        if not organization_id:
-            return redirect("Demo:snapchat_select_organization")
+            # Step 1: Get org & ad account
+            organization_id = request.session.get("snap_org_id") or tokens['snap_org_id']
+            if not organization_id:
+                return redirect("Demo:snapchat_select_organization")
 
-        ad_account_id = request.session.get("snap_ad_account_id") or tokens['snap_ad_account_id']
-        if not ad_account_id:
-            return redirect("Demo:snapchat_select_account", org_id=organization_id)
+            ad_account_id = request.session.get("snap_ad_account_id") or tokens['snap_ad_account_id']
+            if not ad_account_id:
+                return redirect("Demo:snapchat_select_account", org_id=organization_id)
 
-        # Step 2: Get campaigns
-        creatives_data = snapchat_api_call(request, f"adaccounts/{ad_account_id}/creatives")
-        raw_creatives = creatives_data.get("creatives", [])
-        print("[Purchase Campaigns] Raw creatives:", raw_creatives)
-        sources_spend = {"snapchat": {}, "tiktok": {}, "meta": {}}
-        for creative in raw_creatives:
-            utm_ad_snapchat = {}
-            utm_ad_snapchat["id"] = creative.get("id")
-            props = creative.get("web_view_properties")
-            if not props:
-                continue # Skip if it's not a web view creative
+            # Step 2: Get campaigns
+            creatives_data = snapchat_api_call(request, f"adaccounts/{ad_account_id}/creatives")
+            raw_creatives = creatives_data.get("creatives", [])
+            print("[Purchase Campaigns] Raw creatives:", raw_creatives)
+            sources_spend = {"snapchat": {}, "tiktok": {}, "meta": {}}
+            for creative in raw_creatives:
+                utm_ad_snapchat = {}
+                utm_ad_snapchat["id"] = creative.get("id")
+                if creative.get("type") == "WEB_VIEW":
+                    url = creative.get("web_view_properties", {}).get("url", "")
+                elif creative.get("type") in ["PREVIEW", "COMPOSITE"]:
+                    # Fallback for preview/composite types found in raw data
+                    url = creative.get("preview_properties", {}).get("url", "")
+                props = creative.get("web_view_properties")
+                if not props:
+                    continue # Skip if it's not a web view creative
+                    
+                url = props.get("url", "").lower().strip()
+                utm_ad_snapchat["url_utm"] = url
+            
+                # Parse UTMs for THIS specific creative
+                parsed_url = urlparse(url)
+                params = parse_qs(parsed_url.query)
                 
-            url = props.get("url", "").lower().strip()
-            utm_ad_snapchat["url_utm"] = url
-        
-            # Parse UTMs for THIS specific creative
-            parsed_url = urlparse(url)
-            params = parse_qs(parsed_url.query)
+                # Safely extract source and campaign
+                source = params.get("utm_source", [None])[0]
+                campaign = params.get("utm_campaign", [None])[0]
+                
+                utm_ad_snapchat["utm_source"] = source.lower() if source else ""
+                utm_ad_snapchat["utm_campaign"] = campaign.lower() if campaign else ""
+
+                # --- MATCHING LOGIC ---
+                # Check if this creative's UTMs exist in your Supabase log
+                match = df[
+                    (df['UTM_Source'] == utm_ad_snapchat["utm_source"]) & 
+                    (df['UTM_Campaign'] == utm_ad_snapchat["utm_campaign"])
+                ]
+
+                if not match.empty:
+                    creative_stats = snapchat_api_call(request, f"creatives/{creative['id']}/stats", params=snap_params)
+                    raw_creatives_stats = creative_stats.get("timeseries_stats", [])
+                    print("[Purchase Campaigns] Raw creatives stats:", raw_creatives_stats)
+
+                    creative_stats_dict = raw_creatives_stats[0] if raw_creatives_stats else {}
+                    creative_timeseries = creative_stats_dict.get("timeseries_stat", [])
+                    print("[Purchase Campaigns] Creative timeseries:", creative_timeseries)
+                    total_micros = sum(
+                        day.get("stats", {}).get("spend", 0)
+                        for day in creative_timeseries
+                    )
+                    spend = total_micros / 1_000_000 * 3.79
+
+                    camp_key = utm_ad_snapchat.get("utm_campaign", "missing_campaign")
+                    sources_spend["snapchat"][camp_key] = sources_spend["snapchat"].get(camp_key, 0) + spend
+
+            # TikTok
+
+            advertiser_id = request.session.get("tiktok_advertiser_id") or tokens['tiktok_org']
+
+            if not tiktok_access_token:
+                return redirect("Demo:tiktok_login")
+            if not advertiser_id:
+                return HttpResponse("No advertiser selected", status=400)
             
-            # Safely extract source and campaign
-            source = params.get("utm_source", [None])[0]
-            campaign = params.get("utm_campaign", [None])[0]
+            url = f"{API_BASE}/ad/get/"
+            Tiktok_params = {"advertiser_id": advertiser_id, "page_size": 50, "page": 1}
+            headers = {"Access-Token": tiktok_access_token}
+
+            resp = requests.get(url, headers=headers, params=Tiktok_params)
+            resp_data = resp.json()
+
             
-            utm_ad_snapchat["utm_source"] = source.lower() if source else ""
-            utm_ad_snapchat["utm_campaign"] = campaign.lower() if campaign else ""
+            ad_list = resp_data.get("data", {}).get("list", [])
+            print("[Purchase Campaigns] Raw TikTok ads:", ad_list)
+            for ad in ad_list:
+                utm_ad_tiktok = {}
+                utm_ad_tiktok["id"] = ad.get("ad_id")
+                tiktok_utms = ad.get("utm_params", [])
+                extracted_dict = {
+                    item["key"]: urllib.parse.unquote(item["value"]) 
+                    for item in tiktok_utms
+                }
+                utm_ad_tiktok["utm_source"] = extracted_dict.get("utm_source", "").lower().strip()
+                utm_ad_tiktok["utm_campaign"] = extracted_dict.get("utm_campaign", "").lower().strip()
 
-            # --- MATCHING LOGIC ---
-            # Check if this creative's UTMs exist in your Supabase log
-            match = df[
-                (df['UTM_Source'] == utm_ad_snapchat["utm_source"]) & 
-                (df['UTM_Campaign'] == utm_ad_snapchat["utm_campaign"])
-            ]
+                match = df[
+                    (df['UTM_Source'] == utm_ad_tiktok["utm_source"]) & 
+                    (df['UTM_Campaign'] == utm_ad_tiktok["utm_campaign"])
+                ]
 
-            if not match.empty:
-                creative_stats = snapchat_api_call(request, f"creatives/{creative['id']}/stats", params=snap_params)
-                raw_creatives_stats = creative_stats.get("timeseries_stats", [])
-                print("[Purchase Campaigns] Raw creatives stats:", raw_creatives_stats)
+                if not match.empty:
+                    spend_tik_url = f"{API_BASE}/report/integrated/get/"
+                    spend_tik_params = {
+                        "advertiser_id": advertiser_id,
+                        "dimensions": ["ad_id"],
+                        "service_type": "AUCTION",
+                        "report_type": "BASIC",
+                        "data_level": "AUCTION_AD",
+                        "metrics": ["spend"],
+                        "start_time": start_time,
+                        "end_time": end_time,
+                        "filters": [{
+                            "field_name": "ad_ids",
+                            "field_type": "IN",
+                            "field_value": f"[\"{utm_ad_tiktok['id']}\"]"
+                        }]
+                    }
 
-                creative_stats_dict = raw_creatives_stats[0] if raw_creatives_stats else {}
-                creative_timeseries = creative_stats_dict.get("timeseries_stat", [])
-                print("[Purchase Campaigns] Creative timeseries:", creative_timeseries)
-                total_micros = sum(
-                    day.get("stats", {}).get("spend", 0)
-                    for day in creative_timeseries
-                )
-                spend = total_micros / 1_000_000 * 3.79
+                    spend_resp = requests.get(spend_tik_url, headers=headers, params=spend_tik_params)
+                    spend_data = spend_resp.json()
+                    spend_list = spend_data.get("data", {}).get("list", [])
+                    print("[Purchase Campaigns] Raw TikTok spend data:", spend_list)
+                    total_spend = sum(float(item.get("metrics", {}).get("spend", 0)) for item in spend_list)
 
-                camp_key = utm_ad_snapchat.get("utm_campaign", "missing_campaign")
-                sources_spend["snapchat"][camp_key] = sources_spend["snapchat"].get(camp_key, 0) + spend
+                    tiktok_camp_key = utm_ad_tiktok.get("utm_campaign", "missing_campaign")
+                    sources_spend["tiktok"][tiktok_camp_key] = sources_spend["tiktok"].get(tiktok_camp_key, 0) + total_spend
 
-        # TikTok
 
-        advertiser_id = request.session.get("tiktok_advertiser_id") or tokens['tiktok_org']
+            # META
+            meta_account_id = request.session.get("meta_ad_account_id") or tokens['meta_ad_account_id']
+            
 
-        if not tiktok_access_token:
-            return redirect("Demo:tiktok_login")
-        if not advertiser_id:
-            return HttpResponse("No advertiser selected", status=400)
-        
-        url = f"{API_BASE}/ad/get/"
-        Tiktok_params = {"advertiser_id": advertiser_id, "page_size": 50, "page": 1}
-        headers = {"Access-Token": tiktok_access_token}
-
-        resp = requests.get(url, headers=headers, params=Tiktok_params)
-        resp_data = resp.json()
-
-        
-        ad_list = resp_data.get("data", {}).get("list", [])
-        print("[Purchase Campaigns] Raw TikTok ads:", ad_list)
-        for ad in ad_list:
-            utm_ad_tiktok = {}
-            utm_ad_tiktok["id"] = ad.get("ad_id")
-            tiktok_utms = ad.get("utm_params", [])
-            extracted_dict = {
-                item["key"]: urllib.parse.unquote(item["value"]) 
-                for item in tiktok_utms
+            if not meta_access_token:
+                return redirect("Demo:meta_login")
+            if not meta_account_id:
+                return redirect("Demo:meta_select_ad_account")
+            
+            meta_url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/{meta_account_id}/ads"
+            meta_creative_url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/{meta_account_id}/adcreatives"
+            
+            meta_params = {
+                "fields": "name,creative{id},insights.time_range({\"since\":\""+start_time+"\",\"until\":\""+end_time+"\"}){spend}",
+                "filtering": json.dumps([{
+                    "field": "ad.effective_status",
+                    "operator": "IN",
+                    "value": ["ACTIVE"]
+                }])
             }
-            utm_ad_tiktok["utm_source"] = extracted_dict.get("utm_source", "").lower().strip()
-            utm_ad_tiktok["utm_campaign"] = extracted_dict.get("utm_campaign", "").lower().strip()
 
-            match = df[
-                (df['UTM_Source'] == utm_ad_tiktok["utm_source"]) & 
-                (df['UTM_Campaign'] == utm_ad_tiktok["utm_campaign"])
-            ]
+            meta_creative_params = {
+                "fields": "name,id,object_story_spec",
+                "limit": 100
+            }
 
-            if not match.empty:
-                spend_tik_url = f"{API_BASE}/report/integrated/get/"
-                spend_tik_params = {
-                    "advertiser_id": advertiser_id,
-                    "dimensions": ["ad_id"],
-                    "service_type": "AUCTION",
-                    "report_type": "BASIC",
-                    "data_level": "AUCTION_AD",
-                    "metrics": ["spend"],
-                    "start_time": start_time,
-                    "end_time": end_time,
-                    "filters": [{
-                        "field_name": "ad_ids",
-                        "field_type": "IN",
-                        "field_value": f"[\"{utm_ad_tiktok['id']}\"]"
-                    }]
-                }
+            meta_resp = requests.get(meta_url, headers={"Authorization": f"Bearer {meta_access_token}"}, params=meta_params)
+            meta_data = meta_resp.json()
+            ad_meta_list = meta_data.get("data",[])
+            print("[Purchase Campaigns] Raw Meta ads:", ad_meta_list)
+            for ad in ad_meta_list:
+                ad_meta_dict = {}
+                creative_id = ad.get("creative", {}).get("id")
+                if creative_id:
+                    ad_meta_dict[creative_id] = {
+                        "spend": ad.get("insights", {}).get("data", [{}])[0].get("spend", 0)
+                    }
 
-                spend_resp = requests.get(spend_tik_url, headers=headers, params=spend_tik_params)
-                spend_data = spend_resp.json()
-                spend_list = spend_data.get("data", {}).get("list", [])
-                print("[Purchase Campaigns] Raw TikTok spend data:", spend_list)
-                total_spend = sum(float(item.get("metrics", {}).get("spend", 0)) for item in spend_list)
-
-                tiktok_camp_key = utm_ad_tiktok.get("utm_campaign", "missing_campaign")
-                sources_spend["tiktok"][tiktok_camp_key] = sources_spend["tiktok"].get(tiktok_camp_key, 0) + total_spend
-
-
-        # META
-        meta_account_id = request.session.get("meta_ad_account_id") or tokens['meta_ad_account_id']
-        
-
-        if not meta_access_token:
-            return redirect("Demo:meta_login")
-        if not meta_account_id:
-            return redirect("Demo:meta_select_ad_account")
-        
-        meta_url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/{meta_account_id}/ads"
-        meta_creative_url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/{meta_account_id}/adcreatives"
-        
-        meta_params = {
-            "fields": "name,creative{id},insights.time_range({\"since\":\""+start_time+"\",\"until\":\""+end_time+"\"}){spend}",
-            "filtering": json.dumps([{
-                "field": "ad.effective_status",
-                "operator": "IN",
-                "value": ["ACTIVE"]
-            }])
-        }
-
-        meta_creative_params = {
-            "fields": "name,id,object_story_spec",
-            "limit": 100
-        }
-
-        meta_resp = requests.get(meta_url, headers={"Authorization": f"Bearer {meta_access_token}"}, params=meta_params)
-        meta_data = meta_resp.json()
-        ad_meta_list = meta_data.get("data",[])
-        print("[Purchase Campaigns] Raw Meta ads:", ad_meta_list)
-        for ad in ad_meta_list:
-            ad_meta_dict = {}
-            creative_id = ad.get("creative", {}).get("id")
-            if creative_id:
-                ad_meta_dict[creative_id] = {
-                    "spend": ad.get("insights", {}).get("data", [{}])[0].get("spend", 0)
-                }
-
-        meta_creative_resp = requests.get(meta_creative_url, headers={"Authorization": f"Bearer {meta_access_token}"}, params=meta_creative_params)
-        meta_creative_data = meta_creative_resp.json()
-        creative_meta_list = meta_creative_data.get("data", [])
-        print("[Purchase Campaigns] Raw Meta creatives:", creative_meta_list)
-        for creative in creative_meta_list:
-            creative_id = creative.get("id")
-            link_data = creative.get("object_story_spec", {}).get("link_data", {})
-            url = link_data.get("link") or link_data.get("call_to_action", {}).get("value", {}).get("link", "")
-            
-            if not url:
-                continue
-            parsed_url = urlparse(url)
-            utm_params = parse_qs(parsed_url.query)
-            source = utm_params.get("utm_source", [None])[0]
-            campaign = utm_params.get("utm_campaign", [None])[0]
-            print(f"[Purchase Campaigns] Parsed UTM params for creative {creative_id}: source={source}, campaign={campaign}")
-            source = source.lower().strip() if source else ""
-            campaign = campaign.lower().strip() if campaign else ""
-            match = df[
-                (df['UTM_Source'] == source) &
-                (df['UTM_Campaign'] == campaign)
-            ]
-            print(f"[Purchase Campaigns] df data={df[(df['UTM_Source'] == source) & (df['UTM_Campaign'] == campaign)]}")
-            if not match.empty:
-                spend = float(ad_meta_dict.get(creative_id, {}).get("spend", 0))
-                sources_spend["meta"][campaign] = sources_spend["meta"].get(campaign, 0) + spend
-
+            meta_creative_resp = requests.get(meta_creative_url, headers={"Authorization": f"Bearer {meta_access_token}"}, params=meta_creative_params)
+            meta_creative_data = meta_creative_resp.json()
+            creative_meta_list = meta_creative_data.get("data", [])
+            print("[Purchase Campaigns] Raw Meta creatives:", creative_meta_list)
+            for creative in creative_meta_list:
+                creative_id = creative.get("id")
+                link_data = creative.get("object_story_spec", {}).get("link_data", {})
+                url = link_data.get("link") or link_data.get("call_to_action", {}).get("value", {}).get("link", "")
+                
+                if not url:
+                    continue
+                parsed_url = urlparse(url)
+                utm_params = parse_qs(parsed_url.query)
+                source = utm_params.get("utm_source", [None])[0]
+                campaign = utm_params.get("utm_campaign", [None])[0]
+                print(f"[Purchase Campaigns] Parsed UTM params for creative {creative_id}: source={source}, campaign={campaign}")
+                source = source.lower().strip() if source else ""
+                campaign = campaign.lower().strip() if campaign else ""
+                match = df[
+                    (df['UTM_Source'] == source) &
+                    (df['UTM_Campaign'] == campaign)
+                ]
+                print(f"[Purchase Campaigns] df data={df[(df['UTM_Source'] == source) & (df['UTM_Campaign'] == campaign)]}")
+                if not match.empty:
+                    spend = float(ad_meta_dict.get(creative_id, {}).get("spend", 0))
+                    sources_spend["meta"][campaign] = sources_spend["meta"].get(campaign, 0) + spend
+        except Exception as e:
+            check_all_tokens = False
+            print("Error during token checks or API calls:", e)
     # --- Remove duplicate Add To Cart events ---
     atc = df[df['Event_Type'] == 'add_to_cart']
     others = df[df['Event_Type'] != 'add_to_cart']
