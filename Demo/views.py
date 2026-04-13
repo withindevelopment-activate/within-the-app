@@ -7988,15 +7988,16 @@ def update_tracked_customers(new_event, history_rows, customer_dict):
 def view_purchase_campaigns(request):
     ## Get the latest tokens
     tokens = get_latest_token()
-    authorization = tokens["authorization_token"]
+    authorization = tokens['authorization_token']
     access_token = tokens['access_token']
     store_id = tokens['store_id']
     if store_id:
         request.session['store_id'] = store_id
 
-    snap_access_token = request.session.get("snapchat")
-    tiktok_access_token = request.session.get("tiktok_access")
-    meta_access_token = request.session.get("meta")
+    ## Get tokens from db -- 
+    snap_access_token = tokens['snapchat']
+    tiktok_access_token = tokens['tiktok_access']
+    meta_access_token = tokens['meta']
 
 
     import urllib.parse
