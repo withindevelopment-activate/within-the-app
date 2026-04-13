@@ -63,17 +63,17 @@ def get_latest_token():
     
     token_row = res.data[0]
     return {
-        "access_token": token_row["Access"],
-        "authorization_token": token_row["Authorization"],
-        "refresh_token": token_row["Refresh"],
-        "store_id": token_row["Store_ID"],
-        "snapchat": token_row["Snapchat_Access"],
-        "meta": token_row["Meta_Access"],
-        "tiktok_org": token_row["Tiktok_Org"],
-        "tiktok_access": token_row["Tiktok_Access"],
-        "meta_ad_account_id": token_row["meta_ad_account_id"],
-        "snap_org_id": token_row["snap_org_id"],
-        "snap_ad_account_id": token_row["snap_ad_account_id"],
+        "access_token": token_row["Access"] or '',
+        "authorization_token": token_row["Authorization"] or '',
+        "refresh_token": token_row["Refresh"] or '',
+        "store_id": token_row["Store_ID"] or '',
+        "snapchat": token_row["Snapchat_Access"] or '',
+        "meta": token_row["Meta_Access"] or '',
+        "tiktok_org": token_row["Tiktok_Org"] or '',
+        "tiktok_access": token_row["Tiktok_Access"] or '',
+        "meta_ad_account_id": token_row["meta_ad_account_id"] or '',
+        "snap_org_id": token_row["snap_org_id"] or '',
+        "snap_ad_account_id": token_row["snap_ad_account_id"] or '',
     }
 
 def zid_login(request):
