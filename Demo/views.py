@@ -8403,6 +8403,7 @@ def view_purchase_campaigns(request):
         "source_list": unique_sources,
         "campaign_data_json": json.dumps(source_to_campaigns),
         "zid_product_list": zid_product_list,
+        "tokens": tokens,
         "check_all_tokens": check_all_tokens
     }
 

@@ -184,6 +184,13 @@
     </div>
 </div>
 <script>
+const tokens = {{ tokens|safe }};
+const campaigns = {{ campaigns|safe }};
+const productList = {{ zid_product_list|safe }};
+console.log("Tokens available in template:", tokens);
+console.log("Campaigns available in template:", campaigns);
+console.log("Product list available in template:", productList);
+
 (function initDateFilter() {
     const startInput = document.getElementById('startDateInput');
     const endInput = document.getElementById('endDateInput');
