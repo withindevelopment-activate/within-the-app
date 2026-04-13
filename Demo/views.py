@@ -66,7 +66,11 @@ def get_latest_token():
         "access_token": token_row["Access"],
         "authorization_token": token_row["Authorization"],
         "refresh_token": token_row["Refresh"],
-        "store_id": token_row["Store_ID"]
+        "store_id": token_row["Store_ID"],
+        "snapchat": token_row["Snapchat_Access"],
+        "meta": token_row["Meta_Access"],
+        "tiktok_org": token_row["Tiktok_Org"],
+        "tiktok_access": token_row["Tiktok_Access"]
     }
 
 def zid_login(request):
