@@ -7986,6 +7986,19 @@ def update_tracked_customers(new_event, history_rows, customer_dict):
 ############################################################################################
 ############################################################################################
 def view_purchase_campaigns(request):
+    ## Get the latest tokens
+    tokens = get_latest_token()
+    authorization = tokens["authorization_token"]
+    access_token = tokens['access_token']
+    store_id = tokens['store_id']
+    if store_id:
+        request.session['store_id'] = store_id
+
+    snap_access_token = request.session.get("snapchat")
+    tiktok_access_token = request.session.get("tiktok_access")
+    meta_access_token = request.session.get("meta")
+
+
     import urllib.parse
     # Fetch data
     df = fetch_data_from_supabase("Campaign_Event_Log")
@@ -8028,7 +8041,6 @@ def view_purchase_campaigns(request):
         "end_time": snap_end_time,
     }
 
-    snap_access_token = request.session.get("snapchat_access_token")
     if not snap_access_token:
         return redirect("Demo:snapchat_login")
 
@@ -8045,8 +8057,8 @@ def view_purchase_campaigns(request):
     creatives_data = snapchat_api_call(request, f"adaccounts/{ad_account_id}/creatives")
     raw_creatives = creatives_data.get("creatives", [])
     sources_spend = {"snapchat": {}, "tiktok": {}, "meta": {}}
-    utm_ad_snapchat = {}
     for creative in raw_creatives:
+        utm_ad_snapchat = {}
         utm_ad_snapchat["id"] = creative.get("id")
         props = creative.get("web_view_properties")
         if not props:
@@ -8089,7 +8101,6 @@ def view_purchase_campaigns(request):
 
     # TikTok
 
-    tiktok_access_token = request.session.get("tiktok_access_token")
     advertiser_id = request.session.get("tiktok_advertiser_id")
 
     if not tiktok_access_token:
@@ -8104,10 +8115,10 @@ def view_purchase_campaigns(request):
     resp = requests.get(url, headers=headers, params=Tiktok_params)
     resp_data = resp.json()
 
-    utm_ad_tiktok = {}
     
     ad_list = resp_data.get("data", {}).get("list", [])
     for ad in ad_list:
+        utm_ad_tiktok = {}
         utm_ad_tiktok["id"] = ad.get("ad_id")
         tiktok_utms = ad.get("utm_params", [])
         extracted_dict = {
@@ -8150,10 +8161,9 @@ def view_purchase_campaigns(request):
 
 
     # META
-    meta_token = request.session.get("meta_access_token")
     meta_account_id = request.session.get("meta_ad_account_id")
 
-    if not meta_token:
+    if not meta_access_token:
         return redirect("Demo:meta_login")
     if not meta_account_id:
         return redirect("Demo:meta_select_ad_account")
@@ -8175,19 +8185,18 @@ def view_purchase_campaigns(request):
         "limit": 100
     }
 
-    ad_meta_dict = {}
-
-    meta_resp = requests.get(meta_url, headers={"Authorization": f"Bearer {meta_token}"}, params=meta_params)
+    meta_resp = requests.get(meta_url, headers={"Authorization": f"Bearer {meta_access_token}"}, params=meta_params)
     meta_data = meta_resp.json()
     ad_meta_list = meta_data.get("data",[])
     for ad in ad_meta_list:
+        ad_meta_dict = {}
         creative_id = ad.get("creative", {}).get("id")
         if creative_id:
             ad_meta_dict[creative_id] = {
                 "spend": ad.get("insights", {}).get("data", [{}])[0].get("spend", 0)
             }
 
-    meta_creative_resp = requests.get(meta_creative_url, headers={"Authorization": f"Bearer {meta_token}"}, params=meta_creative_params)
+    meta_creative_resp = requests.get(meta_creative_url, headers={"Authorization": f"Bearer {meta_access_token}"}, params=meta_creative_params)
     meta_creative_data = meta_creative_resp.json()
     creative_meta_list = meta_creative_data.get("data", [])
     for creative in creative_meta_list:
@@ -8268,11 +8277,6 @@ def view_purchase_campaigns(request):
     )
 
     ## Get the list of products
-    ## Get the latest tokens
-    tokens = get_latest_token()
-    authorization = tokens["authorization_token"]
-    access_token = tokens['access_token']
-    store_id = tokens['store_id']
 
     # zid_product_list = fetch_product_name_skus(authorization, access_token, store_id) 
     # Not directly calling the function that fetches anymore due to timeout error, 
