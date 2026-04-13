@@ -70,7 +70,10 @@ def get_latest_token():
         "snapchat": token_row["Snapchat_Access"],
         "meta": token_row["Meta_Access"],
         "tiktok_org": token_row["Tiktok_Org"],
-        "tiktok_access": token_row["Tiktok_Access"]
+        "tiktok_access": token_row["Tiktok_Access"],
+        "meta_ad_account_id": token_row["meta_ad_account_id"],
+        "snap_org_id": token_row["snap_org_id"],
+        "snap_ad_account_id": token_row["snap_ad_account_id"],
     }
 
 def zid_login(request):
@@ -4947,8 +4950,23 @@ def snapchat_api_call(request, endpoint, method="GET", params=None, data=None, j
 
 def snapchat_select_organization(request, org_id=None):
     # If an org is selected, save it and redirect to ad accounts
+    tokens = get_latest_token()
+    store_id = tokens['store_id']
+    existing = supabase.table("tokens").select("Store_ID").eq("Store_ID", store_id).execute()
+    
+    if not existing.data:
+        # No row found 
+        return HttpResponse(
+            f"No entry found in 'tokens' for Store_ID: {store_id}. Please create it first.",
+            status=404
+        )
+    
     if org_id:
         request.session["snap_org_id"] = org_id
+        update_data = {
+            "snap_org_id": org_id,
+        }
+        response = supabase.table("tokens").update(update_data).eq("Store_ID", store_id).execute()
         return redirect("Demo:snapchat_select_account", org_id=org_id)
 
     # Fetch organizations from Snapchat API
@@ -4967,8 +4985,23 @@ def snapchat_select_organization(request, org_id=None):
 
 def snapchat_select_account(request, org_id, ad_account_id=None):
     # If an ad account is selected, save it and redirect to campaigns
+    tokens = get_latest_token()
+    store_id = tokens['store_id']
+    existing = supabase.table("tokens").select("Store_ID").eq("Store_ID", store_id).execute()
+    
+    if not existing.data:
+        # No row found 
+        return HttpResponse(
+            f"No entry found in 'tokens' for Store_ID: {store_id}. Please create it first.",
+            status=404
+        )
+    
     if ad_account_id:
         request.session["snap_ad_account_id"] = ad_account_id
+        update_data = {
+            "snap_ad_account_id": ad_account_id
+        }
+        response = supabase.table("tokens").update(update_data).eq("Store_ID", store_id).execute()
         return redirect("Demo:campaigns_overview")
 
     # Fetch ad accounts for the organization
@@ -5016,13 +5049,13 @@ def campaigns_overview(request):
         "start_time": start_time,
         "end_time": end_time,
     }
-
+    tokens = get_latest_token()
     # Step 1: Get org & ad account
-    organization_id = request.session.get("snap_org_id")
+    organization_id = request.session.get("snap_org_id") or tokens['snap_org_id']
     if not organization_id:
         return redirect("Demo:snapchat_select_organization")
 
-    ad_account_id = request.session.get("snap_ad_account_id")
+    ad_account_id = request.session.get("snap_ad_account_id") or tokens['snap_ad_account_id']
     if not ad_account_id:
         return redirect("Demo:snapchat_select_account", org_id=organization_id)
 
@@ -5244,16 +5277,33 @@ def tiktok_callback(request):
 
 # --- SAVE SELECTED ADVERTISER (if multiple) ---
 def tiktok_select_advertiser(request, advertiser_id=None):
-    if not request.session.get("tiktok_access_token"):
+    tokens = get_latest_token()
+    access_token = tokens["tiktok_access"]
+    if not access_token:
         return redirect("Demo:tiktok_login")
+    
+    store_id = tokens['store_id']
+    existing = supabase.table("tokens").select("Store_ID").eq("Store_ID", store_id).execute()
+    
+    if not existing.data:
+        # No row found 
+        return HttpResponse(
+            f"No entry found in 'tokens' for Store_ID: {store_id}. Please create it first.",
+            status=404
+        )
+    
     
     # If an advertiser is selected, save it to the session and redirect to campaigns
     if advertiser_id:
         request.session["tiktok_advertiser_id"] = advertiser_id
+        update_data = {
+            "Tiktok_Org": advertiser_id,
+        }
+        response = supabase.table("tokens").update(update_data).eq("Store_ID", store_id).execute()
         return redirect("Demo:tiktok_campaigns")
     
     # Fetch the list of advertisers again
-    access_token = request.session["tiktok_access_token"]
+
     url = f"{API_BASE}/oauth2/advertiser/get/"
     headers = {"Access-Token": access_token}
     params = {
@@ -5272,8 +5322,9 @@ def tiktok_select_advertiser(request, advertiser_id=None):
 
 # --- FETCH CAMPAIGNS ---
 def tiktok_campaigns(request):
-    access_token = request.session.get("tiktok_access_token")
-    advertiser_id = request.session.get("tiktok_advertiser_id")
+    tokens = get_latest_token()
+    access_token = request.session.get("tiktok_access_token") or tokens['tiktok_access']
+    advertiser_id = request.session.get("tiktok_advertiser_id") or tokens['tiktok_org']
 
     if not access_token:
         return redirect("Demo:tiktok_login")
@@ -5383,8 +5434,9 @@ def tiktok_campaigns(request):
     })
 
 def tiktok_campaign_builder(request):
-    access_token = request.session.get("tiktok_access_token")
-    advertiser_id = request.session.get("tiktok_advertiser_id")
+    tokens = get_latest_token()
+    access_token = request.session.get("tiktok_access_token") or tokens['tiktok_access']
+    advertiser_id = request.session.get("tiktok_advertiser_id") or tokens['tiktok_org']
 
     headers = {"Access-Token": access_token}
     pixel_url = f"{API_BASE}/pixel/list/"
@@ -5461,8 +5513,9 @@ def tiktok_campaign_builder(request):
 @csrf_exempt
 @require_POST
 def tiktok_create_campaign(request):
-    access_token = request.session.get("tiktok_access_token")
-    advertiser_id = request.session.get("tiktok_advertiser_id")
+    tokens = get_latest_token()
+    access_token = request.session.get("tiktok_access_token") or tokens['tiktok_access']
+    advertiser_id = request.session.get("tiktok_advertiser_id") or tokens['tiktok_org']
 
     if not access_token or not advertiser_id:
         return JsonResponse({"error": "Missing auth"}, status=401)
@@ -5520,9 +5573,10 @@ from django.views.decorators.http import require_GET
 
 @require_GET
 def get_tiktok_locations(request):
+    tokens = get_latest_token()
     objective = request.GET.get('objective', 'WEB_CONVERSIONS')
-    advertiser_id = request.session.get("tiktok_advertiser_id")  # Pull from your profile/settings
-    access_token = request.session.get("tiktok_access_token")    # Pull from your encrypted credentials
+    advertiser_id = request.session.get("tiktok_advertiser_id") or tokens['tiktok_org']
+    access_token = request.session.get("tiktok_access_token") or tokens['tiktok_access']
 
     cache_key = f"tt_regions_{objective}"
     cached_data = cache.get(cache_key)
@@ -5645,8 +5699,9 @@ def prepare_optimization_payload(post_data):
 @csrf_exempt
 @require_POST
 def tiktok_create_adgroup(request):
-    access_token = request.session.get("tiktok_access_token")
-    advertiser_id = request.session.get("tiktok_advertiser_id")
+    tokens = get_latest_token()
+    access_token = request.session.get("tiktok_access_token") or tokens['tiktok_access']
+    advertiser_id = request.session.get("tiktok_advertiser_id") or tokens['tiktok_org']
 
     schedule_fields = prepare_tiktok_schedule_data(request.POST)
     optimization_payload = prepare_optimization_payload(request.POST)
@@ -5875,8 +5930,9 @@ def tiktok_create_adgroup(request):
 @csrf_exempt
 @require_POST
 def tiktok_create_ad(request):
-    access_token = request.session.get("tiktok_access_token")
-    advertiser_id = request.session.get("tiktok_advertiser_id")
+    tokens = get_latest_token()
+    access_token = request.session.get("tiktok_access_token") or tokens['tiktok_access']
+    advertiser_id = request.session.get("tiktok_advertiser_id") or tokens['tiktok_org']
 
     if not access_token or not advertiser_id:
         return JsonResponse({"error": "Missing auth"}, status=401)
@@ -5929,8 +5985,9 @@ import time
 @csrf_exempt
 @require_POST
 def upload_tiktok_image(request):
-    access_token = request.session.get("tiktok_access_token")
-    advertiser_id = request.session.get("tiktok_advertiser_id")
+    tokens = get_latest_token()
+    access_token = request.session.get("tiktok_access_token") or tokens['tiktok_access']
+    advertiser_id = request.session.get("tiktok_advertiser_id") or tokens['tiktok_org']
 
     if not access_token or not advertiser_id:
         return JsonResponse({"code": 401, "message": "Auth missing"}, status=401)
@@ -5979,8 +6036,9 @@ import hashlib
 @csrf_exempt
 @require_POST
 def upload_tiktok_video(request):
-    access_token = request.session.get("tiktok_access_token")
-    advertiser_id = request.session.get("tiktok_advertiser_id")
+    tokens = get_latest_token()
+    access_token = request.session.get("tiktok_access_token") or tokens['tiktok_access']
+    advertiser_id = request.session.get("tiktok_advertiser_id") or tokens['tiktok_org']
 
     if not access_token or not advertiser_id:
         return JsonResponse({"code": 401, "message": "Auth missing"}, status=401)
@@ -6144,15 +6202,31 @@ def exchange_long_lived_token(short_token):
 
 # --- SELECT ACCOUNT (if multiple) ---
 def meta_select_ad_account(request, account_id=None):
-    if not request.session.get("meta_access_token"):
+    tokens = get_latest_token()
+    store_id = tokens['store_id']
+    existing = supabase.table("tokens").select("Store_ID").eq("Store_ID", store_id).execute()
+    
+    if not existing.data:
+        # No row found 
+        return HttpResponse(
+            f"No entry found in 'tokens' for Store_ID: {store_id}. Please create it first.",
+            status=404
+        )
+    
+    meta_access_token = tokens["meta"]
+    if not meta_access_token:
         return redirect("Demo:meta_login")
 
     if account_id:
         request.session["meta_ad_account_id"] = account_id
+        update_data = {
+            "meta_ad_account_id": account_id,
+        }
+        response = supabase.table("tokens").update(update_data).eq("Store_ID", store_id).execute()
         return redirect("Demo:meta_campaigns")
 
     # Fetch accounts again
-    token = request.session["meta_access_token"]
+    token = meta_access_token
     url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/me/adaccounts"
     params = {"access_token": token}
     resp = requests.get(url, params=params)
@@ -6161,8 +6235,10 @@ def meta_select_ad_account(request, account_id=None):
     return render(request, "Demo/meta_select_ad_account.html", {"accounts": accounts})
 
 def meta_campaigns(request):
-    token = request.session.get("meta_access_token")
-    account_id = request.session.get("meta_ad_account_id")
+    tokens = get_latest_token()
+    meta_access_token = tokens["meta"]
+    token = meta_access_token
+    account_id = token["meta_ad_account_id"]
 
     if not token:
         return redirect("Demo:meta_login")
@@ -8049,11 +8125,11 @@ def view_purchase_campaigns(request):
         return redirect("Demo:snapchat_login")
 
     # Step 1: Get org & ad account
-    organization_id = request.session.get("snap_org_id") or "d08d96ef-367b-41ef-abfc-3fb0c5b605a4"
+    organization_id = request.session.get("snap_org_id") or tokens['snap_org_id']
     if not organization_id:
         return redirect("Demo:snapchat_select_organization")
 
-    ad_account_id = request.session.get("snap_ad_account_id")
+    ad_account_id = request.session.get("snap_ad_account_id") or tokens['snap_ad_account_id']
     if not ad_account_id:
         return redirect("Demo:snapchat_select_account", org_id=organization_id)
 
@@ -8109,7 +8185,7 @@ def view_purchase_campaigns(request):
 
     # TikTok
 
-    advertiser_id = request.session.get("tiktok_advertiser_id")
+    advertiser_id = request.session.get("tiktok_advertiser_id") or tokens['tiktok_org']
 
     if not tiktok_access_token:
         return redirect("Demo:tiktok_login")
@@ -8171,7 +8247,8 @@ def view_purchase_campaigns(request):
 
 
     # META
-    meta_account_id = request.session.get("meta_ad_account_id")
+    meta_account_id = request.session.get("meta_ad_account_id") or tokens['meta_ad_account_id']
+    
 
     if not meta_access_token:
         return redirect("Demo:meta_login")
