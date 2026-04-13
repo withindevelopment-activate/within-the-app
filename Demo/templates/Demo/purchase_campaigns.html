@@ -116,7 +116,9 @@
                             <th data-col="4" class="sorted">Purchases <span class="sort-arrow">↓</span></th>
                             <th data-col="5">Total Events <span class="sort-arrow">↕</span></th>
                             <th data-col="6">Conversion % <span class="sort-arrow">↕</span></th>
+                            {% if check_all_tokens == True %}
                             <th data-col="7">Spend <span class="sort-arrow">↕</span></th>
+                            {% endif %}
                         </tr>
                     </thead>
                     <tbody id="tableBody">
@@ -162,11 +164,17 @@
                             <td><span class="metric">{{ c.Purchases }}</span></td>
                             <td><span class="metric">{{ c.Total_Events }}</span></td>
                             <td class="metric conversion-cell"></td>
+                            {% if check_all_tokens == True %}
                             <td><span class="metric">{{ c.Spend|floatformat:2 }}</span></td>
+                            {% endif %}
                         </tr>
                         {% empty %}
                         <tr>
+                            {% if check_all_tokens == True %}
                             <td colspan="8" class="empty-state">No campaign data found.</td>
+                            {% else %}
+                            <td colspan="7" class="empty-state">No campaign data found.</td>
+                            {% endif %}
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -607,7 +615,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (!noRow) {
                     noRow = document.createElement('tr');
                     noRow.className = 'no-results-row';
+                    {% if check_all_tokens == True %}
                     noRow.innerHTML = '<td colspan="8" class="no-results" style="text-align:center; padding:3rem; color:var(--ink-3);">No campaigns match your selection.</td>';
+                    {% else %}
+                    noRow.innerHTML = '<td colspan="7" class="no-results" style="text-align:center; padding:3rem; color:var(--ink-3);">No campaigns match your selection.</td>';
+                    {% endif %}
                     tbody.appendChild(noRow);
                 }
             } else if (noRow) {
