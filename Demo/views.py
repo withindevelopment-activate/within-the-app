@@ -8630,7 +8630,7 @@ def view_platform_contributions(request):
     base["Platform_Assist_Score"] = (
         (~is_winner & (base["in_atc"] == 1)) * 0.25 +
         (~is_winner & (base["in_pageview"] == 1)) * 0.10
-    )
+    ).round(2)
 
     base["Platform_Score"] = base["Platform_Purchases"] + base["Platform_Assist_Score"]
 
