@@ -8349,7 +8349,7 @@ def view_purchase_campaigns(request):
             check_all_tokens = False
             print("Error during token checks or API calls:", e)
 
-            
+
     # --- Remove duplicate Add To Cart events ---
     atc = df[df['Event_Type'] == 'add_to_cart']
     others = df[df['Event_Type'] != 'add_to_cart']
@@ -8428,7 +8428,7 @@ def view_purchase_campaigns(request):
     # Fetch advertised products table
     # ----------------------------------------------------
 
-    adv_df = fetch_data_from_supabase("Campaign_Purchased_vs_Advertised")
+    adv_df = fetch_data_from_supabase("Campaign_Purchase_vs_Advertised")
 
     adv_df["Source"] = adv_df["Source"].str.strip().str.lower().astype(str)
     adv_df["Campaign"] = adv_df["Campaign"].str.strip().str.lower().astype(str)
