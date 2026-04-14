@@ -8460,17 +8460,18 @@ def view_purchase_campaigns(request):
 
 ### A FUNCTION TO HANDLE THE INCOMING PRODUCT LIST CHANGE FOR THE UTM_Source/Campaign
 # Campaign event logging
-    def clean_sku(sku):
-        if not sku:
-            return None
+def clean_sku(sku):
+    if not sku:
+        return None
 
-        sku = str(sku).strip()
+    sku = str(sku).strip()
 
-        if sku.endswith("-OM"):
-            sku = sku[:-3]  # remove last 3 chars
+    if sku.endswith("-OM"):
+        sku = sku[:-3]
 
-        return sku
-    
+    return sku
+
+
 def update_campaign_products(request):
 
     print("======================================")
@@ -8516,12 +8517,49 @@ def update_campaign_products(request):
         if existing is not None and len(existing) > 0:
 
             print("[DB] Existing row found")
-            print(f"[DB] Rows returned: {len(existing)}")
-
             entry = existing.iloc[0].to_dict()
 
-            print("[DB] Existing entry:")
-            print(entry)
+            print("[DB] Existing entry loaded")
+
+            # ----------------------------------
+            # CALCULATE AD QUALITY BEFORE CHANGING PRODUCTS
+
+            products_sold = entry.get("Products_Sold") or {}
+            versions = entry.get("Products_Advertised") or []
+
+            print("[QUALITY] Calculating current Ad Quality")
+
+            latest = versions[-1] if versions else {}
+
+            advertised_skus = set(
+                clean_sku(s) for s in latest.get("skus", []) if clean_sku(s)
+            )
+
+            print("[QUALITY] Current advertised SKUs:", advertised_skus)
+
+            total_sold = 0
+            matched_sold = 0
+
+            for sku, data in products_sold.items():
+
+                clean = clean_sku(sku)
+                qty = data.get("quantity", 0)
+
+                total_sold += qty
+
+                if clean in advertised_skus:
+                    matched_sold += qty
+
+            if total_sold > 0:
+                ad_quality = round(matched_sold / total_sold, 4)
+            else:
+                ad_quality = None
+
+            entry["Ad_Quality"] = ad_quality
+
+            print("[QUALITY] Total sold:", total_sold)
+            print("[QUALITY] Matched sold:", matched_sold)
+            print("[QUALITY] Ad Quality:", ad_quality)
 
         else:
 
@@ -8531,8 +8569,6 @@ def update_campaign_products(request):
                 name="Campaign_Purchase_vs_Advertised",
                 column="Distinct_ID"
             ))
-
-            print(f"[DB] Generated Distinct_ID: {new_id}")
 
             entry = {
                 "Distinct_ID": new_id,
@@ -8550,12 +8586,11 @@ def update_campaign_products(request):
 
         versions = entry.get("Products_Advertised") or []
 
-        print("[VERSIONS] Existing advertised versions count:", len(versions))
-        print("[VERSIONS] Current versions:", versions)
+        print("[VERSIONS] Existing advertised versions:", len(versions))
 
         next_version = len(versions) + 1
 
-        print("[VERSIONS] Next version number:", next_version)
+        print("[VERSIONS] Next version:", next_version)
 
         # ----------------------------------
         # BUILD PRODUCT MAP
@@ -8563,22 +8598,30 @@ def update_campaign_products(request):
         print("[PRODUCTS] Building product map")
 
         product_map = {}
+        clean_skus = []
 
-        for sku in skus:
+        for raw in skus:
 
-            print(f"[PRODUCT] Raw SKU: {sku}")
+            print("[PRODUCT] Raw:", raw)
 
-            if "_" in sku:
-                name = sku.split("_")[0]
+            if "_" in raw:
+                name, sku = raw.rsplit("_", 1)
             else:
-                name = sku
+                name = raw
+                sku = raw
+
+            sku = clean_sku(sku)
+
+            if not sku:
+                print("[PRODUCT] Skipping invalid SKU")
+                continue
 
             product_map[sku] = name
+            clean_skus.append(sku)
 
-            print(f"[PRODUCT] Parsed -> SKU: {sku}, Name: {name}")
+            print(f"[PRODUCT] Parsed -> SKU:{sku} Name:{name}")
 
-        print("[PRODUCTS] Final product map:")
-        print(product_map)
+        print("[PRODUCTS] Final map:", product_map)
 
         # ----------------------------------
         # NEW VERSION OBJECT
@@ -8586,35 +8629,27 @@ def update_campaign_products(request):
         new_version = {
             "version": next_version,
             "timestamp": get_uae_current_date(),
-            "skus": list(product_map.keys()),
+            "skus": clean_skus,
             "products": product_map
         }
 
-        print("[VERSION] New version object created:")
+        print("[VERSION] New version:")
         print(new_version)
 
         # ----------------------------------
         # APPEND VERSION
 
-        print("[VERSION] Appending new version...")
-
         versions.append(new_version)
 
         entry["Products_Advertised"] = versions
 
-        print("[VERSION] Updated versions list:")
+        print("[VERSION] Updated versions:")
         print(entry["Products_Advertised"])
 
         # ----------------------------------
-        # FINAL ENTRY BEFORE UPSERT
+        # UPSERT
 
-        print("[UPSERT] Final entry payload:")
-        print(entry)
-
-        # ----------------------------------
-        # UPSERT BACK
-
-        print("[UPSERT] Writing to Supabase...")
+        print("[UPSERT] Writing to Supabase")
 
         upsert_partial(
             pd.DataFrame([entry]),
@@ -8629,6 +8664,7 @@ def update_campaign_products(request):
     print("======================================")
 
     return JsonResponse({"status": "success"})
+
 
 def safe_parse_platforms(x):
     if isinstance(x, dict):
