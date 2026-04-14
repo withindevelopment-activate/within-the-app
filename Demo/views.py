@@ -14,6 +14,8 @@ from io import BytesIO
 from supabase import create_client, Client
 from dateutil import parser
 import threading
+import urllib.parse
+import math
 from urllib.parse import urlparse, parse_qs
 
 ## Custom Imports ------------------
@@ -4848,7 +4850,7 @@ def snapchat_callback(request):
                 status=404
             )
         long_term_access_token = refresh_snapchat_token(request)
-        print("Long term access token is:", long_term_access_token)
+        #print("Long term access token is:", long_term_access_token)
         # Row exists, update it
         update_data = {
             "Snapchat_Access": token_data["access_token"],
@@ -7674,19 +7676,15 @@ def update_tracked_customers(new_event, history_rows, customer_dict):
             entry["Products_ATC"] = products_atc
 
             # ----------------------------------
-            # AD QUALITY CALCULATION 
+            # AD QUALITY CALCULATION (PURCHASE ONLY)
 
             versions = entry.get("Products_Advertised") or []
-
             latest = versions[-1] if versions else {}
 
             advertised_skus = set(clean_sku(s) for s in latest.get("skus", []))
 
             total_sold_value = 0
             matched_sold_value = 0
-
-            total_atc_value = 0
-            matched_atc_value = 0
 
             # -----------------------------
             # SOLD QUALITY
@@ -7699,32 +7697,10 @@ def update_tracked_customers(new_event, history_rows, customer_dict):
                     matched_sold_value += qty
 
             # -----------------------------
-            # ATC QUALITY
-            for sku, data in products_atc.items():
-
-                atc_count = data.get("atc_count", 0)
-                total_atc_value += atc_count
-
-                if sku in advertised_skus:
-                    matched_atc_value += atc_count
-
-            # -----------------------------
             # SAFE DIVISION
-            sold_quality = (
-                matched_sold_value / total_sold_value
+            ad_quality = (
+                round(matched_sold_value / total_sold_value, 4)
                 if total_sold_value > 0 else 0
-            )
-
-            atc_quality = (
-                matched_atc_value / total_atc_value
-                if total_atc_value > 0 else 0
-            )
-
-            # -----------------------------
-            # FINAL AD QUALITY SCORE (weighted)
-            ad_quality = round(
-                (sold_quality * 0.7) + (atc_quality * 0.3),
-                4
             )
 
             entry["Ad_Quality"] = ad_quality
@@ -8066,6 +8042,52 @@ def update_tracked_customers(new_event, history_rows, customer_dict):
 
 ############################################################################################
 ############################################################################################
+def safe_parse(x):
+
+    if x is None:
+        return []
+
+    if isinstance(x, (dict, list)):
+        return x
+
+    if isinstance(x, float):
+        if math.isnan(x):
+            return []
+        return []
+
+    if isinstance(x, str):
+
+        x = x.strip()
+
+        if not x:
+            return []
+
+        try:
+            return json.loads(x)
+
+        except Exception:
+            try:
+                return ast.literal_eval(x)
+            except Exception:
+                return []
+
+    return []
+
+## A function that extracts the selected products from the latest version
+def extract_latest_products(val):
+
+    parsed = safe_parse(val)
+
+    if not parsed or not isinstance(parsed, list):
+        return []
+
+    latest = parsed[-1]
+
+    products = latest.get("products", {})
+
+    return list(products.keys())
+
+
 def view_purchase_campaigns(request):
     ## Get the latest tokens
     tokens = get_latest_token()
@@ -8080,8 +8102,6 @@ def view_purchase_campaigns(request):
     tiktok_access_token = tokens['tiktok_access']
     meta_access_token = tokens['meta']
 
-
-    import urllib.parse
     # Fetch data
     df = fetch_data_from_supabase("Campaign_Event_Log")
 
@@ -8328,6 +8348,8 @@ def view_purchase_campaigns(request):
         except Exception as e:
             check_all_tokens = False
             print("Error during token checks or API calls:", e)
+
+            
     # --- Remove duplicate Add To Cart events ---
     atc = df[df['Event_Type'] == 'add_to_cart']
     others = df[df['Event_Type'] != 'add_to_cart']
@@ -8402,8 +8424,32 @@ def view_purchase_campaigns(request):
     ## Calling the list fromt he db
     products_df = fetch_data_from_supabase("zid_product_list")
     zid_product_list = products_df["Product_Combo"].tolist()
-    print("[Purchase Campaigns] Fetched product list from db:", zid_product_list)
+    # ----------------------------------------------------
+    # Fetch advertised products table
+    # ----------------------------------------------------
 
+    adv_df = fetch_data_from_supabase("Campaign_Purchased_vs_Advertised")
+
+    adv_df["Source"] = adv_df["Source"].str.strip().str.lower().astype(str)
+    adv_df["Campaign"] = adv_df["Campaign"].str.strip().str.lower().astype(str)
+
+
+    adv_df["Selected_Products"] = adv_df["Products_Advertised"].apply(extract_latest_products)
+
+    # create lookup dictionary
+    advertised_lookup = {
+        (row["Source"], row["Campaign"]): row["Selected_Products"]
+        for _, row in adv_df.iterrows()
+    }
+
+    campaigns_list = campaign_summary.to_dict(orient="records")
+
+    for record in campaigns_list:
+        source = record["UTM_Source"]
+        camp   = record["UTM_Campaign"]
+        record["Spend"] = sources_spend.get(source, {}).get(camp, 0)
+        ## Attahc selected products
+        record["Selected_Products"] = advertised_lookup.get((source, camp), [])
 
     context = {
         "campaigns": campaigns_list,

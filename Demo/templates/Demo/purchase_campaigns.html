@@ -111,11 +111,18 @@
                         <tr>
                             <th data-col="0">Campaign <span class="sort-arrow">↕</span></th>
                             <th data-col="1">Source <span class="sort-arrow">↕</span></th>
-                            <th data-col="2">Product <span class="sort-arrow">↕</span></th>
-                            <th data-col="3">Total Score <span class="sort-arrow">↕</span></th>
-                            <th data-col="4" class="sorted">Purchases <span class="sort-arrow">↓</span></th>
-                            <th data-col="5">Total Events <span class="sort-arrow">↕</span></th>
-                            <th data-col="6">Conversion % <span class="sort-arrow">↕</span></th>
+                            <th data-col="2">Products List <span class="sort-arrow">↕</span></th>
+                            <th data-col="3">Selected Products<span class="sort-arrow">↕</span></th>
+                            <th data-col="4">Total Score <span class="sort-arrow">↕</span></th>
+                            <th data-col="5" class="sorted">Purchases <span class="sort-arrow">↓</span></th>
+                            <th data-col="6">Total Events <span class="sort-arrow">↕</span></th>
+                            <th data-col="7">Conversion % <span class="sort-arrow">↕</span></th>
+                            <th data-col="8">Spend <span class="sort-arrow">↕</span></th>
+                            <th data-col="9">Product <span class="sort-arrow">↕</span></th>
+                            <th data-col="10">Total Score <span class="sort-arrow">↕</span></th>
+                            <th data-col="11" class="sorted">Purchases <span class="sort-arrow">↓</span></th>
+                            <th data-col="12">Total Events <span class="sort-arrow">↕</span></th>
+                            <th data-col="13">Conversion % <span class="sort-arrow">↕</span></th>
                             {% if check_all_tokens == True %}
                             <th data-col="7">Spend <span class="sort-arrow">↕</span></th>
                             {% endif %}
@@ -160,6 +167,15 @@
                                         </ul>
                                     </div>
                                 </div>
+                            </td>
+                            <td>
+                            {% if c.Selected_Products %}
+                                {% for p in c.Selected_Products %}
+                                    <span class="product-chip">{{ p }}</span>
+                                {% endfor %}
+                            {% else %}
+                                —
+                            {% endif %}
                             </td>
                             <td><span class="score-chip"><span class="badge-dot"></span>{{ c.Total_Score|floatformat:2}}</span></td>
                             <td><span class="metric">{{ c.Purchases }}</span></td>
