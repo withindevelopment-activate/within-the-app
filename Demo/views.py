@@ -8170,6 +8170,7 @@ def view_purchase_campaigns(request):
                 
                 utm_ad_snapchat["utm_source"] = source.lower() if source else ""
                 utm_ad_snapchat["utm_campaign"] = campaign.lower() if campaign else ""
+                print(f"[Purchase Campaigns] Parsed UTM params for Snapchat creative {utm_ad_snapchat['id']}: source={utm_ad_snapchat['utm_source']}, campaign={utm_ad_snapchat['utm_campaign']}")
 
                 # --- MATCHING LOGIC ---
                 # Check if this creative's UTMs exist in your Supabase log
@@ -8177,9 +8178,11 @@ def view_purchase_campaigns(request):
                     (df['UTM_Source'] == utm_ad_snapchat["utm_source"]) & 
                     (df['UTM_Campaign'] == utm_ad_snapchat["utm_campaign"])
                 ]
+                print(f"[Purchase Campaigns] Matching Snapchat creative {utm_ad_snapchat['id']} against log: found {len(match)} matches")
+                
 
                 if not match.empty:
-                    creative_stats = snapchat_api_call(request, f"creatives/{creative['id']}/stats", params=snap_params)
+                    creative_stats = snapchat_api_call(request, f"creatives/{utm_ad_snapchat['id']}/stats", params=snap_params)
                     raw_creatives_stats = creative_stats.get("timeseries_stats", [])
                     print("[Purchase Campaigns] Raw creatives stats:", raw_creatives_stats)
 
@@ -8224,7 +8227,7 @@ def view_purchase_campaigns(request):
                 }
                 utm_ad_tiktok["utm_source"] = extracted_dict.get("utm_source", "").lower().strip()
                 utm_ad_tiktok["utm_campaign"] = extracted_dict.get("utm_campaign", "").lower().strip()
-
+                print(f"[Purchase Campaigns] Parsed UTM params for TikTok ad {utm_ad_tiktok['id']}: source={utm_ad_tiktok['utm_source']}, campaign={utm_ad_tiktok['utm_campaign']}")
                 match = df[
                     (df['UTM_Source'] == utm_ad_tiktok["utm_source"]) & 
                     (df['UTM_Campaign'] == utm_ad_tiktok["utm_campaign"])
@@ -8241,13 +8244,13 @@ def view_purchase_campaigns(request):
                         "metrics": ["spend"],
                         "start_time": start_time,
                         "end_time": end_time,
-                        "filters": [{
+                        "filtering": [{
                             "field_name": "ad_ids",
-                            "field_type": "IN",
-                            "field_value": f"[\"{utm_ad_tiktok['id']}\"]"
+                            "filter_type": "IN",
+                            "filter_value": f"[\"{utm_ad_tiktok['id']}\"]"
                         }]
                     }
-
+                    print(f"[Purchase Campaigns] Requesting TikTok spend for ad {utm_ad_tiktok['id']} with params: {spend_tik_params}")
                     spend_resp = requests.get(spend_tik_url, headers=headers, params=spend_tik_params)
                     spend_data = spend_resp.json()
                     spend_list = spend_data.get("data", {}).get("list", [])
@@ -8288,8 +8291,8 @@ def view_purchase_campaigns(request):
             meta_data = meta_resp.json()
             ad_meta_list = meta_data.get("data",[])
             print("[Purchase Campaigns] Raw Meta ads:", ad_meta_list)
+            ad_meta_dict = {}
             for ad in ad_meta_list:
-                ad_meta_dict = {}
                 creative_id = ad.get("creative", {}).get("id")
                 if creative_id:
                     ad_meta_dict[creative_id] = {

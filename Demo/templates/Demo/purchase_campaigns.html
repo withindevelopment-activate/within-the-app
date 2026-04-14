@@ -710,13 +710,10 @@ document.addEventListener('DOMContentLoaded', function () {
             function updateTriggerLabel() {
                 if (selectedValues.length === 0) {
                     selectedLabel.textContent = '— Select Product —';
-                    selectedLabel.classList.add('placeholder');
                 } else if (selectedValues.length === 1) {
                     selectedLabel.textContent = selectedValues[0];
-                    selectedLabel.classList.remove('placeholder');
                 } else {
                     selectedLabel.textContent = `${selectedValues.length} products selected`;
-                    selectedLabel.classList.remove('placeholder');
                 }
             }
 
