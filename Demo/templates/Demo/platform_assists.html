@@ -1,0 +1,71 @@
+{% extends "Demo/base.html" %}
+
+{% block title %} Campaign Performance {% endblock title %}
+
+{% block content %}
+<div>
+<div class="data-viewport">
+            <div class="data-scroller" role="region" aria-label="cart dataset" tabindex="0">
+                <table class="orders" id="campaignsTable" role="table" aria-label="Platform attribution dataset">
+                <thead>
+                    <tr>
+                        <th data-col="0">Platform <span class="sort-arrow">↕</span></th>
+                        <th data-col="1">Assist Orders <span class="sort-arrow">↕</span></th>
+                        <th data-col="2">Purchase Orders <span class="sort-arrow">↕</span></th>
+                        <th data-col="3">Platform Score <span class="sort-arrow">↕</span></th>
+                    </tr>
+                </thead>
+
+                <tbody id="tableBody">
+                    {% for c in platforms %}
+                    <tr 
+                        data-platform="{{ c.Platform|default:''|lower }}"
+                        data-assists="{{ c.Assist_Orders|default:0 }}"
+                        data-purchases="{{ c.Purchase_Orders|default:0 }}"
+                        data-score="{{ c.Platform_Score|default:0 }}"
+                    >
+                        <!-- Platform -->
+                        <td>
+                            <span class="badge
+                                {% if c.Platform == 'instagram' %}src-instagram
+                                {% elif c.Platform == 'google' %}src-google
+                                {% elif c.Platform == 'direct' %}src-direct
+                                {% elif c.Platform == 'content creators' or c.Platform == 'content' %}src-content
+                                {% elif c.Platform == 'meta' or c.Platform == 'facebook' %}src-meta
+                                {% else %}src-default{% endif %}">
+                                <span class="badge-dot"></span>
+                                {{ c.Platform|default:"Unknown" }}
+                            </span>
+                        </td>
+
+                        <!-- Assist Orders -->
+                        <td>
+                            <span class="metric">{{ c.Assist_Orders }}</span>
+                        </td>
+
+                        <!-- Purchase Orders -->
+                        <td>
+                            <span class="metric">{{ c.Purchase_Orders }}</span>
+                        </td>
+
+                        <!-- Score -->
+                        <td>
+                            <span class="score-chip">
+                                <span class="badge-dot"></span>
+                                {{ c.Platform_Score|floatformat:2 }}
+                            </span>
+                        </td>
+
+                    </tr>
+
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" class="empty-state">No platform data found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            </div>
+        </div>
+    </div>
+</div>

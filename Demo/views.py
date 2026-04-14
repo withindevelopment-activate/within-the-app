@@ -8558,3 +8558,118 @@ def update_campaign_products(request):
         )
 
     return JsonResponse({"status": "success"})
+
+def safe_parse_platforms(x):
+    if isinstance(x, dict):
+        return x
+    if pd.isna(x):
+        return {}
+    if isinstance(x, str):
+        try:
+            return json.loads(x)
+        except:
+            try:
+                return ast.literal_eval(x)
+            except:
+                return {}
+    return {}
+
+def view_platform_contributions(request):
+
+    import pandas as pd
+
+    df = fetch_data_from_supabase("Orders_Platforms_Contribution")
+
+    # ----------------------------
+    # Parse
+    # ----------------------------
+    df["purchase"] = df["purchase"].apply(safe_parse_platforms)
+    df["atc_campaigns"] = df["atc_campaigns"].apply(safe_parse_platforms)
+    df["pageview_campaigns"] = df["pageview_campaigns"].apply(safe_parse_platforms)
+
+    # ----------------------------
+    # Final platform
+    # ----------------------------
+    df["final_platform"] = df["purchase"].apply(
+        lambda x: (x.get("platform") or "").strip().lower() if isinstance(x, dict) else ""
+    )
+
+    # ----------------------------
+    # Expand ATC
+    # ----------------------------
+    atc = df[["order_id", "final_platform", "atc_campaigns"]].copy()
+    atc["atc_campaigns"] = atc["atc_campaigns"].apply(
+        lambda x: list(x.keys()) if isinstance(x, dict) else []
+    )
+    atc = atc.explode("atc_campaigns")
+    atc = atc.dropna(subset=["atc_campaigns"])
+
+    atc["Platform"] = atc["atc_campaigns"].astype(str).str.lower().str.strip()
+    atc["in_atc"] = 1
+    atc["in_pageview"] = 0
+
+    # ----------------------------
+    # Expand Pageview
+    # ----------------------------
+    pv = df[["order_id", "final_platform", "pageview_campaigns"]].copy()
+    pv["pageview_campaigns"] = pv["pageview_campaigns"].apply(
+        lambda x: list(x.keys()) if isinstance(x, dict) else []
+    )
+    pv = pv.explode("pageview_campaigns")
+    pv = pv.dropna(subset=["pageview_campaigns"])
+
+    pv["Platform"] = pv["pageview_campaigns"].astype(str).str.lower().str.strip()
+    pv["in_atc"] = 0
+    pv["in_pageview"] = 1
+
+    # ----------------------------
+    # Combine
+    # ----------------------------
+    base = pd.concat([atc, pv], ignore_index=True)
+
+    # ----------------------------
+    # Add winners
+    # ----------------------------
+    winners = df[["order_id", "final_platform"]].drop_duplicates()
+    winners["Platform"] = winners["final_platform"]
+    winners["in_atc"] = 0
+    winners["in_pageview"] = 0
+
+    base = pd.concat([base, winners], ignore_index=True)
+
+    # ----------------------------
+    # Clean
+    # ----------------------------
+    base = base[base["Platform"].notna() & (base["Platform"] != "")]
+    base = base.drop_duplicates(["order_id", "Platform"])
+
+    # ----------------------------
+    # Per-order scoring
+    # ----------------------------
+    is_winner = base["Platform"].eq(base["final_platform"])
+
+    base["Platform_Purchases"] = is_winner.astype(int)
+
+    base["Platform_Assist_Score"] = (
+        (~is_winner & base["in_atc"].eq(1)) * 0.25 +
+        (~is_winner & base["in_pageview"].eq(1)) * 0.10
+    )
+
+    base["Platform_Score"] = base["Platform_Purchases"] + base["Platform_Assist_Score"]
+
+
+    result = base.groupby("Platform").agg(
+        Assist_Orders=("Platform_Assist_Score", lambda x: (x > 0).sum()),
+        Purchase_Orders=("Platform_Purchases", "sum"),
+        Platform_Score=("Platform_Score", "sum")
+    ).reset_index()
+
+    return render(
+        request,
+        "Demo/platform_assists.html",
+        {
+            "platforms": result.to_dict(orient="records")
+        }
+    )
+
+
