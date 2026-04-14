@@ -8467,11 +8467,10 @@ def clean_sku(sku):
     sku = str(sku).strip()
 
     if sku.endswith("-OM"):
-        sku = sku[:-3]
+        sku = sku[:-3]  # remove last 3 chars
 
     return sku
-
-
+    
 def update_campaign_products(request):
 
     print("======================================")
@@ -8508,58 +8507,13 @@ def update_campaign_products(request):
 
         existing = fetch_data_from_supabase_specific(
             "Campaign_Purchase_vs_Advertised",
-            filters={
-                "Source": source,
-                "Campaign": campaign
-            }
+            filters={"Source": source, "Campaign": campaign}
         )
 
         if existing is not None and len(existing) > 0:
 
             print("[DB] Existing row found")
             entry = existing.iloc[0].to_dict()
-
-            print("[DB] Existing entry loaded")
-
-            # ----------------------------------
-            # CALCULATE AD QUALITY BEFORE CHANGING PRODUCTS
-
-            products_sold = entry.get("Products_Sold") or {}
-            versions = entry.get("Products_Advertised") or []
-
-            print("[QUALITY] Calculating current Ad Quality")
-
-            latest = versions[-1] if versions else {}
-
-            advertised_skus = set(
-                clean_sku(s) for s in latest.get("skus", []) if clean_sku(s)
-            )
-
-            print("[QUALITY] Current advertised SKUs:", advertised_skus)
-
-            total_sold = 0
-            matched_sold = 0
-
-            for sku, data in products_sold.items():
-
-                clean = clean_sku(sku)
-                qty = data.get("quantity", 0)
-
-                total_sold += qty
-
-                if clean in advertised_skus:
-                    matched_sold += qty
-
-            if total_sold > 0:
-                ad_quality = round(matched_sold / total_sold, 4)
-            else:
-                ad_quality = None
-
-            entry["Ad_Quality"] = ad_quality
-
-            print("[QUALITY] Total sold:", total_sold)
-            print("[QUALITY] Matched sold:", matched_sold)
-            print("[QUALITY] Ad Quality:", ad_quality)
 
         else:
 
@@ -8583,22 +8537,19 @@ def update_campaign_products(request):
 
         # ----------------------------------
         # CURRENT VERSION LIST
-
         versions = entry.get("Products_Advertised") or []
 
-        print("[VERSIONS] Existing advertised versions:", len(versions))
+        print("[VERSIONS] Existing versions:", len(versions))
 
         next_version = len(versions) + 1
 
-        print("[VERSIONS] Next version:", next_version)
-
         # ----------------------------------
         # BUILD PRODUCT MAP
-
         print("[PRODUCTS] Building product map")
 
+        stored_skus = []      # FULL STRING (DB)
+        quality_skus = []     # CLEAN SKU (LOGIC)
         product_map = {}
-        clean_skus = []
 
         for raw in skus:
 
@@ -8610,45 +8561,61 @@ def update_campaign_products(request):
                 name = raw
                 sku = raw
 
-            sku = clean_sku(sku)
+            sku = sku.strip()
 
-            if not sku:
-                print("[PRODUCT] Skipping invalid SKU")
-                continue
+            stored_skus.append(raw)      # keep FULL STRING for DB
+            quality_skus.append(sku)     # extracted SKU for calculations
 
             product_map[sku] = name
-            clean_skus.append(sku)
 
-            print(f"[PRODUCT] Parsed -> SKU:{sku} Name:{name}")
+            print(f"[PRODUCT] Parsed -> FULL:{raw} | SKU:{sku} | Name:{name}")
 
         print("[PRODUCTS] Final map:", product_map)
 
         # ----------------------------------
-        # NEW VERSION OBJECT
-
+        # NEW VERSION OBJECT (STORE FULL RAW STRINGS)
         new_version = {
             "version": next_version,
             "timestamp": get_uae_current_date(),
-            "skus": clean_skus,
+            "skus": stored_skus,      # 🔥 FULL STRING SAVED
             "products": product_map
         }
 
-        print("[VERSION] New version:")
-        print(new_version)
-
-        # ----------------------------------
-        # APPEND VERSION
-
         versions.append(new_version)
-
         entry["Products_Advertised"] = versions
 
-        print("[VERSION] Updated versions:")
-        print(entry["Products_Advertised"])
+        print("[VERSION] Saved version:", new_version)
+
+        # ----------------------------------
+        # CALCULATE AD QUALITY (USE CLEAN SKUS)
+        print("[QUALITY] Calculating Ad Quality")
+
+        products_sold = entry.get("Products_Sold") or {}
+
+        latest = versions[-1] if versions else {}
+        advertised_skus = set(quality_skus)   # 🔥 CLEAN SKUS ONLY
+
+        total_sold = 0
+        matched_sold = 0
+
+        for sku, data in products_sold.items():
+
+            qty = data.get("quantity", 0)
+            total_sold += qty
+
+            if sku in advertised_skus:
+                matched_sold += qty
+
+        ad_quality = round(matched_sold / total_sold, 4) if total_sold > 0 else None
+
+        entry["Ad_Quality"] = ad_quality
+
+        print("[QUALITY] Total sold:", total_sold)
+        print("[QUALITY] Matched sold:", matched_sold)
+        print("[QUALITY] Ad Quality:", ad_quality)
 
         # ----------------------------------
         # UPSERT
-
         print("[UPSERT] Writing to Supabase")
 
         upsert_partial(
