@@ -10,8 +10,8 @@
                 <thead>
                     <tr>
                         <th data-col="0">Platform <span class="sort-arrow">↕</span></th>
-                        <th data-col="1">Assist Orders <span class="sort-arrow">↕</span></th>
-                        <th data-col="2">Purchase Orders <span class="sort-arrow">↕</span></th>
+                        <th data-col="1">Assist Score <span class="sort-arrow">↕</span></th>
+                        <th data-col="2">Purchase Score <span class="sort-arrow">↕</span></th>
                         <th data-col="3">Platform Score <span class="sort-arrow">↕</span></th>
                     </tr>
                 </thead>
@@ -20,8 +20,8 @@
                     {% for c in platforms %}
                     <tr 
                         data-platform="{{ c.Platform|default:''|lower }}"
-                        data-assists="{{ c.Assist_Orders|default:0 }}"
-                        data-purchases="{{ c.Purchase_Orders|default:0 }}"
+                        data-assists="{{ c.Assist_Score|default:0 }}"
+                        data-purchases="{{ c.Purchase_Score|default:0 }}"
                         data-score="{{ c.Platform_Score|default:0 }}"
                     >
                         <!-- Platform -->

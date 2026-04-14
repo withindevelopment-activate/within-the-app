@@ -8565,8 +8565,6 @@ def safe_parse_platforms(x):
 
 def view_platform_contributions(request):
 
-    import pandas as pd
-
     df = fetch_data_from_supabase("Orders_Platforms_Contribution")
 
     # ----------------------------
@@ -8584,7 +8582,7 @@ def view_platform_contributions(request):
     )
 
     # ----------------------------
-    # Expand ATC
+    # ATC
     # ----------------------------
     atc = df[["order_id", "final_platform", "atc_campaigns"]].copy()
     atc["atc_campaigns"] = atc["atc_campaigns"].apply(
@@ -8597,8 +8595,9 @@ def view_platform_contributions(request):
     atc["in_atc"] = 1
     atc["in_pageview"] = 0
 
+
     # ----------------------------
-    # Expand Pageview
+    # Pageview
     # ----------------------------
     pv = df[["order_id", "final_platform", "pageview_campaigns"]].copy()
     pv["pageview_campaigns"] = pv["pageview_campaigns"].apply(
@@ -8611,45 +8610,38 @@ def view_platform_contributions(request):
     pv["in_atc"] = 0
     pv["in_pageview"] = 1
 
+
     # ----------------------------
-    # Combine
+    # Combine RAW signals
     # ----------------------------
     base = pd.concat([atc, pv], ignore_index=True)
 
     # ----------------------------
-    # Add winners
+    # IMPORTANT FIX: aggregate signals first
     # ----------------------------
-    winners = df[["order_id", "final_platform"]].drop_duplicates()
-    winners["Platform"] = winners["final_platform"]
-    winners["in_atc"] = 0
-    winners["in_pageview"] = 0
-
-    base = pd.concat([base, winners], ignore_index=True)
+    base = base.groupby(["order_id", "final_platform", "Platform"], as_index=False).agg({
+        "in_atc": "max",
+        "in_pageview": "max"
+    })
 
     # ----------------------------
-    # Clean
+    # Winners row already implicit via final_platform comparison
     # ----------------------------
-    base = base[base["Platform"].notna() & (base["Platform"] != "")]
-    base = base.drop_duplicates(["order_id", "Platform"])
-
-    # ----------------------------
-    # Per-order scoring
-    # ----------------------------
-    is_winner = base["Platform"].eq(base["final_platform"])
+    is_winner = base["Platform"] == base["final_platform"]
 
     base["Platform_Purchases"] = is_winner.astype(int)
 
     base["Platform_Assist_Score"] = (
-        (~is_winner & base["in_atc"].eq(1)) * 0.25 +
-        (~is_winner & base["in_pageview"].eq(1)) * 0.10
+        (~is_winner & (base["in_atc"] == 1)) * 0.25 +
+        (~is_winner & (base["in_pageview"] == 1)) * 0.10
     )
 
     base["Platform_Score"] = base["Platform_Purchases"] + base["Platform_Assist_Score"]
 
 
     result = base.groupby("Platform").agg(
-        Assist_Orders=("Platform_Assist_Score", lambda x: (x > 0).sum()),
-        Purchase_Orders=("Platform_Purchases", "sum"),
+        Assist_Score=("Platform_Assist_Score", lambda x: (x > 0).sum()),
+        Purchase_Score=("Platform_Purchases", "sum"),
         Platform_Score=("Platform_Score", "sum")
     ).reset_index()
 
