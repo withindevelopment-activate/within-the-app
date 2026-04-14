@@ -8142,6 +8142,7 @@ def view_purchase_campaigns(request):
         "start_time": snap_start_time,
         "end_time": snap_end_time,
     }
+    sources_spend = {"snapchat": {}, "tiktok": {}, "meta": {}}
 
     check_all_tokens = True
     if not snap_access_token or not tiktok_access_token or not meta_access_token:
@@ -8164,7 +8165,6 @@ def view_purchase_campaigns(request):
             creatives_data = snapchat_api_call(request, f"adaccounts/{ad_account_id}/creatives")
             raw_creatives = creatives_data.get("creatives", [])
             print("[Purchase Campaigns] Raw creatives:", creatives_data)
-            sources_spend = {"snapchat": {}, "tiktok": {}, "meta": {}}
             for creative in raw_creatives:
                 utm_ad_snapchat = {}
                 utm_ad_snapchat["id"] = creative.get("id")
@@ -8387,14 +8387,6 @@ def view_purchase_campaigns(request):
             'purchases': subset['Purchases'].tolist(),
             'events': subset['Total_Events'].tolist()
         }
-    campaigns_list = campaign_summary.to_dict(orient="records")
-
-    if check_all_tokens == True:
-        print("[Purchase Campaigns] Campaign summary with spend before adding spend:", campaigns_list)
-        for record in campaigns_list:
-            source = record["UTM_Source"]
-            camp   = record["UTM_Campaign"]
-            record["Spend"] = sources_spend.get(source, {}).get(camp, 0)
 
     unique_sources = (
         df['UTM_Source']
@@ -8438,7 +8430,9 @@ def view_purchase_campaigns(request):
     for record in campaigns_list:
         source = record["UTM_Source"]
         camp   = record["UTM_Campaign"]
-        record["Spend"] = sources_spend.get(source, {}).get(camp, 0)
+        if check_all_tokens == True:
+            print("[Purchase Campaigns] Campaign summary with spend before adding spend:", campaigns_list)
+            record["Spend"] = sources_spend.get(source, {}).get(camp, 0)
         ## Attahc selected products
         record["Selected_Products"] = advertised_lookup.get((source, camp), [])
 
