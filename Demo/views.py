@@ -8449,6 +8449,10 @@ def view_purchase_campaigns(request):
         "campaign_data_json": json.dumps(source_to_campaigns),
         "zid_product_list": zid_product_list,
         "tokens": tokens,
+        "tiktok_connected": bool(tiktok_access_token),
+        "snapchat_connected": bool(snap_access_token),
+        "meta_connected": bool(meta_access_token),
+        "zid_connected": bool(authorization and access_token and store_id),
         "check_all_tokens": check_all_tokens
     }
 

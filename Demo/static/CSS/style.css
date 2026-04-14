@@ -1174,3 +1174,44 @@ table.orders tbody tr:hover td {
     border-radius:6px;
     font-size:12px;
 }
+
+.social-btn-login{
+  position: absolute;
+  top: 120%;
+}
+
+.social-btn-login .btn:hover {
+  background-color: #6b7280;
+}
+
+.social-btn {
+  background-color: #bcbcbc;
+  min-width: 90px;
+}
+
+.zid-btn {
+  background: radial-gradient(circle, #8127E8 55%, #9B4DF0 77%, #8127e8 100%);
+  min-width: 90px;
+}
+.tiktok-btn {
+  background: radial-gradient(circle at center, #000000 0%, #000000 75%, #FE2C55 80%, #25F4EE 100%);
+  min-width: 90px;
+}
+.meta-btn {
+  background: radial-gradient(circle, #0866FF 55%, #468CFF 79%, #0866ff 100%);
+  min-width: 90px;
+}
+.snapchat-btn {
+  background: radial-gradient(circle, #FFFC00 0%, #FFF200 50%, #FFb600 100%);
+  min-width: 90px;
+}
+
+.snapchat-btn span{
+  color: #000;
+}
+
+.disabled-link {
+  pointer-events: none; /* Disables all click events */
+  cursor: default;     /* Changes the cursor from a hand to the default arrow */
+  text-decoration: none; /* Optional: removes the underline */
+}

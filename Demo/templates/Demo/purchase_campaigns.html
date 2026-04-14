@@ -6,6 +6,14 @@
 
 <div>
     <div class="page-header">
+        <div class="social-btn-login start-50 translate-middle" style="z-index: 1080">
+            <div class="btn-group d-flex" role="group" aria-label="Language Switcher">
+                <a href="{% url 'Demo:tiktok_login' %}" class="flex-fill btn btn-sm {% if tiktok_connected %}tiktok-btn disabled-link{% else %}social-btn{% endif %}"><span class="badge"><i class="bi bi-tiktok"></i> TikTok</span></a>
+                <a href="{% url 'Demo:snapchat_login' %}" class="flex-fill btn btn-sm {% if snapchat_connected %}snapchat-btn disabled-link{% else %}social-btn{% endif %}"><span class="badge"><i class="bi bi-snapchat"></i> Snapchat</span></a>
+                <a href="{% url 'Demo:zid_login' %}" class="flex-fill btn btn-sm {% if zid_connected %}zid-btn disabled-link{% else %}social-btn{% endif %}"><span class="badge"><i class="bi bi-plus"></i> Zid</span></a>
+                <a href="{% url 'Demo:meta_login' %}" class="flex-fill btn btn-sm {% if meta_connected %}meta-btn disabled-link{% else %}social-btn{% endif %}"><span class="badge"><i class="bi bi-meta"></i> Meta</span></a>
+            </div>
+        </div>
         <div>
             <h1>Campaign Performance</h1>
             <div class="page-subtitle">Purchases and event volume by source and campaign</div>
