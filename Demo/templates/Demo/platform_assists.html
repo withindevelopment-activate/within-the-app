@@ -12,8 +12,8 @@
                         <th data-col="0">Platform <span class="sort-arrow">↕</span></th>
                         <th data-col="1">Assist Score <span class="sort-arrow">↕</span></th>
                         <th data-col="2">Purchase Score/ Orders <span class="sort-arrow">↕</span></th>
-                        <th data-col="3">Platform Score <span class="sort-arrow">↕</span></th>
                         <th data-col="4">Assisted Orders Count <span class="sort-arrow">↕</span></th>
+                        <th data-col="3">Platform Score <span class="sort-arrow">↕</span></th>
                     </tr>
                 </thead>
 
@@ -49,6 +49,10 @@
                             <span class="metric">{{ c.Purchase_Score }}</span>
                         </td>
 
+                        <td>
+                            <span class="metric">{{ c.Assisted_Orders }}</span>
+                        </td>
+
                         <!-- Score -->
                         <td>
                             <span class="score-chip">
@@ -57,9 +61,6 @@
                             </span>
                         </td>
 
-                        <td>
-                            <span class="metric">{{ c.Assisted_Orders }}</span>
-                        </td>
 
                     </tr>
 
