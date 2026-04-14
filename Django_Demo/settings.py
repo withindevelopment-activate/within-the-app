@@ -184,9 +184,9 @@ SESSION_SAVE_EVERY_REQUEST = True
 
 OAUTH_PROVIDERS = {
     "meta": {
-        "auth_url": "https://www.facebook.com/v24.0/dialog/oauth",
-        "token_url": "https://graph.facebook.com/v24.0/oauth/access_token",
-        "api_base_url": "https://graph.facebook.com/v24.0",
+        "auth_url": "https://www.facebook.com/v25.0/dialog/oauth",
+        "token_url": "https://graph.facebook.com/v25.0/oauth/access_token",
+        "api_base_url": "https://graph.facebook.com/v25.0",
     },
 }
 
