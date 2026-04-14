@@ -14,26 +14,24 @@
                 <a href="{% url 'Demo:meta_login' %}" class="flex-fill btn btn-sm {% if meta_connected %}meta-btn disabled-link{% else %}social-btn{% endif %}"><span class="badge"><i class="bi bi-meta"></i> Meta</span></a>
             </div>
         </div>
-        <div class="row">
-            <div>
-                <h1>Campaign Performance</h1>
-                <div class="page-subtitle">Purchases and event volume by source and campaign</div>
+        <div>
+            <h1>Campaign Performance</h1>
+            <div class="page-subtitle">Purchases and event volume by source and campaign</div>
+        </div>
+        <div class="header-stats">
+            <div class="stat">
+                <div class="stat-val" id="campaignCount">{{ campaigns|length }}</div>
+                <div class="stat-label">Campaigns</div>
             </div>
-            <div class="header-stats">
-                <div class="stat">
-                    <div class="stat-val" id="campaignCount">{{ campaigns|length }}</div>
-                    <div class="stat-label">Campaigns</div>
-                </div>
-                <div class="stat-divider"></div>
-                <div class="stat">
-                    <div class="stat-val" id="totalPurchasesStat">0</div>
-                    <div class="stat-label">Total purchases</div>
-                </div>
-                <div class="stat-divider"></div>
-                <div class="stat">
-                    <div class="stat-val" id="totalEventsStat">0</div>
-                    <div class="stat-label">Total events</div>
-                </div>
+            <div class="stat-divider"></div>
+            <div class="stat">
+                <div class="stat-val" id="totalPurchasesStat">0</div>
+                <div class="stat-label">Total purchases</div>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat">
+                <div class="stat-val" id="totalEventsStat">0</div>
+                <div class="stat-label">Total events</div>
             </div>
         </div>
         
