@@ -8589,7 +8589,6 @@ def view_platform_contributions(request):
     atc["in_atc"] = 1
     atc["in_pageview"] = 0
 
-
     # ----------------------------
     # Pageview
     # ----------------------------
@@ -8604,14 +8603,13 @@ def view_platform_contributions(request):
     pv["in_atc"] = 0
     pv["in_pageview"] = 1
 
-
     # ----------------------------
     # Combine RAW signals
     # ----------------------------
     base = pd.concat([atc, pv], ignore_index=True)
 
     # ----------------------------
-    # IMPORTANT FIX: aggregate signals first
+    #  aggregate signals first
     # ----------------------------
     base = base.groupby(["order_id", "final_platform", "Platform"], as_index=False).agg({
         "in_atc": "max",
@@ -8632,12 +8630,26 @@ def view_platform_contributions(request):
 
     base["Platform_Score"] = base["Platform_Purchases"] + base["Platform_Assist_Score"]
 
+    # ----------------------------
+    # Assisted Orders (ATC or Pageview involvement)
+    assisted_orders = base[
+        (base["in_atc"] == 1) | (base["in_pageview"] == 1)
+    ].groupby("Platform")["order_id"].nunique().reset_index()
 
+    assisted_orders.rename(columns={"order_id": "Assisted_Orders"}, inplace=True)
+
+    # ----------------------------
+    # FINAL RESULT
     result = base.groupby("Platform").agg(
-        Assist_Score=("Platform_Assist_Score", lambda x: (x > 0).sum()),
+        Assist_Score=("Platform_Assist_Score", "sum"),
         Purchase_Score=("Platform_Purchases", "sum"),
-        Platform_Score=("Platform_Score", "sum")
+        Platform_Score=("Platform_Score", "sum"),
+        Order_Count=("order_id", "nunique")
     ).reset_index()
+
+    # merge Assisted Orders
+    result = result.merge(assisted_orders, on="Platform", how="left")
+    result["Assisted_Orders"] = result["Assisted_Orders"].fillna(0).astype(int)
 
     return render(
         request,
