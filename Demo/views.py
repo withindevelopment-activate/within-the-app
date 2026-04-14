@@ -8255,20 +8255,23 @@ def view_purchase_campaigns(request):
 
                 if not match.empty:
                     spend_tik_url = f"{API_BASE}/report/integrated/get/"
+                    filtering_data = [
+                        {
+                            "field_name": "ad_ids",
+                            "filter_type": "IN",
+                            "filter_value": json.dumps([str(utm_ad_tiktok['id'])])
+                        }
+                    ]
                     spend_tik_params = {
                         "advertiser_id": advertiser_id,
-                        "dimensions": ["ad_id"],
+                        "dimensions": json.dumps(["ad_id"]),
                         "service_type": "AUCTION",
                         "report_type": "BASIC",
                         "data_level": "AUCTION_AD",
-                        "metrics": ["spend"],
+                        "metrics": json.dumps(["spend", "ad_id"]),
                         "start_date": start_time,
                         "end_date": end_time,
-                        "filtering": [{
-                            "field_name": "ad_ids",
-                            "filter_type": "IN",
-                            "filter_value": f"[\"{utm_ad_tiktok['id']}\"]"
-                        }]
+                        "filtering": json.dumps(filtering_data)
                     }
                     print(f"[Purchase Campaigns] Requesting TikTok spend for ad {utm_ad_tiktok['id']} with params: {spend_tik_params}")
                     spend_resp = requests.get(spend_tik_url, headers=headers, params=spend_tik_params)
@@ -8291,19 +8294,14 @@ def view_purchase_campaigns(request):
                 return redirect("Demo:meta_select_ad_account")
             
             meta_url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/{meta_account_id}/ads"
-            meta_creative_url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/{meta_account_id}/adcreatives"
             
             meta_params = {
-                "fields": "name,creative{id},insights.time_range({\"since\":\""+start_time+"\",\"until\":\""+end_time+"\"}){spend}",
+                "fields": "name,creative{id,call_to_action},insights.time_range({\"since\":\""+start_time+"\",\"until\":\""+end_time+"\"}){spend}",
                 "filtering": json.dumps([{
                     "field": "ad.effective_status",
                     "operator": "IN",
                     "value": ["ACTIVE"]
-                }])
-            }
-
-            meta_creative_params = {
-                "fields": "name,id,object_story_spec",
+                }]),
                 "limit": 100
             }
 
@@ -8311,40 +8309,32 @@ def view_purchase_campaigns(request):
             meta_data = meta_resp.json()
             ad_meta_list = meta_data.get("data",[])
             print("[Purchase Campaigns] Raw Meta ads:", meta_data)
-            ad_meta_dict = {}
             for ad in ad_meta_list:
-                creative_id = ad.get("creative", {}).get("id")
-                if creative_id:
-                    ad_meta_dict[creative_id] = {
-                        "spend": ad.get("insights", {}).get("data", [{}])[0].get("spend", 0)
-                    }
-
-            meta_creative_resp = requests.get(meta_creative_url, headers={"Authorization": f"Bearer {meta_access_token}"}, params=meta_creative_params)
-            meta_creative_data = meta_creative_resp.json()
-            creative_meta_list = meta_creative_data.get("data", [])
-            print("[Purchase Campaigns] Raw Meta creatives:", meta_creative_data)
-            for creative in creative_meta_list:
+                creative = ad.get("creative", {}) or {}
                 creative_id = creative.get("id")
-                link_data = creative.get("object_story_spec", {}).get("link_data", {})
-                url = link_data.get("link") or link_data.get("call_to_action", {}).get("value", {}).get("link", "")
-                
+                url = creative.get("call_to_action", {}).get("value", {}).get("link", "")
+
                 if not url:
                     continue
+
                 parsed_url = urlparse(url)
                 utm_params = parse_qs(parsed_url.query)
                 source = utm_params.get("utm_source", [None])[0]
                 campaign = utm_params.get("utm_campaign", [None])[0]
-                print(f"[Purchase Campaigns] Parsed UTM params for creative {creative_id}: source={source}, campaign={campaign}")
+                print(f"[Purchase Campaigns] Parsed UTM params for Meta ad {ad.get('id')} / creative {creative_id}: source={source}, campaign={campaign}")
                 source = source.lower().strip() if source else ""
                 campaign = campaign.lower().strip() if campaign else ""
+
+                insight_rows = ad.get("insights", {}).get("data", [])
+                spend = sum(float(item.get("spend", 0) or 0) for item in insight_rows)
+
                 match = df[
                     (df['UTM_Source'] == source) &
                     (df['UTM_Campaign'] == campaign)
                 ]
-                print(f"[Purchase Campaigns] Matching Meta creative {creative_id} against log: found {len(match)} matches")
-                print(f"[Purchase Campaigns] Creative {creative_id} spend from insights: {ad_meta_dict.get(creative_id, {}).get('spend', 0)}")
+                print(f"[Purchase Campaigns] Matching Meta ad {ad.get('id')} against log: found {len(match)} matches")
+                print(f"[Purchase Campaigns] Meta ad {ad.get('id')} spend from insights: {spend}")
                 if not match.empty:
-                    spend = float(ad_meta_dict.get(creative_id, {}).get("spend", 0))
                     sources_spend["meta"][campaign] = sources_spend["meta"].get(campaign, 0) + spend
         except Exception as e:
             check_all_tokens = False
@@ -8469,7 +8459,6 @@ def view_purchase_campaigns(request):
     }
 
     return render(request, "Demo/purchase_campaigns.html", context)
-
 
 ### A FUNCTION TO HANDLE THE INCOMING PRODUCT LIST CHANGE FOR THE UTM_Source/Campaign
 def update_campaign_products(request):
