@@ -49,8 +49,8 @@
         <div class="chart-metrics">
             <div class="progress-card">
                 <div class="progress-head">
-                    <div class="progress-title">Source Purchase Share</div>
-                    <div class="progress-value" id="sourcePurchaseShareValue">0 total purchases</div>
+                    <div class="progress-title">Source Ads Total Share</div>
+                    <div class="progress-value" id="sourcePurchaseShareValue">0 total ads</div>
                 </div>
                 <div class="progress-track" id="sourcePurchaseShareBar"></div>
                 <div class="progress-meta" id="sourcePurchaseShareMeta"></div>
@@ -178,8 +178,9 @@
                             data-source="{{ c.UTM_Source|default:''|lower }}"
                             data-score="{{ c.Total_Score|default:0 }}" 
                             data-purchases="{{ c.Purchases|default:0 }}"
-                            data-quality="{{ c.Ad_Quality|default:0|floatformat:4 }}"
-                            data-events="{{ c.Total_Events|default:0 }}">
+                            data-quality="{% if c.Ad_Quality is not None %}{{ c.Ad_Quality|floatformat:4 }}{% else %}0{% endif %}"
+                            data-events="{{ c.Total_Events|default:0 }}"
+                            data-spend="{{ c.Spend|default:0 }}">
                             <td>{{ c.UTM_Campaign|default:"—" }}</td>
                             <td>
                                 {% with src=c.UTM_Source|default:''|lower %}
@@ -223,7 +224,7 @@
                             </td>
                             <td><span class="score-chip"><span class="badge-dot"></span>{{ c.Total_Score|floatformat:2}}</span></td>
                             <td><span class="metric">{{ c.Purchases }}</span></td>
-                            <td><span class="metric">{{ c.Ad_Quality|default:0|floatformat:3 }}</span></td>
+                            <td><span class="metric">{% if c.Ad_Quality is not None %}{{ c.Ad_Quality|floatformat:3 }}{% else %}—{% endif %}</span></td>
                             <td><span class="metric">{{ c.Total_Events }}</span></td>
                             <td class="metric conversion-cell"></td>
                             {% if check_all_tokens == True %}
@@ -379,6 +380,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const labels = {{ source_labels|safe }};
         const purchases = {{ source_purchases|safe }};
         const events = {{ source_events|safe }};
+        const sourceAdsLabels = {{ source_ads_labels|safe }};
+        const sourceAdsTotals = {{ source_ads_totals|safe }};
 
         function getConversionRate(purchaseValue, eventValue) {
             if (eventValue <= 0) {
@@ -442,24 +445,25 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
 
-            const sourceTotals = labels.map((label, index) => ({
+            const sourceTotals = sourceAdsLabels.map((label, index) => ({
                 source: label || 'Unknown',
-                purchases: Number(purchases[index]) || 0
-            })).filter(item => item.purchases > 0);
+                adsTotal: Number(sourceAdsTotals[index]) || 0
+            })).filter(item => item.adsTotal > 0);
 
             bar.innerHTML = '';
             meta.innerHTML = '';
-            value.textContent = `${totalPurchases.toLocaleString()} total purchases`;
+            const totalAds = sourceTotals.reduce((sum, item) => sum + item.adsTotal, 0);
+            value.textContent = `${totalAds.toLocaleString()} total ads`;
 
-            if (!sourceTotals.length || totalPurchases <= 0) {
-                meta.appendChild(buildMetaChip('#cbd5e1', 'No purchase data'));
-                bar.appendChild(buildSegment('#e2e8f0', 100, 'No purchase data'));
+            if (!sourceTotals.length || totalAds <= 0) {
+                meta.appendChild(buildMetaChip('#cbd5e1', 'No ads total data'));
+                bar.appendChild(buildSegment('#e2e8f0', 100, 'No ads total data'));
                 return;
             }
 
             sourceTotals.forEach((item, index) => {
                 const color = progressPalette[index % progressPalette.length];
-                const percentage = (item.purchases / totalPurchases) * 100;
+                const percentage = (item.adsTotal / totalAds) * 100;
                 const label = `${item.source}: ${percentage.toFixed(1)}%`;
                 bar.appendChild(buildSegment(color, percentage, label));
                 meta.appendChild(buildMetaChip(color, `${item.source} ${percentage.toFixed(1)}%`));
@@ -733,14 +737,18 @@ document.addEventListener('DOMContentLoaded', function () {
             });
 
             const rows = Array.from(tbody.querySelectorAll('tr[data-source]'));
-            const keyMap = ['campaign', 'source', 'product', 'score', 'purchases', 'quality', 'events', 'conversion'];
+            const keyMap = ['campaign', 'source', null, null, 'score', 'purchases', 'quality', 'events', 'conversion', 'spend'];
             const key = keyMap[col];
+
+            if (!key) {
+                return;
+            }
 
             rows.sort((a, b) => {
                 let va = a.dataset[key] || '';
                 let vb = b.dataset[key] || '';
 
-                if (key === 'score' || key === 'purchases' || key === 'events' || key === 'conversion') {
+                if (key === 'score' || key === 'purchases' || key === 'quality' || key === 'events' || key === 'conversion' || key === 'spend') {
                     va = parseFloat(va) || 0;
                     vb = parseFloat(vb) || 0;
                     return sortAsc ? va - vb : vb - va;

@@ -8355,6 +8355,16 @@ def view_purchase_campaigns(request):
     # --- Create purchase flag ---
     df['Is_Purchase'] = (df['Event_Type'] == 'purchase').astype(int)
 
+    def normalize_text(value):
+        return str(value or "").strip().lower()
+
+    def is_direct_bar_bucket(source_value, campaign_value):
+        source_norm = normalize_text(source_value)
+        campaign_norm = normalize_text(campaign_value)
+        if source_norm == "direct":
+            return True
+        return source_norm == "google" and "search-1" in campaign_norm
+
     # --- Group by source + campaign ---
     campaign_summary = (
         df.groupby(['UTM_Source', 'UTM_Campaign'])
@@ -8367,7 +8377,6 @@ def view_purchase_campaigns(request):
         .sort_values(by='Total_Score', ascending=False)
     )
 
-    
     source_summary = (
         df.groupby('UTM_Source')
         .agg(
@@ -8377,6 +8386,17 @@ def view_purchase_campaigns(request):
         )
         .reset_index()
         .sort_values(by='Total_Score', ascending=False)
+    )
+
+    source_bar_df = campaign_summary.copy()
+    source_bar_df["Bar_Source"] = source_bar_df.apply(
+        lambda row: "direct" if is_direct_bar_bucket(row["UTM_Source"], row["UTM_Campaign"]) else row["UTM_Source"],
+        axis=1
+    )
+    source_bar_summary = (
+        source_bar_df.groupby("Bar_Source", as_index=False)
+        .agg(Ads_Total=("Purchases", "sum"))
+        .sort_values(by="Ads_Total", ascending=False)
     )
 
     source_to_campaigns = {}
@@ -8425,6 +8445,10 @@ def view_purchase_campaigns(request):
         (row["Source"], row["Campaign"]): row["Selected_Products"]
         for _, row in adv_df.iterrows()
     }
+    ad_quality_lookup = {
+        (row["Source"], row["Campaign"]): row.get("Ad_Quality")
+        for _, row in adv_df.iterrows()
+    }
 
     campaigns_list = campaign_summary.to_dict(orient="records")
 
@@ -8436,6 +8460,7 @@ def view_purchase_campaigns(request):
             record["Spend"] = sources_spend.get(source, {}).get(camp, 0)
         ## Attahc selected products
         record["Selected_Products"] = advertised_lookup.get((source, camp), [])
+        record["Ad_Quality"] = ad_quality_lookup.get((source, camp))
 
     context = {
         "campaigns": campaigns_list,
@@ -8443,6 +8468,8 @@ def view_purchase_campaigns(request):
         "source_labels": source_summary['UTM_Source'].tolist(),
         "source_purchases": source_summary['Purchases'].tolist(),
         "source_events": source_summary['Total_Events'].tolist(),
+        "source_ads_labels": source_bar_summary["Bar_Source"].tolist(),
+        "source_ads_totals": source_bar_summary["Ads_Total"].tolist(),
 
         
         # Chart 2 Data  -- The Dropdown & Mapping 
