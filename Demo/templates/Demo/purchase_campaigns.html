@@ -733,7 +733,7 @@ document.addEventListener('DOMContentLoaded', function () {
             });
 
             const rows = Array.from(tbody.querySelectorAll('tr[data-source]'));
-            const keyMap = ['campaign', 'source', 'product', 'score', 'purchases', 'events', 'conversion'];
+            const keyMap = ['campaign', 'source', 'product', 'score', 'purchases', 'quality', 'events', 'conversion'];
             const key = keyMap[col];
 
             rows.sort((a, b) => {
