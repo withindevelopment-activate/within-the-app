@@ -8473,22 +8473,38 @@ def view_purchase_campaigns(request):
     
 def update_campaign_products(request):
 
+    print("======================================")
+    print("[START] update_campaign_products")
+    print("======================================")
+
     data = json.loads(request.body)
     campaigns = data.get("campaigns", [])
 
-    for c in campaigns:
+    print(f"[INFO] Campaigns received: {len(campaigns)}")
+
+    for idx, c in enumerate(campaigns):
+
+        print("--------------------------------------")
+        print(f"[LOOP] Campaign #{idx+1}")
+        print("--------------------------------------")
+        print("[RAW PAYLOAD]", c)
 
         source = c.get("UTM_Source")
         campaign = c.get("UTM_Campaign")
         skus = c.get("Products", []) or []
 
-        if not source or not campaign:
-            continue
+        print(f"[PARSED] Source: {source}")
+        print(f"[PARSED] Campaign: {campaign}")
+        print(f"[PARSED] SKUs: {skus}")
 
-        print(source, campaign, skus)
+        if not source or not campaign:
+            print("[SKIP] Missing source or campaign")
+            continue
 
         # ----------------------------------
         # FETCH EXISTING RECORD
+        print("[DB] Fetching existing record...")
+
         existing = fetch_data_from_supabase_specific(
             "Campaign_Purchase_vs_Advertised",
             filters={
@@ -8498,13 +8514,28 @@ def update_campaign_products(request):
         )
 
         if existing is not None and len(existing) > 0:
+
+            print("[DB] Existing row found")
+            print(f"[DB] Rows returned: {len(existing)}")
+
             entry = existing.iloc[0].to_dict()
+
+            print("[DB] Existing entry:")
+            print(entry)
+
         else:
+
+            print("[DB] No existing row — creating new entry")
+
+            new_id = int(get_next_id_from_supabase_compatible_all(
+                name="Campaign_Purchase_vs_Advertised",
+                column="Distinct_ID"
+            ))
+
+            print(f"[DB] Generated Distinct_ID: {new_id}")
+
             entry = {
-                "Distinct_ID": int(get_next_id_from_supabase_compatible_all(
-                    name="Campaign_Purchase_vs_Advertised",
-                    column="Distinct_ID"
-                )),
+                "Distinct_ID": new_id,
                 "Source": source,
                 "Campaign": campaign,
                 "Products_Sold": {},
@@ -8516,27 +8547,42 @@ def update_campaign_products(request):
 
         # ----------------------------------
         # CURRENT VERSION LIST
+
         versions = entry.get("Products_Advertised") or []
 
-        # next version number
+        print("[VERSIONS] Existing advertised versions count:", len(versions))
+        print("[VERSIONS] Current versions:", versions)
+
         next_version = len(versions) + 1
 
+        print("[VERSIONS] Next version number:", next_version)
+
         # ----------------------------------
-        # BUILD PRODUCT MAP (SKU -> name)
-        # If you only have SKU, we store SKU as fallback name too
+        # BUILD PRODUCT MAP
+
+        print("[PRODUCTS] Building product map")
+
         product_map = {}
 
         for sku in skus:
+
+            print(f"[PRODUCT] Raw SKU: {sku}")
+
             if "_" in sku:
-                # heuristic split: "Name_SKU"
                 name = sku.split("_")[0]
             else:
                 name = sku
 
             product_map[sku] = name
 
+            print(f"[PRODUCT] Parsed -> SKU: {sku}, Name: {name}")
+
+        print("[PRODUCTS] Final product map:")
+        print(product_map)
+
         # ----------------------------------
         # NEW VERSION OBJECT
+
         new_version = {
             "version": next_version,
             "timestamp": get_uae_current_date(),
@@ -8544,17 +8590,43 @@ def update_campaign_products(request):
             "products": product_map
         }
 
+        print("[VERSION] New version object created:")
+        print(new_version)
+
+        # ----------------------------------
+        # APPEND VERSION
+
+        print("[VERSION] Appending new version...")
+
         versions.append(new_version)
 
         entry["Products_Advertised"] = versions
 
+        print("[VERSION] Updated versions list:")
+        print(entry["Products_Advertised"])
+
+        # ----------------------------------
+        # FINAL ENTRY BEFORE UPSERT
+
+        print("[UPSERT] Final entry payload:")
+        print(entry)
+
         # ----------------------------------
         # UPSERT BACK
+
+        print("[UPSERT] Writing to Supabase...")
+
         upsert_partial(
             pd.DataFrame([entry]),
             "Campaign_Purchase_vs_Advertised",
             "Distinct_ID"
         )
+
+        print("[UPSERT] Success for campaign:", campaign)
+
+    print("======================================")
+    print("[END] update_campaign_products")
+    print("======================================")
 
     return JsonResponse({"status": "success"})
 
