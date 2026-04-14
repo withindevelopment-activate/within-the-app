@@ -8083,9 +8083,10 @@ def extract_latest_products(val):
 
     latest = parsed[-1]
 
-    products = latest.get("products", {})
+    products = latest.get("products", {}) or {}
 
-    return list(products.keys())
+    # return full display strings
+    return [f"{sku} - {name}" for sku, name in products.items()]
 
 
 def view_purchase_campaigns(request):
@@ -8593,7 +8594,7 @@ def update_campaign_products(request):
         products_sold = entry.get("Products_Sold") or {}
 
         latest = versions[-1] if versions else {}
-        advertised_skus = set(quality_skus)   # 🔥 CLEAN SKUS ONLY
+        advertised_skus = set(quality_skus)   
 
         total_sold = 0
         matched_sold = 0

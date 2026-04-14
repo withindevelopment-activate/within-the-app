@@ -178,7 +178,7 @@
                             data-source="{{ c.UTM_Source|default:''|lower }}"
                             data-score="{{ c.Total_Score|default:0 }}" 
                             data-purchases="{{ c.Purchases|default:0 }}"
-                            data-quality="{{ c.Ad_Quality|default:0 }}"
+                            data-quality="{{ c.Ad_Quality|default:0|floatformat:4 }}"
                             data-events="{{ c.Total_Events|default:0 }}">
                             <td>{{ c.UTM_Campaign|default:"—" }}</td>
                             <td>
@@ -223,7 +223,7 @@
                             </td>
                             <td><span class="score-chip"><span class="badge-dot"></span>{{ c.Total_Score|floatformat:2}}</span></td>
                             <td><span class="metric">{{ c.Purchases }}</span></td>
-                            <td><span class="metric">{{ c.Ad_Quality }}</span></td>
+                            <td><span class="metric">{{ c.Ad_Quality|default:0|floatformat:3 }}</span></td>
                             <td><span class="metric">{{ c.Total_Events }}</span></td>
                             <td class="metric conversion-cell"></td>
                             {% if check_all_tokens == True %}
