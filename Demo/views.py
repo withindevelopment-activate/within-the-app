@@ -8659,7 +8659,8 @@ def view_platform_contributions(request):
         request,
         "Demo/platform_assists.html",
         {
-            "platforms": result.to_dict(orient="records")
+            "platforms": result.to_dict(orient="records"),
+            "platform_count": int(len(result)),
         }
     )
 

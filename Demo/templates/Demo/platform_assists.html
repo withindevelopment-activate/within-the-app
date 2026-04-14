@@ -3,77 +3,182 @@
 {% block title %} Campaign Performance {% endblock title %}
 
 {% block content %}
-<div>
-<div class="data-viewport">
-            <div class="data-scroller" role="region" aria-label="cart dataset" tabindex="0">
-                <table class="orders" id="campaignsTable" role="table" aria-label="Platform attribution dataset">
-                <thead>
-                    <tr>
-                        <th data-col="0">Platform <span class="sort-arrow">↕</span></th>
-                        <th data-col="1">Assist Score <span class="sort-arrow">↕</span></th>
-                        <th data-col="2">Purchase Score/ Orders <span class="sort-arrow">↕</span></th>
-                        <th data-col="4">Assisted Orders Count <span class="sort-arrow">↕</span></th>
-                        <th data-col="3">Platform Score <span class="sort-arrow">↕</span></th>
-                    </tr>
-                </thead>
 
-                <tbody id="tableBody">
-                    {% for c in platforms %}
-                    <tr 
-                        data-platform="{{ c.Platform|default:''|lower }}"
-                        data-assists="{{ c.Assist_Score|default:0 }}"
-                        data-purchases="{{ c.Purchase_Score|default:0 }}"
-                        data-score="{{ c.Platform_Score|default:0 }}"
-                    >
-                        <!-- Platform -->
-                        <td>
-                            <span class="badge
-                                {% if c.Platform == 'instagram' %}src-instagram
-                                {% elif c.Platform == 'google' %}src-google
-                                {% elif c.Platform == 'direct' %}src-direct
-                                {% elif c.Platform == 'content creators' or c.Platform == 'content' %}src-content
-                                {% elif c.Platform == 'meta' or c.Platform == 'facebook' %}src-meta
-                                {% else %}src-default{% endif %}">
-                                <span class="badge-dot"></span>
-                                {{ c.Platform|default:"Unknown" }}
-                            </span>
-                        </td>
+<div class="mt-5">
+  <div class="page-header">
+    <h1>Platform Assists</h1>
+  </div>
 
-                        <!-- Assist Orders -->
-                        <td>
-                            <span class="metric">{{ c.Assist_Score }}</span>
-                        </td>
-
-                        <!-- Purchase Orders -->
-                        <td>
-                            <span class="metric">{{ c.Purchase_Score }}</span>
-                        </td>
-
-                        <td>
-                            <span class="metric">{{ c.Assisted_Orders }}</span>
-                        </td>
-
-                        <!-- Score -->
-                        <td>
-                            <span class="score-chip">
-                                <span class="badge-dot"></span>
-                                {{ c.Platform_Score|floatformat:2 }}
-                            </span>
-                        </td>
-
-
-                    </tr>
-
-                    {% empty %}
-                    <tr>
-                        <td colspan="4" class="empty-state">No platform data found.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            </div>
+  <div class="data-wrap">
+    <div class="toolbar">
+      <div class="toolbar-group">
+        <span class="toolbar-label">Search Platforms</span>
+        <div class="search-wrap">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input class="search-input" id="campaignSearchInput" type="text" placeholder="Search platform...">
         </div>
+      </div>
+
+      <span class="count-tag" id="countTag">{{ platform_count }} platforms</span>
     </div>
+
+    <div class="data-viewport">
+      <div class="data-scroller" role="region" aria-label="Platform attribution dataset" tabindex="0">
+        <table class="data-table table table-hover data-table-big orders" id="platformTable" role="table" aria-label="Platform attribution dataset">
+          <thead>
+            <tr>
+              <th data-col="0">Platform <span class="sort-arrow">↕</span></th>
+              <th data-col="1">Assist Score <span class="sort-arrow">↕</span></th>
+              <th data-col="2">Purchase Score <span class="sort-arrow">↕</span></th>
+              <th data-col="3">Assisted Orders <span class="sort-arrow">↕</span></th>
+              <th data-col="4" class="sorted">Platform Score <span class="sort-arrow">↓</span></th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+            {% for c in platforms %}
+            <tr
+              data-platform="{{ c.Platform|default:''|lower }}"
+              data-assists="{{ c.Assist_Score|default:0 }}"
+              data-purchases="{{ c.Purchase_Score|default:0 }}"
+              data-score="{{ c.Platform_Score|default:0 }}"
+              data-assisted-orders="{{ c.Assisted_Orders|default:0 }}"
+            >
+              <td>
+                {% with src=c.Platform|default:''|lower %}
+                <span class="badge
+                {% if src == 'instagram' %}src-instagram
+                {% elif src == 'google' %}src-google
+                {% elif src == 'content creators' or src == 'content' %}src-content
+                {% elif src == 'direct' %}src-direct
+                {% elif src == 'meta' or src == 'facebook' %}src-meta
+                {% else %}src-default{% endif %}">
+                  <span class="badge-dot"></span>
+                  {{ c.Platform|default:"Unknown" }}
+                </span>
+                {% endwith %}
+              </td>
+              <td><span class="metric">{{ c.Assist_Score|floatformat:2 }}</span></td>
+              <td><span class="metric">{{ c.Purchase_Score|floatformat:0 }}</span></td>
+              <td><span class="metric">{{ c.Assisted_Orders }}</span></td>
+              <td><span class="score-chip"><span class="badge-dot"></span>{{ c.Platform_Score|floatformat:2 }}</span></td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="5" class="empty-state">No platform data found.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 </div>
+
+<script>
+  (function () {
+    function normalizeText(value) {
+      return String(value || '').trim().toLowerCase();
+    }
+
+    const searchInput = document.getElementById('campaignSearchInput');
+    const checkboxGroup = document.getElementById('sourceCheckboxGroup');
+    const countTag = document.getElementById('countTag');
+    const tbody = document.getElementById('tableBody');
+    const headers = document.querySelectorAll('table.orders th[data-col]');
+
+    function applyFilter() {
+      const q = normalizeText(searchInput ? searchInput.value : '');
+      const checkedSources = Array.from(document.querySelectorAll('.source-check:checked'))
+        .map(cb => normalizeText(cb.value));
+
+      let visible = 0;
+      const rows = tbody.querySelectorAll('tr[data-platform]');
+
+      rows.forEach(row => {
+        const rowPlatform = normalizeText(row.dataset.platform);
+        const matchSearch = q === '' || rowPlatform.includes(q);
+        const matchSource = checkedSources.length === 0 || checkedSources.includes(rowPlatform);
+        const show = matchSearch && matchSource;
+
+        row.style.display = show ? '' : 'none';
+        if (show) visible++;
+      });
+
+      let noRow = tbody.querySelector('.no-results-row');
+      if (visible === 0) {
+        if (!noRow) {
+          noRow = document.createElement('tr');
+          noRow.className = 'no-results-row';
+          noRow.innerHTML = '<td colspan="5" class="no-results">No platforms match your filter.</td>';
+          tbody.appendChild(noRow);
+        }
+      } else if (noRow) {
+        noRow.remove();
+      }
+
+      countTag.textContent = visible + ' platform' + (visible !== 1 ? 's' : '');
+    }
+
+    let sortCol = null;
+    let sortAsc = false;
+
+    function sortTable(col) {
+      if (sortCol === col) {
+        sortAsc = !sortAsc;
+      } else {
+        sortCol = col;
+        sortAsc = col === 0;
+      }
+
+      headers.forEach(th => {
+        const arrow = th.querySelector('.sort-arrow');
+        if (parseInt(th.dataset.col) === sortCol) {
+          th.classList.add('sorted');
+          arrow.textContent = sortAsc ? '↑' : '↓';
+        } else {
+          th.classList.remove('sorted');
+          arrow.textContent = '↕';
+        }
+      });
+
+      const rows = Array.from(tbody.querySelectorAll('tr[data-platform]'));
+      const keyMap = ['platform', 'assists', 'purchases', 'score', 'assistedOrders'];
+      const key = keyMap[col];
+
+      rows.sort((a, b) => {
+        let va = a.dataset[key] || '';
+        let vb = b.dataset[key] || '';
+
+        if (key !== 'platform') {
+          va = parseFloat(va) || 0;
+          vb = parseFloat(vb) || 0;
+          return sortAsc ? va - vb : vb - va;
+        }
+
+        return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+      });
+
+      rows.forEach(r => tbody.appendChild(r));
+    }
+
+    if (searchInput) {
+      searchInput.addEventListener('input', applyFilter);
+    }
+
+    if (checkboxGroup) {
+      checkboxGroup.addEventListener('change', applyFilter);
+    }
+
+    headers.forEach(th => {
+      th.addEventListener('click', () => sortTable(parseInt(th.dataset.col)));
+    });
+
+    applyFilter();
+    sortTable(3);
+  })();
+</script>
 
 {% endblock %}

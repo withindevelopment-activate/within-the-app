@@ -1177,7 +1177,7 @@ table.orders tbody tr:hover td {
 
 .social-btn-login{
   position: absolute;
-  top: 120%;
+  top: 90px;
 }
 
 .social-btn-login .btn:hover {
