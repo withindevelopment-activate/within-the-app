@@ -43,10 +43,50 @@
             <div id="sourceCheckboxGroup" class="checkbox-group">
                 {% for source in source_list %}
                     {% if source %}
-                    <label class="checkbox-label">
-                        <input type="checkbox" class="source-check" value="{{ source|lower }}" checked>
-                        {{ source }}
+                    {% with source_key=source|lower %}
+                    <label class="checkbox-label {% if source_key == 'openai' or source_key == 'snapchat' or source_key == 'twitter-x' or source_key == 'twitter' or source_key == 'x' or source_key == 'tiktok' or source_key == 'whatsapp' or source_key == 'threads' or source_key == 'telegram' or source_key == 'pinterest' or source_key == 'instagram' or source_key == 'google' or source_key == 'facebook' or source_key == 'meta' %}checkbox-label-icon{% endif %}">
+                        <input type="checkbox" class="source-check" value="{{ source_key }}" checked>
+                        {% if source_key == 'openai' %}
+                        <span class="source-icon-wrap brand-openai" title="{{ source }}"><i class="bi bi-openai source-icon"></i></span>
+                        <span class="source-label-text">{{ source }}</span>
+                        {% elif source_key == 'snapchat' %}
+                        <span class="source-icon-wrap brand-snapchat" title="{{ source }}"><i class="bi bi-snapchat source-icon"></i></span>
+                        <span class="source-label-text">{{ source }}</span>
+                        {% elif source_key == 'twitter-x' or source_key == 'twitter' or source_key == 'x' %}
+                        <span class="source-icon-wrap brand-twitter-x" title="{{ source }}"><i class="bi bi-twitter-x source-icon"></i></span>
+                        <span class="source-label-text">{{ source }}</span>
+                        {% elif source_key == 'tiktok' %}
+                        <span class="source-icon-wrap brand-tiktok" title="{{ source }}"><i class="bi bi-tiktok source-icon"></i></span>
+                        <span class="source-label-text">{{ source }}</span>
+                        {% elif source_key == 'whatsapp' %}
+                        <span class="source-icon-wrap brand-whatsapp" title="{{ source }}"><i class="bi bi-whatsapp source-icon"></i></span>
+                        <span class="source-label-text">{{ source }}</span>
+                        {% elif source_key == 'threads' %}
+                        <span class="source-icon-wrap brand-threads" title="{{ source }}"><i class="bi bi-threads source-icon"></i></span>
+                        <span class="source-label-text">{{ source }}</span>
+                        {% elif source_key == 'telegram' %}
+                        <span class="source-icon-wrap brand-telegram" title="{{ source }}"><i class="bi bi-telegram source-icon"></i></span>
+                        <span class="source-label-text">{{ source }}</span>
+                        {% elif source_key == 'pinterest' %}
+                        <span class="source-icon-wrap brand-pinterest" title="{{ source }}"><i class="bi bi-pinterest source-icon"></i></span>
+                        <span class="source-label-text">{{ source }}</span>
+                        {% elif source_key == 'instagram' %}
+                        <span class="source-icon-wrap brand-instagram" title="{{ source }}"><i class="bi bi-instagram source-icon"></i></span>
+                        <span class="source-label-text">{{ source }}</span>
+                        {% elif source_key == 'google' %}
+                        <span class="source-icon-wrap brand-google" title="{{ source }}"><i class="bi bi-google source-icon"></i></span>
+                        <span class="source-label-text">{{ source }}</span>
+                        {% elif source_key == 'facebook' %}
+                        <span class="source-icon-wrap brand-facebook" title="{{ source }}"><i class="bi bi-facebook source-icon"></i></span>
+                        <span class="source-label-text">{{ source }}</span>
+                        {% elif source_key == 'meta' %}
+                        <span class="source-icon-wrap brand-meta" title="{{ source }}"><i class="bi bi-meta source-icon"></i></span>
+                        <span class="source-label-text">{{ source }}</span>
+                        {% else %}
+                        <span class="source-label-text">{{ source }}</span>
+                        {% endif %}
                     </label>
+                    {% endwith %}
                     {% endif %}
                 {% endfor %}
             </div>

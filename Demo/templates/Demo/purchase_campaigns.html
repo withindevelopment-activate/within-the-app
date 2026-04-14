@@ -89,10 +89,50 @@
                 <div id="sourceCheckboxGroup" class="checkbox-group">
                     {% for source in source_list %}
                         {% if source %}
-                        <label class="checkbox-label">
-                            <input type="checkbox" class="source-check" value="{{ source|lower }}" checked>
-                            {{ source|title }}
+                        {% with source_key=source|lower %}
+                        <label class="checkbox-label {% if source_key == 'openai' or source_key == 'snapchat' or source_key == 'twitter-x' or source_key == 'twitter' or source_key == 'x' or source_key == 'tiktok' or source_key == 'whatsapp' or source_key == 'threads' or source_key == 'telegram' or source_key == 'pinterest' or source_key == 'instagram' or source_key == 'google' or source_key == 'facebook' or source_key == 'meta' %}checkbox-label-icon{% endif %}">
+                            <input type="checkbox" class="source-check" value="{{ source_key }}" checked>
+                            {% if source_key == 'openai' %}
+                            <span class="source-icon-wrap brand-openai" title="{{ source|title }}"><i class="bi bi-openai source-icon"></i></span>
+                            <span class="source-label-text">{{ source|title }}</span>
+                            {% elif source_key == 'snapchat' %}
+                            <span class="source-icon-wrap brand-snapchat" title="{{ source|title }}"><i class="bi bi-snapchat source-icon"></i></span>
+                            <span class="source-label-text">{{ source|title }}</span>
+                            {% elif source_key == 'twitter-x' or source_key == 'twitter' or source_key == 'x' %}
+                            <span class="source-icon-wrap brand-twitter-x" title="{{ source|title }}"><i class="bi bi-twitter-x source-icon"></i></span>
+                            <span class="source-label-text">{{ source|title }}</span>
+                            {% elif source_key == 'tiktok' %}
+                            <span class="source-icon-wrap brand-tiktok" title="{{ source|title }}"><i class="bi bi-tiktok source-icon"></i></span>
+                            <span class="source-label-text">{{ source|title }}</span>
+                            {% elif source_key == 'whatsapp' %}
+                            <span class="source-icon-wrap brand-whatsapp" title="{{ source|title }}"><i class="bi bi-whatsapp source-icon"></i></span>
+                            <span class="source-label-text">{{ source|title }}</span>
+                            {% elif source_key == 'threads' %}
+                            <span class="source-icon-wrap brand-threads" title="{{ source|title }}"><i class="bi bi-threads source-icon"></i></span>
+                            <span class="source-label-text">{{ source|title }}</span>
+                            {% elif source_key == 'telegram' %}
+                            <span class="source-icon-wrap brand-telegram" title="{{ source|title }}"><i class="bi bi-telegram source-icon"></i></span>
+                            <span class="source-label-text">{{ source|title }}</span>
+                            {% elif source_key == 'pinterest' %}
+                            <span class="source-icon-wrap brand-pinterest" title="{{ source|title }}"><i class="bi bi-pinterest source-icon"></i></span>
+                            <span class="source-label-text">{{ source|title }}</span>
+                            {% elif source_key == 'instagram' %}
+                            <span class="source-icon-wrap brand-instagram" title="{{ source|title }}"><i class="bi bi-instagram source-icon"></i></span>
+                            <span class="source-label-text">{{ source|title }}</span>
+                            {% elif source_key == 'google' %}
+                            <span class="source-icon-wrap brand-google" title="{{ source|title }}"><i class="bi bi-google source-icon"></i></span>
+                            <span class="source-label-text">{{ source|title }}</span>
+                            {% elif source_key == 'facebook' %}
+                            <span class="source-icon-wrap brand-facebook" title="{{ source|title }}"><i class="bi bi-facebook source-icon"></i></span>
+                            <span class="source-label-text">{{ source|title }}</span>
+                            {% elif source_key == 'meta' %}
+                            <span class="source-icon-wrap brand-meta" title="{{ source|title }}"><i class="bi bi-meta source-icon"></i></span>
+                            <span class="source-label-text">{{ source|title }}</span>
+                            {% else %}
+                            <span class="source-label-text">{{ source|title }}</span>
+                            {% endif %}
                         </label>
+                        {% endwith %}
                         {% endif %}
                     {% endfor %}
                 </div>
@@ -117,14 +157,8 @@
                             <th data-col="5" class="sorted">Purchases <span class="sort-arrow">↓</span></th>
                             <th data-col="6">Total Events <span class="sort-arrow">↕</span></th>
                             <th data-col="7">Conversion % <span class="sort-arrow">↕</span></th>
-                            <th data-col="8">Spend <span class="sort-arrow">↕</span></th>
-                            <th data-col="9">Product <span class="sort-arrow">↕</span></th>
-                            <th data-col="10">Total Score <span class="sort-arrow">↕</span></th>
-                            <th data-col="11" class="sorted">Purchases <span class="sort-arrow">↓</span></th>
-                            <th data-col="12">Total Events <span class="sort-arrow">↕</span></th>
-                            <th data-col="13">Conversion % <span class="sort-arrow">↕</span></th>
                             {% if check_all_tokens == True %}
-                            <th data-col="7">Spend <span class="sort-arrow">↕</span></th>
+                            <th data-col="8">Spend <span class="sort-arrow">↕</span></th>
                             {% endif %}
                         </tr>
                     </thead>
@@ -155,7 +189,7 @@
                                 <!-- Product select: options are rendered by JS from productData -->
                                 <div class="product-select-wrap" id="product-select-row-{{ forloop.counter0 }}">
                                     <div class="product-select-trigger" tabindex="0">
-                                        <span class="selected-label placeholder">— Select Product —</span>
+                                        <span class="selected-label">— Select Product —</span>
                                         <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                             <polyline points="6 9 12 15 18 9"/>
                                         </svg>
@@ -188,9 +222,9 @@
                         {% empty %}
                         <tr>
                             {% if check_all_tokens == True %}
-                            <td colspan="8" class="empty-state">No campaign data found.</td>
+                            <td colspan="9" class="empty-state">No campaign data found.</td>
                             {% else %}
-                            <td colspan="7" class="empty-state">No campaign data found.</td>
+                            <td colspan="8" class="empty-state">No campaign data found.</td>
                             {% endif %}
                         </tr>
                         {% endfor %}
@@ -638,9 +672,9 @@ document.addEventListener('DOMContentLoaded', function () {
                     noRow = document.createElement('tr');
                     noRow.className = 'no-results-row';
                     {% if check_all_tokens == True %}
-                    noRow.innerHTML = '<td colspan="8" class="no-results" style="text-align:center; padding:3rem; color:var(--ink-3);">No campaigns match your selection.</td>';
+                    noRow.innerHTML = '<td colspan="9" class="no-results" style="text-align:center; padding:3rem; color:var(--ink-3);">No campaigns match your selection.</td>';
                     {% else %}
-                    noRow.innerHTML = '<td colspan="7" class="no-results" style="text-align:center; padding:3rem; color:var(--ink-3);">No campaigns match your selection.</td>';
+                    noRow.innerHTML = '<td colspan="8" class="no-results" style="text-align:center; padding:3rem; color:var(--ink-3);">No campaigns match your selection.</td>';
                     {% endif %}
                     tbody.appendChild(noRow);
                 }
