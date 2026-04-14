@@ -8163,7 +8163,7 @@ def view_purchase_campaigns(request):
             # Step 2: Get campaigns
             creatives_data = snapchat_api_call(request, f"adaccounts/{ad_account_id}/creatives")
             raw_creatives = creatives_data.get("creatives", [])
-            print("[Purchase Campaigns] Raw creatives:", raw_creatives)
+            print("[Purchase Campaigns] Raw creatives:", creatives_data)
             sources_spend = {"snapchat": {}, "tiktok": {}, "meta": {}}
             for creative in raw_creatives:
                 utm_ad_snapchat = {}
@@ -8204,7 +8204,7 @@ def view_purchase_campaigns(request):
                 if not match.empty:
                     creative_stats = snapchat_api_call(request, f"creatives/{utm_ad_snapchat['id']}/stats", params=snap_params)
                     raw_creatives_stats = creative_stats.get("timeseries_stats", [])
-                    print("[Purchase Campaigns] Raw creatives stats:", raw_creatives_stats)
+                    print("[Purchase Campaigns] Raw creatives stats:", creative_stats)
 
                     creative_stats_dict = raw_creatives_stats[0] if raw_creatives_stats else {}
                     creative_timeseries = creative_stats_dict.get("timeseries_stat", [])
@@ -8236,7 +8236,7 @@ def view_purchase_campaigns(request):
 
             
             ad_list = resp_data.get("data", {}).get("list", [])
-            print("[Purchase Campaigns] Raw TikTok ads:", ad_list)
+            print("[Purchase Campaigns] Raw TikTok ads:", resp_data)
             for ad in ad_list:
                 utm_ad_tiktok = {}
                 utm_ad_tiktok["id"] = ad.get("ad_id")
@@ -8262,8 +8262,8 @@ def view_purchase_campaigns(request):
                         "report_type": "BASIC",
                         "data_level": "AUCTION_AD",
                         "metrics": ["spend"],
-                        "start_time": start_time,
-                        "end_time": end_time,
+                        "start_date": start_time,
+                        "end_date": end_time,
                         "filtering": [{
                             "field_name": "ad_ids",
                             "filter_type": "IN",
@@ -8274,7 +8274,7 @@ def view_purchase_campaigns(request):
                     spend_resp = requests.get(spend_tik_url, headers=headers, params=spend_tik_params)
                     spend_data = spend_resp.json()
                     spend_list = spend_data.get("data", {}).get("list", [])
-                    print("[Purchase Campaigns] Raw TikTok spend data:", spend_list)
+                    print("[Purchase Campaigns] Raw TikTok spend data:", spend_data)
                     total_spend = sum(float(item.get("metrics", {}).get("spend", 0)) for item in spend_list)
 
                     tiktok_camp_key = utm_ad_tiktok.get("utm_campaign", "missing_campaign")
@@ -8310,7 +8310,7 @@ def view_purchase_campaigns(request):
             meta_resp = requests.get(meta_url, headers={"Authorization": f"Bearer {meta_access_token}"}, params=meta_params)
             meta_data = meta_resp.json()
             ad_meta_list = meta_data.get("data",[])
-            print("[Purchase Campaigns] Raw Meta ads:", ad_meta_list)
+            print("[Purchase Campaigns] Raw Meta ads:", meta_data)
             ad_meta_dict = {}
             for ad in ad_meta_list:
                 creative_id = ad.get("creative", {}).get("id")
@@ -8322,7 +8322,7 @@ def view_purchase_campaigns(request):
             meta_creative_resp = requests.get(meta_creative_url, headers={"Authorization": f"Bearer {meta_access_token}"}, params=meta_creative_params)
             meta_creative_data = meta_creative_resp.json()
             creative_meta_list = meta_creative_data.get("data", [])
-            print("[Purchase Campaigns] Raw Meta creatives:", creative_meta_list)
+            print("[Purchase Campaigns] Raw Meta creatives:", meta_creative_data)
             for creative in creative_meta_list:
                 creative_id = creative.get("id")
                 link_data = creative.get("object_story_spec", {}).get("link_data", {})
@@ -8341,7 +8341,8 @@ def view_purchase_campaigns(request):
                     (df['UTM_Source'] == source) &
                     (df['UTM_Campaign'] == campaign)
                 ]
-                print(f"[Purchase Campaigns] df data={df[(df['UTM_Source'] == source) & (df['UTM_Campaign'] == campaign)]}")
+                print(f"[Purchase Campaigns] Matching Meta creative {creative_id} against log: found {len(match)} matches")
+                print(f"[Purchase Campaigns] Creative {creative_id} spend from insights: {ad_meta_dict.get(creative_id, {}).get('spend', 0)}")
                 if not match.empty:
                     spend = float(ad_meta_dict.get(creative_id, {}).get("spend", 0))
                     sources_spend["meta"][campaign] = sources_spend["meta"].get(campaign, 0) + spend
