@@ -8459,6 +8459,18 @@ def view_purchase_campaigns(request):
     return render(request, "Demo/purchase_campaigns.html", context)
 
 ### A FUNCTION TO HANDLE THE INCOMING PRODUCT LIST CHANGE FOR THE UTM_Source/Campaign
+# Campaign event logging
+    def clean_sku(sku):
+        if not sku:
+            return None
+
+        sku = str(sku).strip()
+
+        if sku.endswith("-OM"):
+            sku = sku[:-3]  # remove last 3 chars
+
+        return sku
+    
 def update_campaign_products(request):
 
     data = json.loads(request.body)
