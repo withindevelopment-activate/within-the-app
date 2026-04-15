@@ -8112,28 +8112,28 @@ def view_purchase_campaigns(request):
     filters = {}
     # Fetch data
 
-    if date_after and not date_end:
-        if len(date_after) == 10:
-            date_after += "T00:00:00"
-        filters["Timestamp"] = ("gte", date_after)
+    if start_time and not end_time:
+        if len(start_time) == 10:
+            start_time += "T00:00:00"
+        filters["Timestamp"] = ("gte", start_time)
 
-    if date_end and not date_after:
-        if len(date_end) == 10:
-            date_end += "T23:59:59"
-        filters["Timestamp"] = ("lte", date_end)
+    if end_time and not start_time:
+        if len(end_time) == 10:
+            end_time += "T23:59:59"
+        filters["Timestamp"] = ("lte", end_time)
 
     # ---- Proper date range handling ----
-    if date_after and date_end:
-        if len(date_after) == 10:
-            date_after += "T00:00:00"
-        elif len(date_after) == 16:
-            date_after += ":00"
-        if len(date_end) == 10:
-            date_end += "T23:59:59"
-        elif len(date_end) == 16:
-            date_end += ":00"
+    if start_time and end_time:
+        if len(start_time) == 10:
+            start_time += "T00:00:00"
+        elif len(start_time) == 16:
+            start_time += ":00"
+        if len(end_time) == 10:
+            end_time += "T23:59:59"
+        elif len(end_time) == 16:
+            end_time += ":00"
 
-        filters["Timestamp"] = ("between", date_after, date_end)
+        filters["Timestamp"] = ("between", start_time, end_time)
     
     df = fetch_data_from_supabase_specific(
         table_name="Campaign_Event_Log",
