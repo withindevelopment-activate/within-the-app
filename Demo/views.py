@@ -8102,9 +8102,40 @@ def view_purchase_campaigns(request):
     snap_access_token = tokens['snapchat']
     tiktok_access_token = tokens['tiktok_access']
     meta_access_token = tokens['meta']
-
+    start_time = request.GET.get("start_time", seven_days_ago.strftime("%Y-%m-%d"))
+    end_time = request.GET.get("end_time", yesterday.strftime("%Y-%m-%d"))
+    filters = {}
     # Fetch data
-    df = fetch_data_from_supabase("Campaign_Event_Log")
+
+    if date_after and not date_end:
+        if len(date_after) == 10:
+            date_after += "T00:00:00"
+        filters["Timestamp"] = ("gte", date_after)
+
+    if date_end and not date_after:
+        if len(date_end) == 10:
+            date_end += "T23:59:59"
+        filters["Timestamp"] = ("lte", date_end)
+
+    # ---- Proper date range handling ----
+    if date_after and date_end:
+        if len(date_after) == 10:
+            date_after += "T00:00:00"
+        elif len(date_after) == 16:
+            date_after += ":00"
+        if len(date_end) == 10:
+            date_end += "T23:59:59"
+        elif len(date_end) == 16:
+            date_end += ":00"
+
+        filters["Timestamp"] = ("between", date_after, date_end)
+    
+    df = fetch_data_from_supabase_specific(
+        table_name="Campaign_Event_Log",
+        filters=filters,
+
+    )
+    # df = fetch_data_from_supabase("Campaign_Event_Log")
 
     # --- Cleaning ---
     df['Customer_ID'] = df['Customer_ID'].astype(int)
@@ -8116,10 +8147,6 @@ def view_purchase_campaigns(request):
     today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
     yesterday = today - timedelta(days=1)
     seven_days_ago = today - timedelta(days=7)
-
-    
-    start_time = request.GET.get("start_time", seven_days_ago.strftime("%Y-%m-%d"))
-    end_time = request.GET.get("end_time", yesterday.strftime("%Y-%m-%d"))
 
     tz_offset_minutes = int(request.GET.get("tz_offset", 0))  # in minutes
     from_dt = datetime.strptime(start_time, "%Y-%m-%d") if start_time else datetime.now() - timedelta(days=8)
