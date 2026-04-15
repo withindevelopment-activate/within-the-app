@@ -8102,6 +8102,11 @@ def view_purchase_campaigns(request):
     snap_access_token = tokens['snapchat']
     tiktok_access_token = tokens['tiktok_access']
     meta_access_token = tokens['meta']
+    
+    today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    yesterday = today - timedelta(days=1)
+    seven_days_ago = today - timedelta(days=7)
+
     start_time = request.GET.get("start_time", seven_days_ago.strftime("%Y-%m-%d"))
     end_time = request.GET.get("end_time", yesterday.strftime("%Y-%m-%d"))
     filters = {}
@@ -8144,9 +8149,6 @@ def view_purchase_campaigns(request):
     df['Event_Type'] = df['Event_Type'].str.strip().str.lower().astype(str)
     df['Score'] = df['Score'].astype(float)
 
-    today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    yesterday = today - timedelta(days=1)
-    seven_days_ago = today - timedelta(days=7)
 
     tz_offset_minutes = int(request.GET.get("tz_offset", 0))  # in minutes
     from_dt = datetime.strptime(start_time, "%Y-%m-%d") if start_time else datetime.now() - timedelta(days=8)
