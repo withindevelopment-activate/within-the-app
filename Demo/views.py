@@ -8107,33 +8107,33 @@ def view_purchase_campaigns(request):
     yesterday = today - timedelta(days=1)
     seven_days_ago = today - timedelta(days=7)
 
-    start_time = request.GET.get("start_time", seven_days_ago.strftime("%Y-%m-%d"))
-    end_time = request.GET.get("end_time", yesterday.strftime("%Y-%m-%d"))
+    db_start_time = start_time = request.GET.get("start_time", seven_days_ago.strftime("%Y-%m-%d"))
+    db_end_time = end_time = request.GET.get("end_time", yesterday.strftime("%Y-%m-%d"))
     filters = {}
     # Fetch data
 
-    if start_time and not end_time:
-        if len(start_time) == 10:
-            start_time += "T00:00:00"
-        filters["Timestamp"] = ("gte", start_time)
+    if db_start_time and not db_end_time:
+        if len(db_start_time) == 10:
+            db_start_time += "T00:00:00"
+        filters["Timestamp"] = ("gte", db_start_time)
 
-    if end_time and not start_time:
-        if len(end_time) == 10:
-            end_time += "T23:59:59"
-        filters["Timestamp"] = ("lte", end_time)
+    if db_end_time and not db_start_time:
+        if len(db_end_time) == 10:
+            db_end_time += "T23:59:59"
+        filters["Timestamp"] = ("lte", db_end_time)
 
     # ---- Proper date range handling ----
-    if start_time and end_time:
-        if len(start_time) == 10:
-            start_time += "T00:00:00"
-        elif len(start_time) == 16:
-            start_time += ":00"
-        if len(end_time) == 10:
-            end_time += "T23:59:59"
-        elif len(end_time) == 16:
-            end_time += ":00"
+    if db_start_time and db_end_time:
+        if len(db_start_time) == 10:
+            db_start_time += "T00:00:00"
+        elif len(db_start_time) == 16:
+            db_start_time += ":00"
+        if len(db_end_time) == 10:
+            db_end_time += "T23:59:59"
+        elif len(db_end_time) == 16:
+            db_end_time += ":00"
 
-        filters["Timestamp"] = ("between", start_time, end_time)
+        filters["Timestamp"] = ("between", db_start_time, db_end_time)
     
     df = fetch_data_from_supabase_specific(
         table_name="Campaign_Event_Log",
