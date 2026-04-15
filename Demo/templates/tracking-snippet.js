@@ -10,8 +10,8 @@
 
     function getAllCookies() {
         return document.cookie.split("; ").reduce((acc, c) => {
-            const [k, v] = c.split("=");
-            acc[k] = decodeURIComponent(v);
+            const [k, ...rest] = c.split("=");
+            acc[k] = decodeURIComponent(rest.join("="));
             return acc;
         }, {});
     }
@@ -33,7 +33,7 @@
 
     function parseTikTok(tt) {
         if (!tt) return null;
-        return tt.split(".")[0];
+        return tt;
     }
 
     function parsePosthog(cookie) {
@@ -232,6 +232,8 @@
         const localPrefix = extractPrefix(localId);
         const incomingPrefix = extractPrefix(incomingId);
 
+        if (LOCKED_PREFIXES.includes(localPrefix)) return localId;
+
         const localStrength = getPrefixStrength(localPrefix);
         const incomingStrength = getPrefixStrength(incomingPrefix);
 
@@ -239,8 +241,11 @@
     
         return localId;
     }
+    let _cachedPlatformIdentity = null;
+    let _memorySessionId = null;
 
     function getOrCreateDeviceIdentity() {
+        if (_cachedPlatformIdentity) return _cachedPlatformIdentity;
         // PRIVACY SAFETY: Respect "Do Not Track" and "Global Privacy Control"
         const isPrivacyEnabled = navigator.doNotTrack === "1" || navigator.globalPrivacyControl === true;
         
@@ -251,7 +256,7 @@
 
         const params = new URLSearchParams(window.location.search);
 
-        let platform = null;
+        let platform = detectPlatform();
 
         /* 1️⃣ PRIORITY: URL parameter */
         const incomingId = sanitizeDeviceId(params.get("sleecid"));
@@ -261,14 +266,8 @@
         let deviceId = resolveDeviceId(localId, incomingId);
 
         if (!deviceId) {
-            platform = detectPlatform();
             const prefix = getPlatformPrefix(platform);
             deviceId = generateSecureID(prefix);
-        }
-
-        /* Update platform based on final ID */
-        if (!platform) {
-            platform = detectPlatform();
         }
 
         /* Persist */
@@ -291,11 +290,11 @@
 
         // Map platform-specific IDs for easier tracking integration
         const platformMap = {
-            "instagram": "meta_device_id",
-            "facebook": "meta_device_id",
-            "tiktok": "tiktok_device_id",
-            "snapchat": "snapchat_device_id",
-            "google": "google_device_id",
+            instagram: "meta_device_id",
+            facebook: "meta_device_id",
+            tiktok: "tiktok_device_id",
+            snapchat: "snapchat_device_id",
+            google: "google_device_id",
         };
 
         const specificKey = platformMap[platform];
@@ -305,6 +304,7 @@
             localStorage.setItem(specificKey, deviceId);
         }
 
+        _cachedPlatformIdentity = ids;
         return ids;
     }
 
@@ -346,22 +346,36 @@
     //     return fingerprintPromise;
     // }
     // ------------------- Fingerprint End -------------------
+    function generateUUID() {
+        if (typeof crypto !== "undefined" && crypto.randomUUID) {
+            return crypto.randomUUID();
+        }
+        return Date.now().toString(36) + "-" + Math.random().toString(36).substring(2, 15);
+    }
 
     function getOrCreateCookie(name, days = 365) {
         const existing = document.cookie.split('; ').find(row => row.startsWith(name + '='));
         if (existing) return existing.split('=')[1];
-        const id = crypto.randomUUID();
+        const id = generateUUID();
         document.cookie = `${name}=${id}; path=/; max-age=${days * 86400}`;
         return id;
     }
 
     function getOrCreateSessionId() {
-        let sid = sessionStorage.getItem("session_id");
-        if (!sid) {
-            sid = crypto.randomUUID();
-            sessionStorage.setItem("session_id", sid);
+        try {
+            let sid = sessionStorage.getItem("session_id");
+            if (!sid) {
+                sid = generateUUID(); // FIX #7: use safe UUID wrapper
+                sessionStorage.setItem("session_id", sid);
+            }
+            _memorySessionId = sid;
+            return sid;
+        } catch {
+            if (!_memorySessionId) {
+                _memorySessionId = generateUUID();
+            }
+            return _memorySessionId;
         }
-        return sid;
     }
 
     function getUTMParams() {
@@ -416,11 +430,7 @@
         // ---------------------------
         // 2. Get existing cookie
         // ---------------------------
-        const cookies = document.cookie.split("; ").reduce((acc, c) => {
-            const [k, v] = c.split("=");
-            acc[k] = decodeURIComponent(v);
-            return acc;
-        }, {});
+        const cookies = getAllCookies();
 
         let existing = null;
 
@@ -442,7 +452,7 @@
 
         if (!existingSource) {
             shouldOverride = true;
-        } else if (existingSource === "google") {
+        } else if (existingSource === "google" && incomingSource !== "direct") {
             shouldOverride = true;
         } else if (existingSource !== "google" && incomingSource === "google") {
             shouldOverride = false;
@@ -465,19 +475,14 @@
     setUTMCookie();
 
     function getUTMFromCookie() {
-        const name = "track_utms=";
-        const decodedCookie = decodeURIComponent(document.cookie);
-        const ca = decodedCookie.split(';');
+        const cookies = getAllCookies();
         let savedData = null;
 
-        for (let i = 0; i < ca.length; i++) {
-            let c = ca[i].trim();
-            if (c.indexOf(name) == 0) {
-                try {
-                    savedData = JSON.parse(c.substring(name.length, c.length));
-                } catch (e) {
-                    savedData = null;
-                }
+        if (cookies["track_utms"]) {
+            try {
+                savedData = JSON.parse(cookies["track_utms"]);
+            } catch {
+                savedData = null;
             }
         }
 
@@ -586,10 +591,52 @@
 
     // ------------------- Tracking -------------------
     const BACKEND_URL = "https://testing-within.onrender.com";
+    const _eventQueue = [];
+    let _isFlushing = false;
 
-    
-    function sendTrackingEvent(type, details = {}) {
-        setUTMCookie();
+    function flushQueue() {
+        if (_isFlushing || _eventQueue.length === 0) return;
+        _isFlushing = true;
+
+        const item = _eventQueue[0];
+
+        fetch(`${BACKEND_URL}/save_tracking/`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(item.payload)
+        })
+        .then(res => {
+            console.log("Tracking response:", res.status);
+            _eventQueue.shift(); // remove successfully sent item
+            _isFlushing = false;
+            if (_eventQueue.length > 0) flushQueue(); // continue draining
+        })
+        .catch(err => {
+            console.error("Tracking error:", err);
+            item.attempts = (item.attempts || 0) + 1;
+            _isFlushing = false;
+
+            if (item.attempts >= MAX_RETRIES) {
+                console.warn("Dropping event after", MAX_RETRIES, "failed attempts:", item.payload.event_type);
+                _eventQueue.shift();
+                if (_eventQueue.length > 0) flushQueue();
+                return;
+            }
+
+            const delay = Math.pow(2, item.attempts - 1) * 1000;
+            setTimeout(flushQueue, delay);
+        });
+    }
+
+    function debounce(fn, wait) {
+        let timer;
+        return function (...args) {
+            clearTimeout(timer);
+            timer = setTimeout(() => fn.apply(this, args), wait);
+        };
+    }
+
+    function buildPayload(type, details) {
         const urlUtms = getUTMParams();
         const cookieUtms = getUTMFromCookie();
         const utm = urlUtms.utm_source ? urlUtms : cookieUtms;
@@ -598,12 +645,10 @@
         const inferred = inferSource(utm, referrer);
         const firstTouchContext = identifyFirstTouch();
 
-        // const fingerprint = await getFingerprint(); 
-
-        const platformIdentity = getOrCreateDeviceIdentity() || {};
+        const identity = getOrCreateDeviceIdentity() || {};
         const cookieIntel = extractAnalyticsCookies();
 
-        const payload = {
+        return {
             visitor_id: getOrCreateCookie("visitor_id"),
             cookie_id: cookieIntel,
             session_id: getOrCreateSessionId(),
@@ -614,16 +659,12 @@
             event_type: type,
             event_details: details,
 
-            // fingerprint_id: fingerprint?.visitor_id || null,
-            // fingerprint_confidence: fingerprint?.confidence || null,
-
-            device_id: platformIdentity.device_id,
-            sleecid: platformIdentity.device_id,
-
-            meta_device_id: platformIdentity.meta_device_id,
-            tiktok_device_id: platformIdentity.tiktok_device_id,
-            snapchat_device_id: platformIdentity.snapchat_device_id,
-            google_device_id: platformIdentity.google_device_id,
+            device_id: identity.device_id,
+            sleecid: identity.device_id,
+            meta_device_id: identity.meta_device_id,
+            tiktok_device_id: identity.tiktok_device_id,
+            snapchat_device_id: identity.snapchat_device_id,
+            google_device_id: identity.google_device_id,
 
             utm_params: utm,
             traffic_source: inferred,
@@ -641,19 +682,88 @@
             visitor_info: getVisitorInfo(),
             timestamp: new Date().toISOString()
         };
-
-        fetch(`${BACKEND_URL}/save_tracking/`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-        })
-        .then(res => {
-            console.log("Tracking response:", res.status);
-            return res.text();
-        })
-        .then(data => console.log("Response body:", data))
-        .catch(err => console.error("Tracking error:", err));
     }
+
+    function sendTrackingEvent(type, details = {}) {
+        const payload = buildPayload(type, details);
+
+        _eventQueue.push({ payload, attempts: 0 });
+        flushQueue();
+    }
+
+    // wrap UI-triggered events in a debounce so rapid button clicks don't
+    // send duplicate events or flood the backend within the same user gesture
+    const _debouncedAddToCart = debounce((p) => sendTrackingEvent("add_to_cart", p || {}), 300);
+    const _debouncedAddToWishlist = debounce((pid) => sendTrackingEvent("add_to_wishlist", { product_id: pid }), 300);
+
+
+    
+    // function sendTrackingEvent(type, details = {}) {
+    //     setUTMCookie();
+    //     const urlUtms = getUTMParams();
+    //     const cookieUtms = getUTMFromCookie();
+    //     const utm = urlUtms.utm_source ? urlUtms : cookieUtms;
+    //     const referrer = document.referrer || null;
+
+    //     const inferred = inferSource(utm, referrer);
+    //     const firstTouchContext = identifyFirstTouch();
+
+    //     // const fingerprint = await getFingerprint(); 
+
+    //     const platformIdentity = getOrCreateDeviceIdentity() || {};
+    //     const cookieIntel = extractAnalyticsCookies();
+
+    //     const payload = {
+    //         visitor_id: getOrCreateCookie("visitor_id"),
+    //         cookie_id: cookieIntel,
+    //         session_id: getOrCreateSessionId(),
+    //         store_url: location.origin,
+    //         page_url: location.href,
+    //         referrer,
+
+    //         event_type: type,
+    //         event_details: details,
+
+    //         // fingerprint_id: fingerprint?.visitor_id || null,
+    //         // fingerprint_confidence: fingerprint?.confidence || null,
+
+    //         device_id: platformIdentity.device_id,
+    //         sleecid: platformIdentity.device_id,
+
+    //         meta_device_id: platformIdentity.meta_device_id,
+    //         tiktok_device_id: platformIdentity.tiktok_device_id,
+    //         snapchat_device_id: platformIdentity.snapchat_device_id,
+    //         google_device_id: platformIdentity.google_device_id,
+
+    //         utm_params: utm,
+    //         traffic_source: inferred,
+    //         first_touch_context: firstTouchContext,
+
+    //         client_info: {
+    //             user_agent: navigator.userAgent,
+    //             language: navigator.language,
+    //             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    //             platform: navigator.platform,
+    //             screen_resolution: `${screen.width}x${screen.height}`,
+    //             device_memory: navigator.deviceMemory || null,
+    //         },
+
+    //         visitor_info: getVisitorInfo(),
+    //         timestamp: new Date().toISOString()
+    //     };
+
+    //     fetch(`${BACKEND_URL}/save_tracking/`, {
+    //         method: "POST",
+    //         headers: { "Content-Type": "application/json" },
+    //         body: JSON.stringify(payload)
+    //     })
+    //     .then(res => {
+    //         console.log("Tracking response:", res.status);
+    //         return res.text();
+    //     })
+    //     .then(data => console.log("Response body:", data))
+    //     .catch(err => console.error("Tracking error:", err));
+    // }
 
 
     // ------------------- Base Events -------------------
@@ -664,10 +774,9 @@
 
     // ------------------- Purchase Interception -------------------
     (function interceptPurchaseEvent() {
-        if (typeof window.sendPurchaseEvent !== "function") return;
-        const originalSendPurchaseEvent = window.sendPurchaseEvent;
+        let _originalSendPurchaseEvent = window.sendPurchaseEvent || null;
 
-        window.sendPurchaseEvent = function (payload) {
+        function wrappedSendPurchaseEvent(payload) {
             try {
                 const order = payload?.order || (payload && payload.id ? payload : null);
 
@@ -685,12 +794,12 @@
                         payment_method_name: order.payment?.method?.name || null,
                         products: Array.isArray(order.products)
                             ? order.products.map(p => ({
-                                  product_id: p.id || p.product_id || null,
-                                  name: p.name || null,
-                                  sku: p.sku || null,
-                                  price: Number(p.sale_price ?? p.price) || null,
-                                  quantity: Number(p.quantity) || 1
-                              }))
+                                product_id: p.id || p.product_id || null,
+                                name: p.name || null,
+                                sku: p.sku || null,
+                                price: Number(p.sale_price ?? p.price) || null,
+                                quantity: Number(p.quantity) || 1
+                            }))
                             : [],
                         products_count:
                             order.products_count ||
@@ -699,13 +808,26 @@
 
                     sendTrackingEvent("purchase", orderInfo);
                 }
-
-            } catch (err) {
-                // silently fail
+            } catch {
+                // silently fail — never block the original purchase flow
             }
 
-            return originalSendPurchaseEvent.apply(this, arguments);
-        };
+            if (typeof _originalSendPurchaseEvent === "function") {
+                return _originalSendPurchaseEvent.apply(this, arguments);
+            }
+        }
+
+        // FIX #15: define a property setter so that if the host page does:
+        //   window.sendPurchaseEvent = function(...) { ... }
+        // after this script runs, our setter fires and wraps it automatically
+        Object.defineProperty(window, "sendPurchaseEvent", {
+            get() { return wrappedSendPurchaseEvent; },
+            set(fn) {
+                // FIX #15: store the newly assigned function as the original to call through
+                _originalSendPurchaseEvent = fn;
+            },
+            configurable: true
+        });
     })();
 
 })();
