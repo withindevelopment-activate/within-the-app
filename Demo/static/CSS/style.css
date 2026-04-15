@@ -315,6 +315,10 @@ nav {
   text-shadow: 0 0 0.5px #111827, 0 0 0.5px #111827;
 }
 
+.brand-snapchat .source-icon {
+  color: #4a4a4a;
+}
+
 .brand-twitter-x .source-icon {
   color: #111111;
 }

@@ -136,6 +136,9 @@
                             {% elif source_key == 'meta' %}
                             <span class="source-icon-wrap brand-meta" title="{{ source|title }}"><i class="bi bi-meta source-icon"></i></span>
                             <span class="source-label-text">{{ source|title }}</span>
+                            {% elif source_key == 'direct' %}
+                            <span class="source-icon-wrap brand-direct" title="{{ source|title }}"><i class="bi bi-globe2 source-icon"></i></span>
+                            <span class="source-label-text">{{ source|title }}</span>
                             {% else %}
                             <span class="source-label-text">{{ source|title }}</span>
                             {% endif %}
