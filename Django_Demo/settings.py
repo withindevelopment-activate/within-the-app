@@ -179,7 +179,7 @@ ZID_API_HOST = "api.zid.sa"'''
 
 
 # Sessions
-SESSION_COOKIE_AGE = 3600  # 1 hour
+SESSION_COOKIE_AGE = 3600 * 24  # 1 day
 SESSION_SAVE_EVERY_REQUEST = True
 
 OAUTH_PROVIDERS = {

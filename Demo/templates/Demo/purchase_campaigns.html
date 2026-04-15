@@ -480,10 +480,24 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
 
-            const nonDirectRows = rows.filter(row => normalizeText(row.dataset.source) !== 'direct');
-            const nonDirectPurchases = nonDirectRows.reduce((sum, row) => sum + (parseFloat(row.dataset.purchases) || 0), 0);
-            const missingCampaignPurchases = nonDirectRows
-                .filter(row => isMissingCampaignValue(row.dataset.campaign))
+            const nonDirectPurchases = rows.reduce((sum, row) => sum + (parseFloat(row.dataset.purchases) || 0), 0);
+            const missingCampaignPurchases = rows
+                .filter(row => {
+                    const source = normalizeText(row.dataset.source);
+                    const campaign = normalizeText(row.dataset.campaign || "");
+
+                    // Include if it matches your missing campaign criteria
+                    const isMissing = isMissingCampaignValue(campaign);
+                    
+                    // Include if source is 'direct'
+                    const isDirect = (source === 'direct');
+                    
+                    // Include if source is 'google' and campaign is 'search-1'
+                    const isSpecificGoogle = (source === 'google' && campaign === 'search-1');
+
+                    // The row is included in the sum if ANY of these conditions are true
+                    return isMissing || isDirect || isSpecificGoogle;
+                })
                 .reduce((sum, row) => sum + (parseFloat(row.dataset.purchases) || 0), 0);
             const trackedCampaignPurchases = Math.max(nonDirectPurchases - missingCampaignPurchases, 0);
             const missingPercentage = nonDirectPurchases > 0 ? (missingCampaignPurchases / nonDirectPurchases) * 100 : 0;
