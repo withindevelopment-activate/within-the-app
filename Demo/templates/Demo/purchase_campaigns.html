@@ -505,7 +505,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             bar.innerHTML = '';
             meta.innerHTML = '';
-            value.textContent = `${missingPercentage.toFixed(1)}% excluding direct`;
+            value.textContent = `${missingPercentage.toFixed(1)}%`;
 
             if (nonDirectPurchases <= 0) {
                 bar.appendChild(buildSegment('#e2e8f0', 100, 'No non-direct purchase data'));

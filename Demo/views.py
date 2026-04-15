@@ -8391,8 +8391,10 @@ def view_purchase_campaigns(request):
         source_norm = normalize_text(source_value)
         campaign_norm = normalize_text(campaign_value)
         if source_norm == "direct":
-            return True
-        return source_norm == "google" and "search-1" in campaign_norm
+            return "direct"
+        if source_norm == "google" and campaign_norm == "search-1":
+            return "google search"
+        return None
 
     # --- Group by source + campaign ---
     campaign_summary = (
@@ -8419,7 +8421,7 @@ def view_purchase_campaigns(request):
 
     source_bar_df = campaign_summary.copy()
     source_bar_df["Bar_Source"] = source_bar_df.apply(
-        lambda row: "direct" if is_direct_bar_bucket(row["UTM_Source"], row["UTM_Campaign"]) else row["UTM_Source"],
+        lambda row: is_direct_bar_bucket(row["UTM_Source"], row["UTM_Campaign"]) or row["UTM_Source"],
         axis=1
     )
     source_bar_summary = (
