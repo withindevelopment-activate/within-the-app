@@ -8382,7 +8382,8 @@ def view_purchase_campaigns(request):
                 print(f"[Purchase Campaigns] Matching Meta ad {ad.get('id')} against log: found {len(match)} matches")
                 print(f"[Purchase Campaigns] Meta ad {ad.get('id')} spend from insights: {spend}")
                 if not match.empty:
-                    source_key = "meta"
+                    source_key = source or "meta"
+                    sources_spend.setdefault(source_key, {})
                     sources_spend[source_key][campaign] = sources_spend[source_key].get(campaign, 0) + spend
                     print(f"[Purchase Campaigns] Added spend for Meta campaign '{campaign}': {spend}. Total so far: {sources_spend[source_key][campaign]}")
         except Exception as e:
@@ -8506,8 +8507,6 @@ def view_purchase_campaigns(request):
         source = record["UTM_Source"]
         camp   = record["UTM_Campaign"]
         if check_all_tokens == True:
-            if source == "instagram" or source == "facebook":
-                source = "meta"
             record["Spend"] = sources_spend.get(source, {}).get(camp, 0)
         ## Attahc selected products
         record["Selected_Products"] = advertised_lookup.get((source, camp), [])
