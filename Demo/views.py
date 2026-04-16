@@ -8287,7 +8287,7 @@ def view_purchase_campaigns(request):
                     
                     # parse_qs returns lists, so we take the first element if it exists
                     extracted_dict = {
-                        k: urllib.parse.unquote(v[0]) 
+                        k: urllib.parse.unquote(v[0]).replace("+", " ") if v else ""
                         for k, v in query_params.items()
                     }
 
