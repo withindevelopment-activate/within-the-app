@@ -8383,7 +8383,6 @@ def view_purchase_campaigns(request):
                 print(f"[Purchase Campaigns] Meta ad {ad.get('id')} spend from insights: {spend}")
                 if not match.empty:
                     source_key = "meta"
-                    sources_spend.setdefault(source_key, {})
                     sources_spend[source_key][campaign] = sources_spend[source_key].get(campaign, 0) + spend
                     print(f"[Purchase Campaigns] Added spend for Meta campaign '{campaign}': {spend}. Total so far: {sources_spend[source_key][campaign]}")
         except Exception as e:
