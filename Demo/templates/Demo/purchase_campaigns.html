@@ -98,7 +98,7 @@
                     {% for source in source_list %}
                         {% if source %}
                         {% with source_key=source|lower %}
-                        <label class="checkbox-label {% if source_key == 'chatgpt.com' or source_key == 'snapchat' or source_key == 'twitter-x' or source_key == 'twitter' or source_key == 'x' or source_key == 'tiktok' or source_key == 'whatsapp' or source_key == 'threads' or source_key == 'telegram' or source_key == 'pinterest' or source_key == 'instagram' or source_key == 'google' or source_key == 'facebook' or source_key == 'meta' %}checkbox-label-icon{% endif %}">
+                        <label class="checkbox-label {% if source_key == 'chatgpt.com' or source_key == 'snapchat' or source_key == 'twitter-x' or source_key == 'twitter' or source_key == 'x' or source_key == 'tiktok' or source_key == 'whatsapp' or source_key == 'threads' or source_key == 'telegram' or source_key == 'pinterest' or source_key == 'instagram' or source_key == 'google' or source_key == 'facebook' or source_key == 'meta' or source_key == 'direct' %}checkbox-label-icon{% endif %}">
                             <input type="checkbox" class="source-check" value="{{ source_key }}" checked>
                             {% if source_key == 'chatgpt.com' %}
                             <span class="source-icon-wrap brand-openai" title="{{ source|title }}"><i class="bi bi-openai source-icon"></i></span>

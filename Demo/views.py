@@ -8270,11 +8270,28 @@ def view_purchase_campaigns(request):
             for ad in ad_list:
                 utm_ad_tiktok = {}
                 utm_ad_tiktok["id"] = ad.get("ad_id")
+                
                 tiktok_utms = ad.get("utm_params", [])
-                extracted_dict = {
-                    item["key"]: urllib.parse.unquote(item["value"]) 
-                    for item in tiktok_utms
-                }
+
+                # Check if we have the structured list first
+                if tiktok_utms:
+                    extracted_dict = {
+                        item["key"]: urllib.parse.unquote(item["value"]) 
+                        for item in tiktok_utms
+                    }
+                else:
+                    # Alternative: Parse from the landing_page_url
+                    landing_url = ad.get("landing_page_url", "")
+                    parsed_url = urlparse(landing_url)
+                    query_params = parse_qs(parsed_url.query)
+                    
+                    # parse_qs returns lists, so we take the first element if it exists
+                    extracted_dict = {
+                        k: urllib.parse.unquote(v[0]) 
+                        for k, v in query_params.items()
+                    }
+
+                # Standardize the extracted data
                 utm_ad_tiktok["utm_source"] = extracted_dict.get("utm_source", "").lower().strip()
                 utm_ad_tiktok["utm_campaign"] = extracted_dict.get("utm_campaign", "").lower().strip()
                 print(f"[Purchase Campaigns] Parsed UTM params for TikTok ad {utm_ad_tiktok['id']}: source={utm_ad_tiktok['utm_source']}, campaign={utm_ad_tiktok['utm_campaign']}")
@@ -8365,7 +8382,9 @@ def view_purchase_campaigns(request):
                 print(f"[Purchase Campaigns] Matching Meta ad {ad.get('id')} against log: found {len(match)} matches")
                 print(f"[Purchase Campaigns] Meta ad {ad.get('id')} spend from insights: {spend}")
                 if not match.empty:
-                    sources_spend["meta"][campaign] = sources_spend["meta"].get(campaign, 0) + spend
+                    source_key = "meta"
+                    sources_spend.setdefault(source_key, {})
+                    sources_spend[source_key][campaign] = sources_spend[source_key].get(campaign, 0) + spend
         except Exception as e:
             check_all_tokens = False
             print("Error during token checks or API calls:", e)
@@ -8487,7 +8506,6 @@ def view_purchase_campaigns(request):
         source = record["UTM_Source"]
         camp   = record["UTM_Campaign"]
         if check_all_tokens == True:
-            print("[Purchase Campaigns] Campaign summary with spend before adding spend:", campaigns_list)
             record["Spend"] = sources_spend.get(source, {}).get(camp, 0)
         ## Attahc selected products
         record["Selected_Products"] = advertised_lookup.get((source, camp), [])
