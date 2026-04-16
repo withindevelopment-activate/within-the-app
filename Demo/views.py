@@ -8385,6 +8385,7 @@ def view_purchase_campaigns(request):
                     source_key = "meta"
                     sources_spend.setdefault(source_key, {})
                     sources_spend[source_key][campaign] = sources_spend[source_key].get(campaign, 0) + spend
+                    print(f"[Purchase Campaigns] Added spend for Meta campaign '{campaign}': {spend}. Total so far: {sources_spend[source_key][campaign]}")
         except Exception as e:
             check_all_tokens = False
             print("Error during token checks or API calls:", e)
