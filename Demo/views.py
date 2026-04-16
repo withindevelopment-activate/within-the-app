@@ -8506,6 +8506,8 @@ def view_purchase_campaigns(request):
         source = record["UTM_Source"]
         camp   = record["UTM_Campaign"]
         if check_all_tokens == True:
+            if source == "instagram" or source == "facebook":
+                source = "meta"
             record["Spend"] = sources_spend.get(source, {}).get(camp, 0)
         ## Attahc selected products
         record["Selected_Products"] = advertised_lookup.get((source, camp), [])
