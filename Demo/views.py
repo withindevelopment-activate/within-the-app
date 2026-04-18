@@ -8504,8 +8504,8 @@ def view_purchase_campaigns(request):
     campaigns_list = campaign_summary.to_dict(orient="records")
 
     for record in campaigns_list:
-        source = record["UTM_Source"]
-        camp   = record["UTM_Campaign"]
+        source = record["UTM_Source"].strip().lower()
+        camp   = record["UTM_Campaign"].strip().lower()
         if check_all_tokens == True:
             record["Spend"] = sources_spend.get(source, {}).get(camp, 0)
         ## Attahc selected products
