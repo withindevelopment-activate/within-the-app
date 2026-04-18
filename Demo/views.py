@@ -8531,7 +8531,8 @@ def view_purchase_campaigns(request):
         "snapchat_connected": bool(snap_access_token),
         "meta_connected": bool(meta_access_token),
         "zid_connected": bool(authorization and access_token and store_id),
-        "check_all_tokens": check_all_tokens
+        "check_all_tokens": check_all_tokens,
+        "sources_spend" : sources_spend
     }
 
     return render(request, "Demo/purchase_campaigns.html", context)

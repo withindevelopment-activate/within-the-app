@@ -252,8 +252,9 @@
 <script>
 const tokens = {{ tokens|safe }};
 const campaigns = {{ campaigns|safe }};
-const productList = {{ zid_product_list|safe }};
+const sourcesSpend = {{ sources_spend|safe }};
 console.log("Tokens available in template:", tokens);
+console.log("sourcesSpend available in template:", sourcesSpend);
 
 (function initDateFilter() {
     const startInput = document.getElementById('startDateInput');
