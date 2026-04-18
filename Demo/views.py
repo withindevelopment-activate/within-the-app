@@ -8347,7 +8347,7 @@ def view_purchase_campaigns(request):
                 "filtering": json.dumps([{
                     "field": "ad.effective_status",
                     "operator": "IN",
-                    "value": ["ACTIVE"]
+                    "value": ["ACTIVE", "PAUSED"]
                 }]),
                 "limit": 100
             }
