@@ -8376,8 +8376,8 @@ def view_purchase_campaigns(request):
                 spend = sum(float(item.get("spend", 0) or 0) for item in insight_rows)
 
                 match = df[
-                    (df['UTM_Source'] == source) &
-                    (df['UTM_Campaign'] == campaign)
+                    (df['UTM_Source'].str.strip().str.lower().astype(str) == source) &
+                    (df['UTM_Campaign'].str.strip().str.lower().astype(str) == campaign)
                 ]
                 print(f"[Purchase Campaigns] Matching Meta ad {ad.get('id')} against log: found {len(match)} matches")
                 print(f"[Purchase Campaigns] Meta ad {ad.get('id')} spend from insights: {spend}")
