@@ -8310,7 +8310,6 @@ def view_purchase_campaigns(request):
 
             
             ad_list = resp_data.get("data", {}).get("list", [])
-            print("[Purchase Campaigns] Raw TikTok ads:", resp_data)
             for ad in ad_list:
                 utm_ad_tiktok = {}
                 utm_ad_tiktok["id"] = ad.get("ad_id")
@@ -8338,7 +8337,6 @@ def view_purchase_campaigns(request):
                 # Standardize the extracted data
                 utm_ad_tiktok["utm_source"] = extracted_dict.get("utm_source", "").lower().strip()
                 utm_ad_tiktok["utm_campaign"] = extracted_dict.get("utm_campaign", "").lower().strip()
-                print(f"[Purchase Campaigns] Parsed UTM params for TikTok ad {utm_ad_tiktok['id']}: source={utm_ad_tiktok['utm_source']}, campaign={utm_ad_tiktok['utm_campaign']}")
                 match = df[
                     (df['UTM_Source'] == utm_ad_tiktok["utm_source"]) & 
                     (df['UTM_Campaign'] == utm_ad_tiktok["utm_campaign"])
@@ -8364,11 +8362,9 @@ def view_purchase_campaigns(request):
                         "end_date": end_time,
                         "filtering": json.dumps(filtering_data)
                     }
-                    print(f"[Purchase Campaigns] Requesting TikTok spend for ad {utm_ad_tiktok['id']} with params: {spend_tik_params}")
                     spend_resp = requests.get(spend_tik_url, headers=headers, params=spend_tik_params)
                     spend_data = spend_resp.json()
                     spend_list = spend_data.get("data", {}).get("list", [])
-                    print("[Purchase Campaigns] Raw TikTok spend data:", spend_data)
                     total_spend = sum(float(item.get("metrics", {}).get("spend", 0)) for item in spend_list)
 
                     tiktok_camp_key = utm_ad_tiktok.get("utm_campaign", "missing_campaign")
