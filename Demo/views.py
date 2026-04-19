@@ -8090,6 +8090,50 @@ def extract_latest_products(val):
 
 
 def view_purchase_campaigns(request):
+    def extract_meta_creative_link(creative_payload, fallback_creative=None):
+        creative_payload = creative_payload or {}
+        fallback_creative = fallback_creative or {}
+
+        def clean_link(candidate):
+            return str(candidate or "").strip()
+
+        object_story_spec = creative_payload.get("object_story_spec") or {}
+
+        link_candidates = [
+            object_story_spec.get("link_data", {}).get("link"),
+            object_story_spec.get("video_data", {}).get("call_to_action", {}).get("value", {}).get("link"),
+            object_story_spec.get("template_data", {}).get("link"),
+            object_story_spec.get("template_data", {}).get("call_to_action", {}).get("value", {}).get("link"),
+            object_story_spec.get("photo_data", {}).get("call_to_action", {}).get("value", {}).get("link"),
+            fallback_creative.get("call_to_action", {}).get("value", {}).get("link"),
+        ]
+
+        child_attachments = object_story_spec.get("link_data", {}).get("child_attachments", []) or []
+        for attachment in child_attachments:
+            link_candidates.append(attachment.get("link"))
+
+        for candidate in link_candidates:
+            cleaned = clean_link(candidate)
+            if cleaned:
+                return cleaned
+
+        return ""
+
+    def fetch_meta_graph_items(url, headers, params=None):
+        items = []
+        next_url = url
+        next_params = params
+
+        while next_url:
+            response = requests.get(next_url, headers=headers, params=next_params)
+            response.raise_for_status()
+            payload = response.json()
+            items.extend(payload.get("data", []))
+            next_url = payload.get("paging", {}).get("next")
+            next_params = None
+
+        return items
+
     ## Get the latest tokens
     tokens = get_latest_token()
     authorization = tokens['authorization_token']
@@ -8340,26 +8384,39 @@ def view_purchase_campaigns(request):
             if not meta_account_id:
                 return redirect("Demo:meta_select_ad_account")
             
-            meta_url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/{meta_account_id}/ads"
-            
-            meta_params = {
-                "fields": "name,creative{id,call_to_action},insights.time_range({\"since\":\""+start_time+"\",\"until\":\""+end_time+"\"}){spend}",
+            meta_headers = {"Authorization": f"Bearer {meta_access_token}"}
+            meta_creatives_url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/{meta_account_id}/adcreatives"
+            meta_ads_url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/{meta_account_id}/ads"
+
+            meta_creatives_params = {
+                "fields": "id,name,object_story_spec,effective_object_story_id,video_id",
+                "limit": 100,
+            }
+            meta_ads_params = {
+                "fields": "name,creative{id,call_to_action,video_id},insights.time_range({\"since\":\""+start_time+"\",\"until\":\""+end_time+"\"}){spend}",
                 "filtering": json.dumps([{
-                    "field": "ad.effective_status",
+                    "field": "effective_status",
                     "operator": "IN",
                     "value": ["ACTIVE", "PAUSED"]
                 }]),
                 "limit": 100
             }
 
-            meta_resp = requests.get(meta_url, headers={"Authorization": f"Bearer {meta_access_token}"}, params=meta_params)
-            meta_data = meta_resp.json()
-            ad_meta_list = meta_data.get("data",[])
-            print("[Purchase Campaigns] Raw Meta ads:", meta_data)
+            meta_creatives_list = fetch_meta_graph_items(meta_creatives_url, meta_headers, meta_creatives_params)
+            creative_lookup = {
+                str(creative.get("id")): creative
+                for creative in meta_creatives_list
+                if creative.get("id")
+            }
+            print("[Purchase Campaigns] Raw Meta creatives:", meta_creatives_list)
+
+            ad_meta_list = fetch_meta_graph_items(meta_ads_url, meta_headers, meta_ads_params)
+            print("[Purchase Campaigns] Raw Meta ads:", ad_meta_list)
             for ad in ad_meta_list:
                 creative = ad.get("creative", {}) or {}
                 creative_id = creative.get("id")
-                url = creative.get("call_to_action", {}).get("value", {}).get("link", "")
+                creative_payload = creative_lookup.get(str(creative_id), {})
+                url = extract_meta_creative_link(creative_payload, creative)
 
                 if not url:
                     continue
