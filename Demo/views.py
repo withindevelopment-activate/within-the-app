@@ -8409,7 +8409,7 @@ def view_purchase_campaigns(request):
                 if c.get("id")
             }
 
-            print("[Meta] creatives fetched:", len(meta_creatives_list))
+            print("[Purchase Campaigns] creatives fetched:", creatives_resp.json())
 
 
             # -------------------------
@@ -8432,7 +8432,7 @@ def view_purchase_campaigns(request):
             ads_resp.raise_for_status()
             ad_meta_list = ads_resp.json().get("data", [])
 
-            print("[Meta] ads fetched:", len(ad_meta_list))
+            print("[Purchase Campaigns] ads fetched:", ads_resp.json())
 
 
             # -------------------------
@@ -8454,6 +8454,7 @@ def view_purchase_campaigns(request):
 
                 parsed_url = urlparse(url)
                 utm_params = parse_qs(parsed_url.query)
+                print(f"[Purchase Campaigns] Parsed URL for ad {ad_id}: {url} with UTM params: {utm_params}")
 
                 source = utm_params.get("utm_source", [""])[0]
                 campaign = utm_params.get("utm_campaign", [""])[0]
@@ -8492,7 +8493,7 @@ def view_purchase_campaigns(request):
             # -------------------------
             meta_df = pd.DataFrame(meta_flat)
 
-            print("[Meta] flattened rows:", len(meta_df))
+            print("[Purchase Campaigns] sample flattened data:", meta_df.head().to_dict(orient="records"))
 
 
             # -------------------------
