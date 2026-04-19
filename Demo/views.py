@@ -8375,25 +8375,51 @@ def view_purchase_campaigns(request):
                     sources_spend["tiktok"][tiktok_camp_key] = sources_spend["tiktok"].get(tiktok_camp_key, 0) + total_spend
 
 
-            # META
+            # =========================
+            # META (FLATTENED PIPELINE)
+            # =========================
+
             meta_account_id = request.session.get("meta_ad_account_id") or tokens['meta_ad_account_id']
-            
 
             if not meta_access_token:
                 return redirect("Demo:meta_login")
             if not meta_account_id:
                 return redirect("Demo:meta_select_ad_account")
-            
+
             meta_headers = {"Authorization": f"Bearer {meta_access_token}"}
-            meta_creatives_url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/{meta_account_id}/adcreatives"
-            meta_ads_url = f"{settings.OAUTH_PROVIDERS['meta']['api_base_url']}/{meta_account_id}/ads"
+            meta_base_url = settings.OAUTH_PROVIDERS['meta']['api_base_url']
+
+            # -------------------------
+            # 1. FETCH CREATIVES (LIMIT 100)
+            # -------------------------
+            meta_creatives_url = f"{meta_base_url}/{meta_account_id}/adcreatives"
 
             meta_creatives_params = {
                 "fields": "id,name,object_story_spec,effective_object_story_id,video_id",
                 "limit": 100,
             }
+
+            creatives_resp = requests.get(meta_creatives_url, headers=meta_headers, params=meta_creatives_params)
+            creatives_resp.raise_for_status()
+            meta_creatives_list = creatives_resp.json().get("data", [])
+
+            creative_lookup = {
+                str(c.get("id")): c
+                for c in meta_creatives_list
+                if c.get("id")
+            }
+
+            print("[Meta] creatives fetched:", len(meta_creatives_list))
+
+
+            # -------------------------
+            # 2. FETCH ADS (LIMIT 100)
+            # -------------------------
+            meta_ads_url = f"{meta_base_url}/{meta_account_id}/ads"
+
             meta_ads_params = {
-                "fields": "name,creative{id,call_to_action,video_id},insights.time_range({\"since\":\""+start_time+"\",\"until\":\""+end_time+"\"}){spend}",
+                "fields": "name,creative{id,call_to_action,video_id},insights.time_range({\"since\":\""
+                        + start_time + "\",\"until\":\"" + end_time + "\"}){spend}",
                 "filtering": json.dumps([{
                     "field": "effective_status",
                     "operator": "IN",
@@ -8402,19 +8428,24 @@ def view_purchase_campaigns(request):
                 "limit": 100
             }
 
-            meta_creatives_list = fetch_meta_graph_items(meta_creatives_url, meta_headers, meta_creatives_params)
-            creative_lookup = {
-                str(creative.get("id")): creative
-                for creative in meta_creatives_list
-                if creative.get("id")
-            }
-            print("[Purchase Campaigns] Raw Meta creatives:", meta_creatives_list)
+            ads_resp = requests.get(meta_ads_url, headers=meta_headers, params=meta_ads_params)
+            ads_resp.raise_for_status()
+            ad_meta_list = ads_resp.json().get("data", [])
 
-            ad_meta_list = fetch_meta_graph_items(meta_ads_url, meta_headers, meta_ads_params)
-            print("[Purchase Campaigns] Raw Meta ads:", ad_meta_list)
+            print("[Meta] ads fetched:", len(ad_meta_list))
+
+
+            # -------------------------
+            # 3. FLATTEN ADS → CREATIVE → URL → UTM
+            # -------------------------
+            meta_flat = []
+
             for ad in ad_meta_list:
+                ad_id = ad.get("id")
+
                 creative = ad.get("creative", {}) or {}
                 creative_id = creative.get("id")
+
                 creative_payload = creative_lookup.get(str(creative_id), {})
                 url = extract_meta_creative_link(creative_payload, creative)
 
@@ -8423,26 +8454,61 @@ def view_purchase_campaigns(request):
 
                 parsed_url = urlparse(url)
                 utm_params = parse_qs(parsed_url.query)
-                source = utm_params.get("utm_source", [None])[0]
-                campaign = utm_params.get("utm_campaign", [None])[0]
-                print(f"[Purchase Campaigns] Parsed UTM params for Meta ad {ad.get('id')} / creative {creative_id}: source={source}, campaign={campaign}")
+
+                source = utm_params.get("utm_source", [""])[0]
+                campaign = utm_params.get("utm_campaign", [""])[0]
+
                 source = source.lower().strip() if source else ""
                 campaign = campaign.lower().strip() if campaign else ""
 
+                # -------------------------
+                # Spend extraction
+                # -------------------------
                 insight_rows = ad.get("insights", {}).get("data", [])
-                spend = sum(float(item.get("spend", 0) or 0) for item in insight_rows)
+                spend = sum(float(i.get("spend", 0) or 0) for i in insight_rows)
 
+                # -------------------------
+                # Match with Supabase log
+                # -------------------------
                 match = df[
-                    (df['UTM_Source'].str.strip().str.lower().astype(str) == source) &
-                    (df['UTM_Campaign'].str.strip().str.lower().astype(str) == campaign)
+                    (df["UTM_Source"].str.strip().str.lower().astype(str) == source) &
+                    (df["UTM_Campaign"].str.strip().str.lower().astype(str) == campaign)
                 ]
-                print(f"[Purchase Campaigns] Matching Meta ad {ad.get('id')} against log: found {len(match)} matches")
-                print(f"[Purchase Campaigns] Meta ad {ad.get('id')} spend from insights: {spend}")
-                if not match.empty:
-                    source_key = source or "meta"
-                    sources_spend.setdefault(source_key, {})
-                    sources_spend[source_key][campaign] = sources_spend[source_key].get(campaign, 0) + spend
-                    print(f"[Purchase Campaigns] Added spend for Meta campaign '{campaign}': {spend}. Total so far: {sources_spend[source_key][campaign]}")
+
+                meta_flat.append({
+                    "ad_id": ad_id,
+                    "creative_id": creative_id,
+                    "url": url,
+                    "utm_source": source,
+                    "utm_campaign": campaign,
+                    "spend": spend,
+                    "has_match": not match.empty,
+                    "match_count": len(match)
+                })
+
+
+            # -------------------------
+            # 4. BUILD DATAFRAME
+            # -------------------------
+            meta_df = pd.DataFrame(meta_flat)
+
+            print("[Meta] flattened rows:", len(meta_df))
+
+
+            # -------------------------
+            # 5. INTEGRATE INTO YOUR EXISTING STRUCTURE
+            # -------------------------
+            for row in meta_flat:
+                source = row["utm_source"]
+                campaign = row["utm_campaign"]
+
+                if not row["has_match"]:
+                    continue
+
+                sources_spend.setdefault(source, {})
+                sources_spend[source][campaign] = (
+                    sources_spend[source].get(campaign, 0) + row["spend"]
+                )
         except Exception as e:
             check_all_tokens = False
             print("Error during token checks or API calls:", e)
