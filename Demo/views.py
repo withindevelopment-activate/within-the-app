@@ -8360,9 +8360,8 @@ def view_purchase_campaigns(request):
 
 
             # =========================
-            # META (FLATTENED PIPELINE)
+            # META (CONTENT-AWARE PIPELINE)
             # =========================
-
             meta_account_id = request.session.get("meta_ad_account_id") or tokens['meta_ad_account_id']
 
             if not meta_access_token:
@@ -8373,13 +8372,10 @@ def view_purchase_campaigns(request):
             meta_headers = {"Authorization": f"Bearer {meta_access_token}"}
             meta_base_url = settings.OAUTH_PROVIDERS['meta']['api_base_url']
 
-            # -------------------------
-            # 1. FETCH CREATIVES (LIMIT 100)
-            # -------------------------
+            # 1. FETCH CREATIVES & GENERATE CONTENT KEYS
             meta_creatives_url = f"{meta_base_url}/{meta_account_id}/adcreatives"
-
             meta_creatives_params = {
-                "fields": "id,name,object_story_spec,effective_object_story_id,video_id",
+                "fields": "id,name,object_story_spec,effective_object_story_id,video_id,url_tags",
                 "limit": 100,
             }
 
@@ -8387,28 +8383,26 @@ def view_purchase_campaigns(request):
             creatives_resp.raise_for_status()
             meta_creatives_list = creatives_resp.json().get("data", [])
 
-            creative_lookup = {
-                str(c.get("id")): c
-                for c in meta_creatives_list
-                if c.get("id")
-            }
+            creative_lookup = {}
+            for c in meta_creatives_list:
+                c_id = str(c.get("id"))
+                
+                # Identify actual asset to detect duplicate ads using same content
+                video_id = c.get("video_id")
+                image_hash = (c.get("object_story_spec") or {}).get("link_data", {}).get("image_hash")
+                content_key = f"vid_{video_id}" if video_id else (f"img_{image_hash}" if image_hash else f"cid_{c_id}")
+                
+                creative_lookup[c_id] = {
+                    "payload": c,
+                    "content_key": content_key
+                }
 
-            print("[Purchase Campaigns] creatives fetched:", creatives_resp.json())
-
-
-            # -------------------------
-            # 2. FETCH ADS (LIMIT 100)
-            # -------------------------
+            # 2. FETCH ADS
             meta_ads_url = f"{meta_base_url}/{meta_account_id}/ads"
-
             meta_ads_params = {
-                "fields": "name,creative{id,call_to_action,video_id},insights.time_range({\"since\":\""
+                "fields": "name,creative{id,call_to_action},insights.time_range({\"since\":\""
                         + start_time + "\",\"until\":\"" + end_time + "\"}){spend}",
-                "filtering": json.dumps([{
-                    "field": "effective_status",
-                    "operator": "IN",
-                    "value": ["ACTIVE", "PAUSED"]
-                }]),
+                "filtering": json.dumps([{"field": "effective_status", "operator": "IN", "value": ["ACTIVE", "PAUSED"]}]),
                 "limit": 100
             }
 
@@ -8416,84 +8410,52 @@ def view_purchase_campaigns(request):
             ads_resp.raise_for_status()
             ad_meta_list = ads_resp.json().get("data", [])
 
-            print("[Purchase Campaigns] ads fetched:", ads_resp.json())
-
-
-            # -------------------------
-            # 3. FLATTEN ADS → CREATIVE → URL → UTM
-            # -------------------------
-            meta_flat = []
+            # 3. AGGREGATE BY CONTENT + UTMs
+            meta_aggregation = {}
 
             for ad in ad_meta_list:
-                ad_id = ad.get("id")
+                creative_brief = ad.get("creative", {})
+                c_id = str(creative_brief.get("id"))
+                
+                lookup = creative_lookup.get(c_id, {})
+                creative_payload = lookup.get("payload", {})
+                content_key = lookup.get("content_key", c_id)
 
-                creative = ad.get("creative", {}) or {}
-                creative_id = creative.get("id")
-
-                creative_payload = creative_lookup.get(str(creative_id), {})
-                url = extract_meta_creative_link(creative_payload, creative)
-
-                if not url:
-                    continue
+                url = extract_meta_creative_link(creative_payload, creative_brief)
+                if not url: continue
 
                 parsed_url = urlparse(url)
                 utm_params = parse_qs(parsed_url.query)
-                print(f"[Purchase Campaigns] Parsed URL for ad {ad_id}: {url} with UTM params: {utm_params}")
+                source = utm_params.get("utm_source", [""])[0].lower().strip()
+                campaign = utm_params.get("utm_campaign", [""])[0].lower().strip()
 
-                source = utm_params.get("utm_source", [""])[0]
-                campaign = utm_params.get("utm_campaign", [""])[0]
-
-                source = source.lower().strip() if source else ""
-                campaign = campaign.lower().strip() if campaign else ""
-
-                # -------------------------
-                # Spend extraction
-                # -------------------------
+                # Get Spend
                 insight_rows = ad.get("insights", {}).get("data", [])
-                spend = sum(float(i.get("spend", 0) or 0) for i in insight_rows)
+                ad_spend = sum(float(i.get("spend", 0) or 0) for i in insight_rows)
 
-                # -------------------------
-                # Match with Supabase log
-                # -------------------------
+                # Grouping key ensures ads with same content + same UTMs are merged
+                group_key = f"{content_key}_{source}_{campaign}"
+
+                if group_key not in meta_aggregation:
+                    meta_aggregation[group_key] = {
+                        "utm_source": source,
+                        "utm_campaign": campaign,
+                        "spend": 0.0
+                    }
+                meta_aggregation[group_key]["spend"] += ad_spend
+
+            # 4. MATCH AGGREGATED GROUPS TO LOG
+            for key, data in meta_aggregation.items():
+                source, campaign = data["utm_source"], data["utm_campaign"]
+
                 match = df[
-                    (df["UTM_Source"].str.strip().str.lower().astype(str) == source) &
-                    (df["UTM_Campaign"].str.strip().str.lower().astype(str) == campaign)
+                    (df["UTM_Source"] == source) &
+                    (df["UTM_Campaign"] == campaign)
                 ]
 
-                meta_flat.append({
-                    "ad_id": ad_id,
-                    "creative_id": creative_id,
-                    "url": url,
-                    "utm_source": source,
-                    "utm_campaign": campaign,
-                    "spend": spend,
-                    "has_match": not match.empty,
-                    "match_count": len(match)
-                })
-
-
-            # -------------------------
-            # 4. BUILD DATAFRAME
-            # -------------------------
-            meta_df = pd.DataFrame(meta_flat)
-
-            print("[Purchase Campaigns] sample flattened data:", meta_df.head().to_dict(orient="records"))
-
-
-            # -------------------------
-            # 5. INTEGRATE INTO YOUR EXISTING STRUCTURE
-            # -------------------------
-            for row in meta_flat:
-                source = row["utm_source"]
-                campaign = row["utm_campaign"]
-
-                if not row["has_match"]:
-                    continue
-
-                sources_spend.setdefault(source, {})
-                sources_spend[source][campaign] = (
-                    sources_spend[source].get(campaign, 0) + row["spend"]
-                )
+                if not match.empty:
+                    sources_spend.setdefault("meta", {})
+                    sources_spend["meta"][campaign] = sources_spend["meta"].get(campaign, 0) + data["spend"]
         except Exception as e:
             check_all_tokens = False
             print("Error during token checks or API calls:", e)
