@@ -8456,8 +8456,8 @@ def view_purchase_campaigns(request):
                 ]
 
                 if not match.empty:
-                    sources_spend.setdefault("meta", {})
-                    sources_spend["meta"][campaign] = sources_spend["meta"].get(campaign, 0) + data["spend"]
+                    sources_spend.setdefault(source, {})
+                    sources_spend[source][campaign] = sources_spend[source].get(campaign, 0) + data["spend"]
         except Exception as e:
             check_all_tokens = False
             print("Error during token checks or API calls:", e)
