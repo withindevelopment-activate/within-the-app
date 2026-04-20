@@ -8105,6 +8105,7 @@ def view_purchase_campaigns(request):
             object_story_spec.get("template_data", {}).get("call_to_action", {}).get("value", {}).get("link"),
             object_story_spec.get("photo_data", {}).get("call_to_action", {}).get("value", {}).get("link"),
             fallback_creative.get("call_to_action", {}).get("value", {}).get("link"),
+            creative_payload.get("url_tags"),  # 👈 NEW fallback
         ]
 
         child_attachments = object_story_spec.get("link_data", {}).get("child_attachments", []) or []
@@ -8117,21 +8118,6 @@ def view_purchase_campaigns(request):
                 return cleaned
 
         return ""
-
-    def fetch_meta_graph_items(url, headers, params=None):
-        items = []
-        next_url = url
-        next_params = params
-
-        while next_url:
-            response = requests.get(next_url, headers=headers, params=next_params)
-            response.raise_for_status()
-            payload = response.json()
-            items.extend(payload.get("data", []))
-            next_url = payload.get("paging", {}).get("next")
-            next_params = None
-
-        return items
 
     ## Get the latest tokens
     tokens = get_latest_token()
@@ -8249,8 +8235,9 @@ def view_purchase_campaigns(request):
                 props = creative.get("web_view_properties")
                 if not props:
                     continue # Skip if it's not a web view creative
-                    
-                url = props.get("url", "").lower().strip()
+
+                if not url: 
+                    url = props.get("url", "").lower().strip()
                 utm_ad_snapchat["url_utm"] = url
             
                 # Parse UTMs for THIS specific creative
@@ -8428,8 +8415,7 @@ def view_purchase_campaigns(request):
             # -------------------------
             meta_ads_url = f"{meta_base_url}/{meta_account_id}/ads"
             meta_ads_params = {
-                "fields": "name,creative{id},insights.time_range({\"since\":\""
-                        + start_time + "\",\"until\":\"" + end_time + "\"}){spend}",
+                "fields": "id,name,creative{id},insights.time_range({\"since\":\"" + start_time + "\",\"until\":\"" + end_time + "\"}){spend}",
                 "filtering": json.dumps([{
                     "field": "effective_status",
                     "operator": "IN",
@@ -8453,7 +8439,10 @@ def view_purchase_campaigns(request):
                 creative_brief = ad.get("creative", {})
                 c_id = str(creative_brief.get("id"))
                 
-                lookup_data = creative_lookup.get(c_id, {})
+                if not c_id or c_id not in creative_lookup:
+                    continue
+
+                lookup_data = creative_lookup[c_id]
                 creative_payload = lookup_data.get("payload", {})
                 content_key = lookup_data.get("content_key")
 
@@ -8470,10 +8459,10 @@ def view_purchase_campaigns(request):
 
                 # Get Spend
                 insight_rows = ad.get("insights", {}).get("data", [])
-                ad_spend = sum(float(i.get("spend", 0) or 0) for i in insight_rows)
+                ad_spend = sum(float(i.get("spend") or 0.0) for i in insight_rows)
 
                 # Unique identifier for aggregation: Content + UTMs
-                group_key = f"{content_key}_{source}_{campaign}"
+                group_key = (content_key, source, campaign)
 
                 if group_key not in aggregated_data:
                     aggregated_data[group_key] = {
@@ -8499,8 +8488,8 @@ def view_purchase_campaigns(request):
                 campaign = data["utm_campaign"]
 
                 match = df[
-                    (df["UTM_Source"].str.strip().str.lower().astype(str) == source) &
-                    (df["UTM_Campaign"].str.strip().str.lower().astype(str) == campaign)
+                    (df["UTM_Source"] == source) &
+                    (df["UTM_Campaign"] == campaign)
                 ]
 
                 meta_flat.append({
