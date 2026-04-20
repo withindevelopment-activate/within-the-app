@@ -8235,9 +8235,11 @@ def view_purchase_campaigns(request):
                 props = creative.get("web_view_properties")
                 if not props:
                     continue # Skip if it's not a web view creative
+                else:
+                    url = props.get("url", "").lower().strip()
 
                 if not url: 
-                    url = props.get("url", "").lower().strip()
+                    continue
                 utm_ad_snapchat["url_utm"] = url
             
                 # Parse UTMs for THIS specific creative
