@@ -8234,11 +8234,10 @@ def view_purchase_campaigns(request):
                     url = creative.get("preview_properties", {}).get("url", "")
                 props = creative.get("web_view_properties")
                 if not props:
-                    continue # Skip if it's not a web view creative
-                else:
-                    url = props.get("url", "").lower().strip()
+                    continue
 
-                if not url: 
+                url = props.get("url", "").lower().strip()
+                if not url:
                     continue
                 utm_ad_snapchat["url_utm"] = url
             
@@ -8417,7 +8416,10 @@ def view_purchase_campaigns(request):
                 creative_brief = ad.get("creative", {})
                 c_id = str(creative_brief.get("id"))
                 
-                lookup = creative_lookup.get(c_id, {})
+                if not c_id or c_id not in creative_lookup:
+                    continue
+
+                lookup = creative_lookup[c_id]
                 creative_payload = lookup.get("payload", {})
                 content_key = lookup.get("content_key", c_id)
 
@@ -8434,7 +8436,7 @@ def view_purchase_campaigns(request):
                 ad_spend = sum(float(i.get("spend", 0) or 0) for i in insight_rows)
 
                 # Grouping key ensures ads with same content + same UTMs are merged
-                group_key = f"{content_key}_{source}_{campaign}"
+                group_key = (content_key, source, campaign)
 
                 if group_key not in meta_aggregation:
                     meta_aggregation[group_key] = {
