@@ -1,0 +1,123 @@
+{% extends "Demo/base.html" %}
+
+{% block title %} Url Builder {% endblock title %}
+
+{% block content %}
+<style>
+    .card { border: none; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+    .btn-primary { background-color: #5a67d8; border: none; }
+    .btn-primary:hover { background-color: #434190; }
+    #finalUrl { word-break: break-all; background: #e9ecef; cursor: pointer; }
+    .badge-utm { background-color: #edf2f7; color: #4a5568; margin-right: 5px; }
+</style>
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card p-4">
+                <h3 class="mb-4 text-center">🔗 Bridge Link Builder</h3>
+                
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Paste Landing Page URL</label>
+                    <input type="text" id="landingPage" class="form-control form-control-lg" placeholder="Landing page URL..." autocomplete="off">
+                    <div class="form-text">Paste a link here; it will automatically extract UTMs if present.</div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">UTM Source</label>
+                        <input type="text" id="utm_source" class="form-control utm-input" placeholder="facebook">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">UTM Medium</label>
+                        <input type="text" id="utm_medium" class="form-control utm-input" placeholder="cpc">
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">UTM Campaign</label>
+                    <input type="text" id="utm_campaign" class="form-control utm-input" placeholder="summer_sale">
+                </div>
+
+                <hr>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Generated Tracking Link</label>
+                    <div id="finalUrl" class="p-3 border rounded text-muted" onclick="copyToClipboard()">
+                        Result will appear here...
+                    </div>
+                    <div class="mt-2">
+                        <button class="btn btn-primary w-100 py-2" onclick="copyToClipboard()">Copy Result</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const BRIDGE_BASE = "https://testing-within.onrender.com/bridge/"; // Change to your Render URL
+
+    const landingInput = document.getElementById('landingPage');
+    const utmInputs = document.querySelectorAll('.utm-input');
+    const display = document.getElementById('finalUrl');
+
+    // AUTO-CAPTURE LOGIC
+    landingInput.addEventListener('input', (e) => {
+        const val = e.target.value;
+        try {
+            const url = new URL(val);
+            const params = new URLSearchParams(url.search);
+
+            // Extract UTMs if they exist in the pasted link
+            if (params.has('utm_source')) document.getElementById('utm_source').value = params.get('utm_source');
+            if (params.has('utm_medium')) document.getElementById('utm_medium').value = params.get('utm_medium');
+            if (params.has('utm_campaign')) document.getElementById('utm_campaign').value = params.get('utm_campaign');
+
+            // Clean the base URL (remove the query string from the landing page input)
+            landingInput.value = url.origin + url.pathname;
+            
+            generateLink();
+        } catch (err) {
+            // Not a valid URL yet, just generate
+            generateLink();
+        }
+    });
+
+    // REGENERATE ON ANY CHANGE
+    utmInputs.forEach(input => {
+        input.addEventListener('input', generateLink);
+    });
+
+    function generateLink() {
+        const base = landingInput.value.trim();
+        if (!base) {
+            display.innerText = "Result will appear here...";
+            return;
+        }
+
+        const source = document.getElementById('utm_source').value.trim() || 'direct';
+        const medium = document.getElementById('utm_medium').value.trim();
+        const campaign = document.getElementById('utm_campaign').value.trim();
+
+        // Build the query string for the bridge
+        const bridgeParams = new URLSearchParams();
+        bridgeParams.append('target', base);
+        bridgeParams.append('utm_source', source);
+        if (medium) bridgeParams.append('utm_medium', medium);
+        if (campaign) bridgeParams.append('utm_campaign', campaign);
+
+        const fullUrl = `${BRIDGE_BASE}?${bridgeParams.toString()}`;
+        display.innerText = fullUrl;
+        display.classList.remove('text-muted');
+    }
+
+    function copyToClipboard() {
+        const text = display.innerText;
+        if (text.startsWith('http')) {
+            navigator.clipboard.writeText(text);
+            alert("Link copied to clipboard!");
+        }
+    }
+</script>
+
+{% endblock %}

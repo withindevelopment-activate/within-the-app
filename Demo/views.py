@@ -8979,3 +8979,6 @@ def log_bridge_click(request, params, sleecid, target_url):
     # Use your existing batch insert helper
     batch_insert_to_supabase(pd.DataFrame([bridge_entry]), "Tracking_Visitors_duplicate")
     print(f"[BRIDGE LOGGED] SleecID: {sleecid} | Source: {bridge_entry['UTM_Source']}")
+
+def url_builder(request):
+    return render(request, "Demo/url_builder.html", {})
