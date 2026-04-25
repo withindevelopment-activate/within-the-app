@@ -32,10 +32,16 @@
                         <input type="text" id="utm_medium" class="form-control utm-input" placeholder="cpc">
                     </div>
                 </div>
-
-                <div class="mb-3">
-                    <label class="form-label">UTM Campaign</label>
-                    <input type="text" id="utm_campaign" class="form-control utm-input" placeholder="summer_sale">
+                
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">UTM Campaign</label>
+                        <input type="text" id="utm_campaign" class="form-control utm-input" placeholder="summer_sale">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Campaign ID</label>
+                        <input type="text" id="utm_id" class="form-control utm-input" placeholder="12345">
+                    </div>
                 </div>
 
                 <hr>
@@ -72,6 +78,8 @@
             if (params.has('utm_source')) document.getElementById('utm_source').value = params.get('utm_source');
             if (params.has('utm_medium')) document.getElementById('utm_medium').value = params.get('utm_medium');
             if (params.has('utm_campaign')) document.getElementById('utm_campaign').value = params.get('utm_campaign');
+            if (params.has('utm_id')) document.getElementById('utm_id').value = params.get('utm_id');
+
 
             // Clean the base URL (remove the query string from the landing page input)
             landingInput.value = url.origin + url.pathname;
@@ -98,6 +106,7 @@
         const source = document.getElementById('utm_source').value.trim() || 'direct';
         const medium = document.getElementById('utm_medium').value.trim();
         const campaign = document.getElementById('utm_campaign').value.trim();
+        const id = document.getElementById('utm_id').value.trim();
 
         // Build the query string for the bridge
         const bridgeParams = new URLSearchParams();
@@ -105,7 +114,7 @@
         bridgeParams.append('utm_source', source);
         if (medium) bridgeParams.append('utm_medium', medium);
         if (campaign) bridgeParams.append('utm_campaign', campaign);
-
+        if (id) bridgeParams.append('utm_id', id);
         const fullUrl = `${BRIDGE_BASE}?${bridgeParams.toString()}`;
         display.innerText = fullUrl;
         display.classList.remove('text-muted');
