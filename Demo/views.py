@@ -8902,7 +8902,25 @@ def view_platform_contributions(request):
             "platform_count": int(len(result)),
         }
     )
-
+def get_platform_prefix(source):
+    prefixes = {
+        "meta": "meta_",
+        "instagram": "insta_",
+        "facebook": "fb_",
+        "tiktok": "tiktok_",
+        "snapchat": "snap_",
+        "google": "google_",
+        "x": "x_",
+        "linkedin": "li_",
+        "pinterest": "pin_",
+        "reddit": "rdt_",
+        "whatsapp": "wa_",
+        "telegram": "tg_",
+        "web": "web_"
+    }
+    # Normalize the source to lowercase and get prefix, default to 'web_'
+    platform = str(source or "").lower()
+    return prefixes.get(platform, "web_")
 
 def tracking_bridge(request):
     # 1. Capture all incoming parameters
@@ -8920,11 +8938,18 @@ def tracking_bridge(request):
         return HttpResponseBadRequest("Missing destination target.")
     
     # 3. Dynamic SleeCID Generation (if not present)
+    
     sleecid = params.get('sleecid')
     if not sleecid:
-        source = params.get('utm_source', 'gen')
-        prefix = f"{source}_" if source else "id_"
+        source = params.get('utm_source', 'web')
+        
+        # 1. Get the mapped prefix (e.g., 'facebook' becomes 'fb_')
+        prefix = get_platform_prefix(source)
+        
+        # 2. Generate UUID (Python's uuid4 matches your JS requirement)
         unique_id = str(uuid.uuid4())
+        
+        # 3. Combine to create the final SleeCID
         sleecid = f"{prefix}{unique_id}"
         params['sleecid'] = sleecid
 

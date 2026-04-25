@@ -150,6 +150,7 @@
 
     function getPlatformPrefix(platform) {
         const prefixes = {
+            meta: "meta_",
             instagram: "insta_",
             facebook: "fb_",
             tiktok: "tiktok_",
@@ -184,6 +185,7 @@
 
     function getPrefixStrength(prefix) {
         const strength = {
+            meta_: 100,
             insta_: 100,
             fb_: 100,
             tiktok_: 100,
