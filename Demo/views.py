@@ -78,6 +78,30 @@ def get_latest_token():
         "snap_ad_account_id": token_row["snap_ad_account_id"] or '',
     }
 
+def resolve_token_store_id(request):
+    """Resolve the current store id from session first, then latest token row."""
+    store_id = request.session.get("store_id")
+    if store_id:
+        return store_id
+
+    try:
+        return get_latest_token().get("store_id")
+    except Exception:
+        return None
+
+def update_tokens_table(request, update_data, store_id=None):
+    """Persist token fields for the current store into the tokens table."""
+    store_id = store_id or resolve_token_store_id(request)
+    if not store_id:
+        raise ValueError("No store_id found for tokens update.")
+
+    existing = supabase.table("tokens").select("Store_ID").eq("Store_ID", store_id).execute()
+    if not existing.data:
+        raise ValueError(f"No entry found in 'tokens' for Store_ID: {store_id}. Please create it first.")
+
+    supabase.table("tokens").update(update_data).eq("Store_ID", store_id).execute()
+    return store_id
+
 def zid_login(request):
     params = {
         "client_id": settings.ZID_CLIENT_ID,
@@ -327,6 +351,19 @@ def zid_refresh_token(request):
     # Update tokens in session
     request.session['access_token'] = new_tokens.get('access_token')
     request.session['refresh_token'] = new_tokens.get('refresh_token')
+    if new_tokens.get('authorization'):
+        request.session['authorization_token'] = new_tokens.get('authorization')
+
+    try:
+        update_data = {
+            "Access": request.session.get('access_token'),
+            "Refresh": request.session.get('refresh_token'),
+        }
+        if request.session.get('authorization_token'):
+            update_data["Authorization"] = request.session.get('authorization_token')
+        update_tokens_table(request, update_data)
+    except Exception as e:
+        return JsonResponse({'error': 'Token refresh saved in session but failed to update table', 'details': str(e)}, status=500)
 
     return JsonResponse({'status': 'refreshed', 'new_access_token': new_tokens.get('access_token')})
 
@@ -4834,36 +4871,17 @@ def snapchat_callback(request):
         expiry_datetime = datetime.now() + timedelta(seconds=expires_in_seconds)
         request.session["snapchat_token_expires_at"] = expiry_datetime.isoformat()
 
-        ## Add them to database
-        tokens = get_latest_token()
-        store_id = request.session.get("store_id") or tokens['store_id']
-        if not store_id:
-            return HttpResponse("No store_id found in session", status=400)
-
-        # Check if row exists first
-        existing = supabase.table("tokens").select("Store_ID").eq("Store_ID", store_id).execute()
-
-        if not existing.data:
-            # No row found 
-            return HttpResponse(
-                f"No entry found in 'tokens' for Store_ID: {store_id}. Please create it first.",
-                status=404
-            )
         long_term_access_token = refresh_snapchat_token(request)
-        #print("Long term access token is:", long_term_access_token)
-        # Row exists, update it
-        update_data = {
-            "Snapchat_Access": token_data["access_token"],
-            "Snapchat_Refresh": token_data.get("refresh_token"),
+        store_id = update_tokens_table(request, {
+            "Snapchat_Access": request.session.get("snapchat_access_token"),
+            "Snapchat_Refresh": request.session.get("snapchat_refresh_token"),
             "Snapchat_long_term_Access": long_term_access_token,
-        }
+        })
 
-        response = supabase.table("tokens").update(update_data).eq("Store_ID", store_id).execute()
-        print(f"TikTok tokens updated for Store_ID {store_id}")
-
-        # Redirect the user to the campaigns overview page.
         return redirect("Demo:campaigns_overview")
 
+    except ValueError as e:
+        return HttpResponse(str(e), status=404)
     except requests.RequestException as e:
         return HttpResponse(f"Failed to get access token: {e}", status=500)
 
@@ -4894,9 +4912,13 @@ def refresh_snapchat_token(request):
         expires_in = token_data.get("expires_in", 3600)
         expiry_datetime = datetime.now() + timedelta(seconds=expires_in)
         request.session["snapchat_token_expires_at"] = expiry_datetime.isoformat()
+        update_tokens_table(request, {
+            "Snapchat_Access": request.session.get("snapchat_access_token"),
+            "Snapchat_Refresh": request.session.get("snapchat_refresh_token"),
+        })
 
         return token_data["access_token"]
-    except requests.RequestException as e:
+    except (requests.RequestException, ValueError) as e:
         print(f"Token refresh failed: {e}")
         return None
     
@@ -5232,7 +5254,6 @@ def tiktok_callback(request):
     }
     resp = requests.get(url, params=params, headers=headers, timeout=10)
     advertisers = resp.json()
-    print("Advertisers data:", advertisers)
 
     if "data" not in advertisers or "list" not in advertisers["data"]:
         return JsonResponse(advertisers, status=400)
@@ -5246,29 +5267,13 @@ def tiktok_callback(request):
 
     # --- Store tokens in Supabase ---
     try:
-        store_id = request.session.get("store_id")
-        if not store_id:
-            return HttpResponse("No store_id found in session", status=400)
-
-        # Check if row exists first
-        existing = supabase.table("tokens").select("Store_ID").eq("Store_ID", store_id).execute()
-
-        if not existing.data:
-            # No row found 
-            return HttpResponse(
-                f"No entry found in 'tokens' for Store_ID: {store_id}. Please create it first.",
-                status=404
-            )
-
-        # Row exists, update it
-        update_data = {
+        store_id = update_tokens_table(request, {
             "Tiktok_Access": access_token,
             "Tiktok_Org": advertiser_id
-        }
+        })
 
-        response = supabase.table("tokens").update(update_data).eq("Store_ID", store_id).execute()
-        print(f"TikTok tokens updated for Store_ID {store_id}")
-
+    except ValueError as e:
+        return HttpResponse(str(e), status=404)
     except Exception as e:
         print(f"Error saving TikTok tokens to table: {e}")
         return HttpResponse(f"Error saving tokens: {e}", status=500)
@@ -6141,7 +6146,6 @@ def meta_callback(request):
         resp = requests.get(settings.OAUTH_PROVIDERS['meta']['token_url'], params=data)
         resp.raise_for_status()
         token_data = resp.json()
-        print("Meta token data:", token_data)
         short_lived_token = token_data["access_token"]
 
         # Optional: exchange for long-lived token
@@ -6155,33 +6159,14 @@ def meta_callback(request):
 
         ## Save the access token to the db
         ## Add them to database
-        tokens = get_latest_token()
-        store_id = request.session.get("store_id") or tokens['store_id']
-        if not store_id:
-            return HttpResponse("No store_id found in session", status=400)
-
-        # Check if row exists first
-        existing = supabase.table("tokens").select("Store_ID").eq("Store_ID", store_id).execute()
-
-        if not existing.data:
-            # No row found 
-            return HttpResponse(
-                f"No entry found in 'tokens' for Store_ID: {store_id}. Please create it first.",
-                status=404
-            )
-
-        # Row exists, update it
-        update_data = {
+        store_id = update_tokens_table(request, {
             "Meta_Access": request.session.get("meta_access_token")
-        }
-
-        response = supabase.table("tokens").update(update_data).eq("Store_ID", store_id).execute()
-        print(f"TikTok tokens updated for Store_ID {store_id}")
-
-        # your mom
+        })
 
         return redirect("Demo:meta_select_ad_account")
 
+    except ValueError as e:
+        return HttpResponse(str(e), status=404)
     except requests.RequestException as e:
         messages.error(request, f"Token exchange failed: {e}")
         return redirect("Demo:home")
@@ -6198,7 +6183,6 @@ def exchange_long_lived_token(short_token):
     try:
         resp = requests.get(url, params=params)
         resp.raise_for_status()
-        print("Long-lived token response:", resp.json())
         return resp.json().get("access_token")
     except requests.RequestException as e:
         print("Failed to get long-lived token:", e)
