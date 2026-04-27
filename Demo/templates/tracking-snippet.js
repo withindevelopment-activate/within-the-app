@@ -181,8 +181,6 @@
         return `${prefix}${timestamp}-${randomBits}`;
     }
 
-    const LOCKED_PREFIXES = ["insta_", "fb_", "tiktok_", "snap_"];
-
     function getPrefixStrength(prefix) {
         const strength = {
             meta_: 100,
@@ -233,8 +231,6 @@
 
         const localPrefix = extractPrefix(localId);
         const incomingPrefix = extractPrefix(incomingId);
-
-        if (LOCKED_PREFIXES.includes(localPrefix)) return localId;
 
         const localStrength = getPrefixStrength(localPrefix);
         const incomingStrength = getPrefixStrength(incomingPrefix);
