@@ -6477,7 +6477,7 @@ def events_table_view(request):
         columns=[
             "Visitor_ID", "Event_Type", "UTM_Source", "UTM_Campaign", "Session_ID", "SleecID",
             "Visited_at", "Client_IP", "User_Agent", "Timezone", "UTM_Medium","UTM_Term","UTM_Content","Event_Details",
-            "Cookie_ID", "Customer_ID",  "Customer_Mobile","Screen_Resolution","Order_ID","Attribution_Type","Page_URL","Referrer_Platform"
+            "Cookie_ID", "Customer_ID",  "Customer_Mobile","Screen_Resolution","Order_ID","Attribution_Type","Page_URL","Referrer_Platform","RAW_UTM_SOURCE"
             ],
         filters=filters,
         order_by=sort_field,
