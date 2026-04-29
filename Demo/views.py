@@ -8977,7 +8977,6 @@ def log_bridge_click(request, params, sleecid, target_url):
         "Attribution_Type": "bridge_tracking_entry",
         "Visited_at": get_uae_current_date(), # Uses your existing helper
         "Last_Updated": get_uae_current_date(),
-        "RAW_UTM_SOURCE": params.get('utm_source', '').lower(),
         "Event_Details": json.dumps({
             "is_bridge": True,
             "original_params": dict(params),
