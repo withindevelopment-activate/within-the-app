@@ -8073,36 +8073,6 @@ def extract_latest_products(val):
     return [f"{sku} - {name}" for sku, name in products.items()]
 
 def view_purchase_campaigns(request):
-    def extract_meta_creative_link(creative_payload, fallback_creative=None):
-        creative_payload = creative_payload or {}
-        fallback_creative = fallback_creative or {}
-
-        def clean_link(candidate):
-            return str(candidate or "").strip()
-
-        object_story_spec = creative_payload.get("object_story_spec") or {}
-
-        link_candidates = [
-            object_story_spec.get("link_data", {}).get("link"),
-            object_story_spec.get("video_data", {}).get("call_to_action", {}).get("value", {}).get("link"),
-            object_story_spec.get("template_data", {}).get("link"),
-            object_story_spec.get("template_data", {}).get("call_to_action", {}).get("value", {}).get("link"),
-            object_story_spec.get("photo_data", {}).get("call_to_action", {}).get("value", {}).get("link"),
-            fallback_creative.get("call_to_action", {}).get("value", {}).get("link"),
-            creative_payload.get("url_tags"),  # 👈 NEW fallback
-        ]
-
-        child_attachments = object_story_spec.get("link_data", {}).get("child_attachments", []) or []
-        for attachment in child_attachments:
-            link_candidates.append(attachment.get("link"))
-
-        for candidate in link_candidates:
-            cleaned = clean_link(candidate)
-            if cleaned:
-                return cleaned
-
-        return ""
-
     ## Get the latest tokens
     tokens = get_latest_token()
     authorization = tokens['authorization_token']
@@ -8355,93 +8325,79 @@ def view_purchase_campaigns(request):
             meta_headers = {"Authorization": f"Bearer {meta_access_token}"}
             meta_base_url = settings.OAUTH_PROVIDERS['meta']['api_base_url']
 
-            # 1. FETCH CREATIVES & GENERATE CONTENT KEYS
-            meta_creatives_url = f"{meta_base_url}/{meta_account_id}/adcreatives"
-            meta_creatives_params = {
-                "fields": "id,name,object_story_spec,effective_object_story_id,video_id,url_tags",
-                "limit": 100,
+            # 1. FETCH ALL INSIGHTS FOR THE DATE RANGE
+            meta_insights_url = f"{meta_base_url}/{meta_account_id}/insights"
+            meta_insights_params = {
+                "fields": "ad_id,spend",
+                "level": "ad",
+                "limit": 500,
+                "time_range": json.dumps({"since": start_time, "until": end_time}),
             }
 
-            creatives_resp = requests.get(meta_creatives_url, headers=meta_headers, params=meta_creatives_params)
-            creatives_resp.raise_for_status()
-            meta_creatives_list = creatives_resp.json().get("data", [])
+            insights_resp = requests.get(meta_insights_url, headers=meta_headers, params=meta_insights_params)
+            insights_data = insights_resp.json().get("data", [])
 
-            creative_lookup = {}
-            for c in meta_creatives_list:
-                c_id = str(c.get("id"))
-                
-                # Identify actual asset to detect duplicate ads using same content
-                video_id = c.get("video_id")
-                image_hash = (c.get("object_story_spec") or {}).get("link_data", {}).get("image_hash")
-                content_key = f"vid_{video_id}" if video_id else (f"img_{image_hash}" if image_hash else f"cid_{c_id}")
-                
-                creative_lookup[c_id] = {
-                    "payload": c,
-                    "content_key": content_key
-                }
+            # Store ad_id and spend
+            ad_spend_data = {item["ad_id"]: float(item["spend"]) for item in insights_data}
+            ad_ids = list(ad_spend_data.keys())
 
-            # 2. FETCH ADS
-            meta_ads_url = f"{meta_base_url}/{meta_account_id}/ads"
-            meta_ads_params = {
-                "fields": "name,creative{id,call_to_action},insights.time_range({\"since\":\""
-                        + start_time + "\",\"until\":\"" + end_time + "\"}){spend}",
-                "filtering": json.dumps([{"field": "effective_status", "operator": "IN", "value": ["ACTIVE", "PAUSED"]}]),
-                "limit": 100
-            }
+            # 2. LOOP THROUGH AD IDs TO GET CREATIVE IDs
+            creative_to_spend = {}
 
-            ads_resp = requests.get(meta_ads_url, headers=meta_headers, params=meta_ads_params)
-            ads_resp.raise_for_status()
-            ad_meta_list = ads_resp.json().get("data", [])
+            for aid in ad_ids:
+                try:
+                    ad_url = f"{meta_base_url}/{aid}"
+                    ad_params = {"fields": "creative{id}"}
+                    ad_resp = requests.get(ad_url, headers=meta_headers, params=ad_params).json()
+                    
+                    c_id = ad_resp.get("creative", {}).get("id")
+                    if c_id:
+                        # Map the spend from the Ad to the Creative ID
+                        creative_to_spend[c_id] = creative_to_spend.get(c_id, 0) + ad_spend_data[aid]
+                except Exception as e:
+                    print(f"Error fetching Ad {aid}: {e}")
 
-            # 3. AGGREGATE BY CONTENT + UTMs
-            meta_aggregation = {}
+            # 3. LOOP THROUGH CREATIVE IDs TO EXTRACT UTMs
+            for cid, spend in creative_to_spend.items():
+                try:
+                    c_url = f"{meta_base_url}/{cid}"
+                    c_params = {"fields": "id,url_tags,object_story_spec,asset_feed_spec,call_to_action"}
+                    c_data = requests.get(c_url, headers=meta_headers, params=c_params).json()
 
-            for ad in ad_meta_list:
-                creative_brief = ad.get("creative", {})
-                c_id = str(creative_brief.get("id"))
-                
-                if not c_id or c_id not in creative_lookup:
-                    continue
+                    # --- UTM EXTRACTION LOGIC ---
+                    url = ""
+                    
+                    # Priority 1: Asset Feed (Advantage+ Ads)
+                    asset_feed = c_data.get("asset_feed_spec") or {}
+                    if asset_feed.get("link_urls"):
+                        url = asset_feed["link_urls"][0].get("website_url", "")
+                        
+                    # Priority 2: Call to Action Value (Direct Ads)
+                    if not url:
+                        url = c_data.get("call_to_action", {}).get("value", {}).get("link", "")
+                        
+                    # Priority 3: Object Story Spec (Standard Post Ads)
+                    if not url:
+                        url = (c_data.get("object_story_spec", {})
+                            .get("link_data", {})
+                            .get("link", ""))
 
-                lookup = creative_lookup[c_id]
-                creative_payload = lookup.get("payload", {})
-                content_key = lookup.get("content_key", c_id)
+                    if url:
+                        parsed = urlparse(url)
+                        params = parse_qs(parsed.query)
+                        source = params.get("utm_source", [""])[0].lower().strip()
+                        campaign = params.get("utm_campaign", [""])[0].lower().strip()
 
-                url = extract_meta_creative_link(creative_payload, creative_brief)
-                if not url: continue
-
-                parsed_url = urlparse(url)
-                utm_params = parse_qs(parsed_url.query)
-                source = utm_params.get("utm_source", [""])[0].lower().strip()
-                campaign = utm_params.get("utm_campaign", [""])[0].lower().strip()
-
-                # Get Spend
-                insight_rows = ad.get("insights", {}).get("data", [])
-                ad_spend = sum(float(i.get("spend", 0) or 0) for i in insight_rows)
-
-                # Grouping key ensures ads with same content + same UTMs are merged
-                group_key = (content_key, source, campaign)
-
-                if group_key not in meta_aggregation:
-                    meta_aggregation[group_key] = {
-                        "utm_source": source,
-                        "utm_campaign": campaign,
-                        "spend": 0.0
-                    }
-                meta_aggregation[group_key]["spend"] += ad_spend
-
-            # 4. MATCH AGGREGATED GROUPS TO LOG
-            for key, data in meta_aggregation.items():
-                source, campaign = data["utm_source"], data["utm_campaign"]
-
-                match = df[
-                    (df["UTM_Source"] == source) &
-                    (df["UTM_Campaign"] == campaign)
-                ]
-
-                if not match.empty:
-                    sources_spend.setdefault(source, {})
-                    sources_spend[source][campaign] = sources_spend[source].get(campaign, 0) + data["spend"]
+                        if source and campaign:
+                            # SYNC WITH YOUR DATABASE DATAFRAME
+                            match = df[(df["UTM_Source"] == source) & (df["UTM_Campaign"] == campaign)]
+                            
+                            if not match.empty:
+                                if source not in sources_spend:
+                                    sources_spend[source] = {}
+                                sources_spend[source][campaign] = sources_spend[source].get(campaign, 0) + spend
+                except Exception as e:
+                    print(f"Error processing Creative {cid}: {e}")
         except Exception as e:
             check_all_tokens = False
             print("Error during token checks or API calls:", e)
