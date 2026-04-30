@@ -8325,79 +8325,68 @@ def view_purchase_campaigns(request):
             meta_headers = {"Authorization": f"Bearer {meta_access_token}"}
             meta_base_url = settings.OAUTH_PROVIDERS['meta']['api_base_url']
 
-            # 1. FETCH ALL INSIGHTS FOR THE DATE RANGE
-            meta_insights_url = f"{meta_base_url}/{meta_account_id}/insights"
-            meta_insights_params = {
-                "fields": "ad_id,spend",
-                "level": "ad",
-                "limit": 500,
-                "time_range": json.dumps({"since": start_time, "until": end_time}),
+            # 1. SETUP PARAMETERS
+            meta_ads_url = f"{meta_base_url}/{meta_account_id}/ads"
+            time_range = json.dumps({"since": start_time, "until": end_time})
+
+            # We call the Ads endpoint and expand the creative and insights fields inline
+            meta_ads_params = {
+                "fields": (
+                    "name,"
+                    "creative{id,url_tags,object_story_spec,asset_feed_spec,call_to_action},"
+                    f"insights.time_range({time_range}){{spend}}"
+                ),
+                "limit": 300
             }
 
-            insights_resp = requests.get(meta_insights_url, headers=meta_headers, params=meta_insights_params)
-            insights_data = insights_resp.json().get("data", [])
+            # 2. EXECUTE CALL & PROCESS
+            ads_resp = requests.get(meta_ads_url, headers=meta_headers, params=meta_ads_params)
+            ads_data = ads_resp.json().get("data", [])
 
-            # Store ad_id and spend
-            ad_spend_data = {item["ad_id"]: float(item["spend"]) for item in insights_data}
-            ad_ids = list(ad_spend_data.keys())
+            for ad in ads_data:
+                # Extract Spend from nested insights
+                insights = ad.get("insights", {}).get("data", [])
+                ad_spend = sum(float(i.get("spend", 0)) for i in insights)
+                
+                if ad_spend <= 0:
+                    continue
 
-            # 2. LOOP THROUGH AD IDs TO GET CREATIVE IDs
-            creative_to_spend = {}
+                # Extract Creative details
+                creative = ad.get("creative", {})
+                url = ""
 
-            for aid in ad_ids:
-                try:
-                    ad_url = f"{meta_base_url}/{aid}"
-                    ad_params = {"fields": "creative{id}"}
-                    ad_resp = requests.get(ad_url, headers=meta_headers, params=ad_params).json()
-                    
-                    c_id = ad_resp.get("creative", {}).get("id")
-                    if c_id:
-                        # Map the spend from the Ad to the Creative ID
-                        creative_to_spend[c_id] = creative_to_spend.get(c_id, 0) + ad_spend_data[aid]
-                except Exception as e:
-                    print(f"Error fetching Ad {aid}: {e}")
+                # Priority 1: Asset Feed (Advantage+ / Dynamic)
+                asset_feed = creative.get("asset_feed_spec") or {}
+                if asset_feed.get("link_urls"):
+                    url = asset_feed["link_urls"][0].get("website_url", "")
 
-            # 3. LOOP THROUGH CREATIVE IDs TO EXTRACT UTMs
-            for cid, spend in creative_to_spend.items():
-                try:
-                    c_url = f"{meta_base_url}/{cid}"
-                    c_params = {"fields": "id,url_tags,object_story_spec,asset_feed_spec,call_to_action"}
-                    c_data = requests.get(c_url, headers=meta_headers, params=c_params).json()
+                # Priority 2: Call to Action Value
+                if not url:
+                    url = creative.get("call_to_action", {}).get("value", {}).get("link", "")
 
-                    # --- UTM EXTRACTION LOGIC ---
-                    url = ""
-                    
-                    # Priority 1: Asset Feed (Advantage+ Ads)
-                    asset_feed = c_data.get("asset_feed_spec") or {}
-                    if asset_feed.get("link_urls"):
-                        url = asset_feed["link_urls"][0].get("website_url", "")
+                # Priority 3: Object Story Spec
+                if not url:
+                    url = (creative.get("object_story_spec", {})
+                        .get("link_data", {})
+                        .get("link", ""))
+
+                # 3. PARSE & MATCH
+                if url:
+                    parsed = urlparse(url)
+                    params = parse_qs(parsed.query)
+                    source = params.get("utm_source", [""])[0].lower().strip()
+                    campaign = params.get("utm_campaign", [""])[0].lower().strip()
+
+                    if source and campaign:
+                        # Check against your Supabase dataframe (df)
+                        match = df[(df["UTM_Source"] == source) & (df["UTM_Campaign"] == campaign)]
                         
-                    # Priority 2: Call to Action Value (Direct Ads)
-                    if not url:
-                        url = c_data.get("call_to_action", {}).get("value", {}).get("link", "")
-                        
-                    # Priority 3: Object Story Spec (Standard Post Ads)
-                    if not url:
-                        url = (c_data.get("object_story_spec", {})
-                            .get("link_data", {})
-                            .get("link", ""))
-
-                    if url:
-                        parsed = urlparse(url)
-                        params = parse_qs(parsed.query)
-                        source = params.get("utm_source", [""])[0].lower().strip()
-                        campaign = params.get("utm_campaign", [""])[0].lower().strip()
-
-                        if source and campaign:
-                            # SYNC WITH YOUR DATABASE DATAFRAME
-                            match = df[(df["UTM_Source"] == source) & (df["UTM_Campaign"] == campaign)]
+                        if not match.empty:
+                            if source not in sources_spend:
+                                sources_spend[source] = {}
                             
-                            if not match.empty:
-                                if source not in sources_spend:
-                                    sources_spend[source] = {}
-                                sources_spend[source][campaign] = sources_spend[source].get(campaign, 0) + spend
-                except Exception as e:
-                    print(f"Error processing Creative {cid}: {e}")
+                            # Aggregate spend by source/campaign
+                            sources_spend[source][campaign] = sources_spend[source].get(campaign, 0) + ad_spend
         except Exception as e:
             check_all_tokens = False
             print("Error during token checks or API calls:", e)
