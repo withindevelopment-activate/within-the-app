@@ -769,7 +769,7 @@
     window.addToCartEvent = p => sendTrackingEvent("add_to_cart", p || {});
     window.addToWishlist = pid => sendTrackingEvent("add_to_wishlist", { product_id: pid });
     window.purchaseEvent = p => sendTrackingEvent("purchase", p || {});
-
+    
     // ------------------- Purchase Interception -------------------
     (function interceptPurchaseEvent() {
         let _originalSendPurchaseEvent = window.sendPurchaseEvent || null;
@@ -826,6 +826,27 @@
             },
             configurable: true
         });
+    })();
+
+    (function() {
+        // 1. Store the original function so we don't break Zid's native tracking
+        const originalZidTracking = window.zidPurchaseEventTracking;
+
+        if (typeof originalZidTracking === 'function') {
+            window.zidPurchaseEventTracking = function(win, transactionItems) {
+                console.log("Zid Purchase Detected:", transactionItems);
+
+                // 2. Map Zid data to your existing tracking structure
+                // transactionItems usually contains the order details
+                if (typeof window.sendTrackingEvent === 'function') {
+                    window.sendTrackingEvent("purchase", transactionItems || {});
+                    console.log("zidPurchaseEventTracking data:", transactionItems)
+                }
+
+                // 3. Call the original function so Zid's internal systems still work
+                return originalZidTracking.apply(this, arguments);
+            };
+        }
     })();
 
 })();
