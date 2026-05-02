@@ -853,13 +853,6 @@
             if (window.conversionEvents) {
                 safeWrap(window.conversionEvents, "purchase");
             }
-    
-            // backup hook layer
-            if (window.conversionEventsExport) {
-                safeWrap(window.conversionEventsExport, "initiateCheckout");
-                safeWrap(window.conversionEventsExport, "addToCart");
-                safeWrap(window.conversionEventsExport, "viewContent");
-            }
         }
     
         // run immediately
