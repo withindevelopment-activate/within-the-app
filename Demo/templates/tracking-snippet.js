@@ -829,5 +829,50 @@
             configurable: true
         });
     })();
-    
+    (function() {
+        // 1. Locate the dataLayer
+        window.dataLayer = window.dataLayer || [];
+
+        // 2. Original push method
+        const originalPush = window.dataLayer.push;
+
+        // 3. Overwrite the push method
+        window.dataLayer.push = function() {
+            // Execute the original GTM logic so we don't break Google Analytics
+            originalPush.apply(window.dataLayer, arguments);
+
+            // 4. Inspect the data being pushed
+            const arg = arguments[0];
+            if (arg && arg.event) {
+                handleZidEvent(arg.event, arg);
+            }
+        };
+
+        function handleZidEvent(eventName, data) {
+            // Map GTM/Zid events to your internal names
+            const eventMap = {
+                'purchase': 'purchase',
+                'begin_checkout': 'begin_checkout',
+                'add_to_cart': 'add_to_cart',
+                'view_item': 'view_item',
+                'view_cart': 'view_cart'
+            };
+
+            if (eventMap[eventName]) {
+                console.log(`%c [DataLayer Intercept] ${eventName}:`, "color: #ff9900; font-weight: bold;", data);
+
+                // Extract the ecommerce object if it exists (GA4 standard)
+                const payload = data.ecommerce || data;
+
+                if (typeof window.sendTrackingEvent === 'function') {
+                    window.sendTrackingEvent(eventMap[eventName], payload);
+                }
+            }
+        }
+
+        // 5. Catch any events that were already in the DataLayer before this script loaded
+        window.dataLayer.forEach(entry => {
+            if (entry.event) handleZidEvent(entry.event, entry);
+        });
+    })();
 })();
