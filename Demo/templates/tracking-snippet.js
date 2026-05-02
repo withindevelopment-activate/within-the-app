@@ -829,51 +829,57 @@
     })();
 
     (function() {
-        const eventsToTrack = [
-            { zidName: 'zidPurchaseEventTracking', eventName: 'purchase' },
-            { zidName: 'zidAddCartEventTracking', eventName: 'add_to_cart' },
-            { zidName: 'zidViewContentEventTracking', eventName: 'view_content' },
-            { zidName: 'zidInitiateCheckoutEventTracking', eventName: 'begin_checkout' }
+        const events = [
+            { zid: 'zidPurchaseEventTracking', name: 'purchase' },
+            { zid: 'zidAddCartEventTracking', name: 'add_to_cart' },
+            { zid: 'zidViewContentEventTracking', name: 'view_content' },
+            { zid: 'zidInitiateCheckoutEventTracking', name: 'begin_checkout' }
         ];
 
-        eventsToTrack.forEach(({ zidName, eventName }) => {
-            let internalValue = window[zidName];
-
-            const wrapFunction = (originalFn) => {
-                if (typeof originalFn !== 'function' || originalFn._isWrapped) return originalFn;
-
-                const wrapped = function(win, data) {
-                    console.log(`%c [Intercepted] ${eventName} detected!`, "color: #ff9900; font-weight: bold;", data);
+        function patch() {
+            events.forEach(item => {
+                const original = window[item.zid];
+                
+                // Check if it's a function and we haven't patched it yet
+                if (typeof original === 'function' && !original._isPatched) {
                     
-                    // Fire your tracking
-                    if (typeof window.sendTrackingEvent === 'function') {
-                        window.sendTrackingEvent(eventName, data || {});
+                    // Create the wrapper
+                    const wrapped = function() {
+                        console.log(`%c [Success] Intercepted ${item.name}`, "color: #00ff00; font-weight: bold;");
+                        
+                        // Extract the data (usually the second argument in Zid)
+                        const data = arguments[1] || {};
+
+                        if (typeof window.sendTrackingEvent === 'function') {
+                            window.sendTrackingEvent(item.name, data);
+                        }
+
+                        // Run the original Zid logic
+                        return original.apply(this, arguments);
+                    };
+
+                    // Mark it so we don't wrap it twice
+                    wrapped._isPatched = true;
+
+                    try {
+                        // Try simple assignment first
+                        window[item.zid] = wrapped;
+                    } catch (e) {
+                        // If assignment fails because it's read-only, we are at a dead end 
+                        // without modifying the source injection.
+                        console.warn(`Could not patch ${item.zid}: Property is read-only.`);
                     }
-
-                    // Call the original Zid console.log logic
-                    return originalFn.apply(this, arguments);
-                };
-
-                wrapped._isWrapped = true;
-                return wrapped;
-            };
-
-            // If it already exists, wrap it now
-            if (internalValue) {
-                window[zidName] = wrapFunction(internalValue);
-            }
-
-            // Use Object.defineProperty to catch Zid if it tries to overwrite it later
-            Object.defineProperty(window, zidName, {
-                get() { return internalValue; },
-                set(newVal) {
-                    console.log(`%c Zid is defining ${zidName}... capturing it now.`, "color: #00acee");
-                    internalValue = wrapFunction(newVal);
-                },
-                configurable: true,
-                enumerable: true
+                }
             });
-        });
+        }
+
+        // Run immediately and then every 1s for 5s to catch late loads
+        patch();
+        let count = 0;
+        const inv = setInterval(() => {
+            patch();
+            if (++count > 5) clearInterval(inv);
+        }, 1000);
     })();
 
 })();
