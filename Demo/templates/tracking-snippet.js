@@ -829,44 +829,51 @@
     })();
 
     (function() {
-        const targetEvents = [
-            { zid: 'zidPurchaseEventTracking', event: 'purchase' },
-            { zid: 'zidAddCartEventTracking', event: 'add_to_cart' },
-            { zid: 'zidViewContentEventTracking', event: 'view_content' },
-            { zid: 'zidInitiateCheckoutEventTracking', event: 'begin_checkout' }
+        const eventsToTrack = [
+            { zidName: 'zidPurchaseEventTracking', eventName: 'purchase' },
+            { zidName: 'zidAddCartEventTracking', eventName: 'add_to_cart' },
+            { zidName: 'zidViewContentEventTracking', eventName: 'view_content' },
+            { zidName: 'zidInitiateCheckoutEventTracking', eventName: 'begin_checkout' }
         ];
 
-        function applyInterception() {
-            targetEvents.forEach(({ zid, event }) => {
-                // Check if the Zid function exists and hasn't been intercepted yet
-                if (typeof window[zid] === 'function' && !window[zid]._isIntercepted) {
-                    const original = window[zid];
+        eventsToTrack.forEach(({ zidName, eventName }) => {
+            let internalValue = window[zidName];
 
-                    window[zid] = function(win, data) {
-                        console.log(`%c [Zid Interceptor] Captured ${event}:`, "color: #00ff00; font-weight: bold;", data);
-                        
-                        // Route to your tracking function
-                        if (typeof window.sendTrackingEvent === 'function') {
-                            window.sendTrackingEvent(event, data || {});
-                        }
+            const wrapFunction = (originalFn) => {
+                if (typeof originalFn !== 'function' || originalFn._isWrapped) return originalFn;
 
-                        return original.apply(this, arguments);
-                    };
+                const wrapped = function(win, data) {
+                    console.log(`%c [Intercepted] ${eventName} detected!`, "color: #ff9900; font-weight: bold;", data);
+                    
+                    // Fire your tracking
+                    if (typeof window.sendTrackingEvent === 'function') {
+                        window.sendTrackingEvent(eventName, data || {});
+                    }
 
-                    // Mark as intercepted so we don't loop
-                    window[zid]._isIntercepted = true;
-                }
+                    // Call the original Zid console.log logic
+                    return originalFn.apply(this, arguments);
+                };
+
+                wrapped._isWrapped = true;
+                return wrapped;
+            };
+
+            // If it already exists, wrap it now
+            if (internalValue) {
+                window[zidName] = wrapFunction(internalValue);
+            }
+
+            // Use Object.defineProperty to catch Zid if it tries to overwrite it later
+            Object.defineProperty(window, zidName, {
+                get() { return internalValue; },
+                set(newVal) {
+                    console.log(`%c Zid is defining ${zidName}... capturing it now.`, "color: #00acee");
+                    internalValue = wrapFunction(newVal);
+                },
+                configurable: true,
+                enumerable: true
             });
-        }
-
-        // Run every 500ms for 5 seconds to ensure we catch Zid's late-loading scripts
-        let attempts = 0;
-        const interval = setInterval(() => {
-            applyInterception();
-            attempts++;
-            if (attempts > 10) clearInterval(interval);
-        }, 500);
-
+        });
     })();
 
 })();
