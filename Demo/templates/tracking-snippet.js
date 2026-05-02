@@ -830,43 +830,4 @@
         });
     })();
     
-    (function hookConversionPurchase() {
-    
-        function safeWrap(obj, key) {
-            if (!obj || typeof obj[key] !== "function") return;
-    
-            const original = obj[key];
-    
-            obj[key] = function (...args) {
-                try {
-                    const payload = args?.[0] || {};
-    
-                    sendTrackingEvent("purchase", payload);
-                } catch (e) {}
-    
-                return original.apply(this, args);
-            };
-        }
-    
-        function tryHook() {
-            // primary hook
-            if (window.conversionEvents) {
-                safeWrap(window.conversionEvents, "purchase");
-            }
-        }
-    
-        // run immediately
-        tryHook();
-    
-        // also observe late injection (VERY IMPORTANT in SPA / checkout apps)
-        const observer = new MutationObserver(() => {
-            tryHook();
-        });
-    
-        observer.observe(document.documentElement, {
-            childList: true,
-            subtree: true
-        });
-    
-    })();
 })();
