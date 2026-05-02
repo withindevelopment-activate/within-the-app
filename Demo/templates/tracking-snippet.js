@@ -689,6 +689,8 @@
         flushQueue();
     }
 
+    window.sendTrackingEvent = sendTrackingEvent;
+
     // wrap UI-triggered events in a debounce so rapid button clicks don't
     // send duplicate events or flood the backend within the same user gesture
     const _debouncedAddToCart = debounce((p) => sendTrackingEvent("add_to_cart", p || {}), 300);
