@@ -77,6 +77,6 @@ urlpatterns = [
     path("view_purchase_campaigns/", views.view_purchase_campaigns, name="view_purchase_campaigns"),
     path("update_campaign_products/", views.update_campaign_products, name="update_campaign_products"),
     path("view_platform_contributions/", views.view_platform_contributions, name="view_platform_contributions"),
-    path("bridge/", views.tracking_bridge, name="tracking_bridge"),
+    # path("bridge/", views.tracking_bridge, name="tracking_bridge"),
     path("url-builder/", views.url_builder, name="url_builder"),
     ]
