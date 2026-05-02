@@ -8831,108 +8831,107 @@ def view_platform_contributions(request):
             "platform_count": int(len(result)),
         }
     )
+def get_platform_prefix(source):
+    prefixes = {
+        "meta": "meta_",
+        "instagram": "insta_",
+        "facebook": "fb_",
+        "tiktok": "tiktok_",
+        "snapchat": "snap_",
+        "google": "google_",
+        "x": "x_",
+        "linkedin": "li_",
+        "pinterest": "pin_",
+        "reddit": "rdt_",
+        "whatsapp": "wa_",
+        "telegram": "tg_",
+        "web": "web_"
+    }
+    # Normalize the source to lowercase and get prefix, default to 'web_'
+    platform = str(source or "").lower()
+    return prefixes.get(platform, "web_")
 
-# def get_platform_prefix(source):
-#     prefixes = {
-#         "meta": "meta_",
-#         "instagram": "insta_",
-#         "facebook": "fb_",
-#         "tiktok": "tiktok_",
-#         "snapchat": "snap_",
-#         "google": "google_",
-#         "x": "x_",
-#         "linkedin": "li_",
-#         "pinterest": "pin_",
-#         "reddit": "rdt_",
-#         "whatsapp": "wa_",
-#         "telegram": "tg_",
-#         "web": "web_"
-#     }
-#     # Normalize the source to lowercase and get prefix, default to 'web_'
-#     platform = str(source or "").lower()
-#     return prefixes.get(platform, "web_")
+def tracking_bridge(request):
+    # 1. Capture all incoming parameters
+    params = request.GET.copy()
+    
+    # 2. Extract Target (Dynamic)
+    target_url = params.pop('target', [None])[0] or params.pop('next', [None])[0]
+    
+    if not target_url:
+        # Fallback to the Referer header (where the user just came from)
+        target_url = request.META.get('HTTP_REFERER')
 
-# def tracking_bridge(request):
-#     # 1. Capture all incoming parameters
-#     params = request.GET.copy()
+    # If still no target, we can't redirect safely
+    if not target_url:
+        return HttpResponseBadRequest("Missing destination target.")
     
-#     # 2. Extract Target (Dynamic)
-#     target_url = params.pop('target', [None])[0] or params.pop('next', [None])[0]
+    # 3. Dynamic SleeCID Generation (if not present)
     
-#     if not target_url:
-#         # Fallback to the Referer header (where the user just came from)
-#         target_url = request.META.get('HTTP_REFERER')
-
-#     # If still no target, we can't redirect safely
-#     if not target_url:
-#         return HttpResponseBadRequest("Missing destination target.")
-    
-#     # 3. Dynamic SleeCID Generation (if not present)
-    
-#     sleecid = params.get('sleecid')
-#     if not sleecid:
-#         source = params.get('utm_source', 'web')
+    sleecid = params.get('sleecid')
+    if not sleecid:
+        source = params.get('utm_source', 'web')
         
-#         # 1. Get the mapped prefix (e.g., 'facebook' becomes 'fb_')
-#         prefix = get_platform_prefix(source)
+        # 1. Get the mapped prefix (e.g., 'facebook' becomes 'fb_')
+        prefix = get_platform_prefix(source)
         
-#         # 2. Generate UUID (Python's uuid4 matches your JS requirement)
-#         unique_id = str(uuid.uuid4())
+        # 2. Generate UUID (Python's uuid4 matches your JS requirement)
+        unique_id = str(uuid.uuid4())
         
-#         # 3. Combine to create the final SleeCID
-#         sleecid = f"{prefix}{unique_id}"
-#         params['sleecid'] = sleecid
+        # 3. Combine to create the final SleeCID
+        sleecid = f"{prefix}{unique_id}"
+        params['sleecid'] = sleecid
 
-#     # 4. SAVE TO DATABASE (The "Dummy" Data + Real UTMs)
-#     try:
-#         log_bridge_click(request, params, sleecid, target_url)
-#     except Exception as e:
-#         print(f"[BRIDGE ERROR] Failed to log: {e}")
+    # 4. SAVE TO DATABASE (The "Dummy" Data + Real UTMs)
+    try:
+        log_bridge_click(request, params, sleecid, target_url)
+    except Exception as e:
+        print(f"[BRIDGE ERROR] Failed to log: {e}")
 
-#     # 5. Redirect with full payload
-#     query_string = params.urlencode()
-#     separator = "&" if "?" in target_url else "?"
-#     return redirect(f"{target_url}{separator}{query_string}")
+    # 5. Redirect with full payload
+    query_string = params.urlencode()
+    separator = "&" if "?" in target_url else "?"
+    return redirect(f"{target_url}{separator}{query_string}")
 
-# def log_bridge_click(request, params, sleecid, target_url):
-#     """Stores the bridge click as a dummy 'visit' record."""
+def log_bridge_click(request, params, sleecid, target_url):
+    """Stores the bridge click as a dummy 'visit' record."""
     
-#     # Gather metadata
-#     agent = request.META.get('HTTP_USER_AGENT', '').lower()
-#     ip = get_client_ip(request)
-#     hash_ip = generate_ip_hash(ip) if ip else None
+    # Gather metadata
+    agent = request.META.get('HTTP_USER_AGENT', '').lower()
+    ip = get_client_ip(request)
+    hash_ip = generate_ip_hash(ip) if ip else None
     
-#     # Prepare the row to match your Tracking_Visitors_duplicate schema
-#     bridge_entry = {
-#         "Distinct_ID": int(get_next_id_from_supabase_compatible_all(
-#             name="Tracking_Visitors_duplicate", 
-#             column="Distinct_ID"
-#         )),
-#         "SleecID": sleecid,
-#         "Visitor_ID": f"tmp_{uuid.uuid4().hex[:8]}", # Dummy ID until JS loads
-#         "Session_ID": params.get('session_id', f"sess_{uuid.uuid4().hex[:8]}"),
-#         "Event_Type": "bridge_click",
-#         "UTM_Source": params.get('utm_source', 'bridge').lower(),
-#         "UTM_Medium": params.get('utm_medium', ''),
-#         "UTM_Campaign": params.get('utm_campaign', ''),
-#         "UTM_Term": params.get('utm_term', ''),
-#         "UTM_Content": params.get('utm_content', ''),
-#         "Page_URL": target_url,
-#         "Referrer_Platform": request.META.get('HTTP_REFERER', ''),
-#         "User_Agent": agent,
-#         "Attribution_Type": "bridge_tracking_entry",
-#         "Visited_at": get_uae_current_date(), # Uses your existing helper
-#         "Last_Updated": get_uae_current_date(),
-#         "Event_Details": json.dumps({
-#             "is_bridge": True,
-#             "original_params": dict(params),
-#             "ip_address": hash_ip
-#         })
-#     }
+    # Prepare the row to match your Tracking_Visitors_duplicate schema
+    bridge_entry = {
+        "Distinct_ID": int(get_next_id_from_supabase_compatible_all(
+            name="Tracking_Visitors_duplicate", 
+            column="Distinct_ID"
+        )),
+        "SleecID": sleecid,
+        "Visitor_ID": f"tmp_{uuid.uuid4().hex[:8]}", # Dummy ID until JS loads
+        "Session_ID": params.get('session_id', f"sess_{uuid.uuid4().hex[:8]}"),
+        "Event_Type": "bridge_click",
+        "UTM_Source": params.get('utm_source', 'bridge').lower(),
+        "UTM_Medium": params.get('utm_medium', ''),
+        "UTM_Campaign": params.get('utm_campaign', ''),
+        "UTM_Term": params.get('utm_term', ''),
+        "UTM_Content": params.get('utm_content', ''),
+        "Page_URL": target_url,
+        "Referrer_Platform": request.META.get('HTTP_REFERER', ''),
+        "User_Agent": agent,
+        "Attribution_Type": "bridge_tracking_entry",
+        "Visited_at": get_uae_current_date(), # Uses your existing helper
+        "Last_Updated": get_uae_current_date(),
+        "Event_Details": json.dumps({
+            "is_bridge": True,
+            "original_params": dict(params),
+            "ip_address": hash_ip
+        })
+    }
 
-#     # Use your existing batch insert helper
-#     batch_insert_to_supabase(pd.DataFrame([bridge_entry]), "Tracking_Visitors_duplicate")
-#     print(f"[BRIDGE LOGGED] SleecID: {sleecid} | Source: {bridge_entry['UTM_Source']}")
+    # Use your existing batch insert helper
+    batch_insert_to_supabase(pd.DataFrame([bridge_entry]), "Tracking_Visitors_duplicate")
+    print(f"[BRIDGE LOGGED] SleecID: {sleecid} | Source: {bridge_entry['UTM_Source']}")
 
 def url_builder(request):
     return render(request, "Demo/url_builder.html", {})
