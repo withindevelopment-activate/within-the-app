@@ -829,38 +829,4 @@
             configurable: true
         });
     })();
-
-    (function() {
-    // Helper to ensure data exists
-        const send = (name, data) => {
-            if (typeof window.sendTrackingEvent === 'function') {
-                window.sendTrackingEvent(name, data || {});
-            }
-        };
-
-        // 1. Hook into Start Checkout
-        window.startCheckoutEvent = function(cart) {
-            console.log("Zid Script triggered Start Checkout:", cart);
-            send("begin_checkout", cart);
-        };
-
-        // 2. Hook into Add to Cart
-        window.addToCartEvent = function(product) {
-            console.log("Zid Script triggered Add to Cart:", product);
-            send("add_to_cart", product);
-        };
-
-        // 3. Hook into Purchase
-        // Zid script calls window.purchaseEvent on the success page
-        window.purchaseEvent = function(order) {
-            console.log("Zid Script triggered Purchase:", order);
-            send("purchase", order);
-        };
-
-        // 4. Hook into View Content
-        window.productDetailsEvent = function(product) {
-            console.log("Zid Script triggered View Content:", product);
-            send("view_item", product);
-        };
-    })();
 })();
