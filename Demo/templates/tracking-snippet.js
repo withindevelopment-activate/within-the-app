@@ -829,24 +829,44 @@
     })();
 
     (function() {
-        // 1. Store the original function so we don't break Zid's native tracking
-        const originalZidTracking = window.zidPurchaseEventTracking;
+        const targetEvents = [
+            { zid: 'zidPurchaseEventTracking', event: 'purchase' },
+            { zid: 'zidAddCartEventTracking', event: 'add_to_cart' },
+            { zid: 'zidViewContentEventTracking', event: 'view_content' },
+            { zid: 'zidInitiateCheckoutEventTracking', event: 'begin_checkout' }
+        ];
 
-        if (typeof originalZidTracking === 'function') {
-            window.zidPurchaseEventTracking = function(win, transactionItems) {
-                console.log("Zid Purchase Detected:", transactionItems);
+        function applyInterception() {
+            targetEvents.forEach(({ zid, event }) => {
+                // Check if the Zid function exists and hasn't been intercepted yet
+                if (typeof window[zid] === 'function' && !window[zid]._isIntercepted) {
+                    const original = window[zid];
 
-                // 2. Map Zid data to your existing tracking structure
-                // transactionItems usually contains the order details
-                if (typeof window.sendTrackingEvent === 'function') {
-                    window.sendTrackingEvent("purchase", transactionItems || {});
-                    console.log("zidPurchaseEventTracking data:", transactionItems)
+                    window[zid] = function(win, data) {
+                        console.log(`%c [Zid Interceptor] Captured ${event}:`, "color: #00ff00; font-weight: bold;", data);
+                        
+                        // Route to your tracking function
+                        if (typeof window.sendTrackingEvent === 'function') {
+                            window.sendTrackingEvent(event, data || {});
+                        }
+
+                        return original.apply(this, arguments);
+                    };
+
+                    // Mark as intercepted so we don't loop
+                    window[zid]._isIntercepted = true;
                 }
-
-                // 3. Call the original function so Zid's internal systems still work
-                return originalZidTracking.apply(this, arguments);
-            };
+            });
         }
+
+        // Run every 500ms for 5 seconds to ensure we catch Zid's late-loading scripts
+        let attempts = 0;
+        const interval = setInterval(() => {
+            applyInterception();
+            attempts++;
+            if (attempts > 10) clearInterval(interval);
+        }, 500);
+
     })();
 
 })();
