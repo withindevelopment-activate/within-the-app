@@ -22,6 +22,7 @@ urlpatterns = [
 
     path("save_tracking/", views.save_tracking, name="save_tracking"), # Tracking
     path("tracking_snippet.js", views.tracking_snippet, name="tracking_snippet"),
+    path("purchase_snippet.js", views.purchase_snippet, name="purchase_snippet"),
     path("view_tracking/", views.view_tracking, name="view_tracking"),
     
     path('zid/abandoned_carts/', views.abandoned_carts_page, name='abandoned_carts_page'),

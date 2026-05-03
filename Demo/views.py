@@ -4621,6 +4621,10 @@ def save_tracking(request):
 def tracking_snippet(request):
     js_content = render_to_string("tracking-snippet.js")
     return HttpResponse(js_content, content_type="application/javascript")
+
+def purchase_snippet(request):
+    js_content = render_to_string("purchase-snippet.js")
+    return HttpResponse(js_content, content_type="application/javascript")
 ###################################################################################################################3
 ###########################################
 

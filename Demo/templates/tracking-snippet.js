@@ -10,8 +10,8 @@
 
     function getAllCookies() {
         return document.cookie.split("; ").reduce((acc, c) => {
-            const [k, v] = c.split("=");
-            acc[k] = decodeURIComponent(v);
+            const [k, ...rest] = c.split("=");
+            acc[k] = decodeURIComponent(rest.join("="));
             return acc;
         }, {});
     }
@@ -33,7 +33,7 @@
 
     function parseTikTok(tt) {
         if (!tt) return null;
-        return tt.split(".")[0];
+        return tt;
     }
 
     function parsePosthog(cookie) {
@@ -150,6 +150,7 @@
 
     function getPlatformPrefix(platform) {
         const prefixes = {
+            meta: "meta_",
             instagram: "insta_",
             facebook: "fb_",
             tiktok: "tiktok_",
@@ -180,10 +181,9 @@
         return `${prefix}${timestamp}-${randomBits}`;
     }
 
-    const LOCKED_PREFIXES = ["insta_", "fb_", "tiktok_", "snap_"];
-
     function getPrefixStrength(prefix) {
         const strength = {
+            meta_: 100,
             insta_: 100,
             fb_: 100,
             tiktok_: 100,
@@ -239,8 +239,11 @@
     
         return localId;
     }
+    let _cachedPlatformIdentity = null;
+    let _memorySessionId = null;
 
     function getOrCreateDeviceIdentity() {
+        if (_cachedPlatformIdentity) return _cachedPlatformIdentity;
         // PRIVACY SAFETY: Respect "Do Not Track" and "Global Privacy Control"
         const isPrivacyEnabled = navigator.doNotTrack === "1" || navigator.globalPrivacyControl === true;
         
@@ -251,7 +254,7 @@
 
         const params = new URLSearchParams(window.location.search);
 
-        let platform = null;
+        let platform = detectPlatform();
 
         /* 1️⃣ PRIORITY: URL parameter */
         const incomingId = sanitizeDeviceId(params.get("sleecid"));
@@ -261,14 +264,8 @@
         let deviceId = resolveDeviceId(localId, incomingId);
 
         if (!deviceId) {
-            platform = detectPlatform();
             const prefix = getPlatformPrefix(platform);
             deviceId = generateSecureID(prefix);
-        }
-
-        /* Update platform based on final ID */
-        if (!platform) {
-            platform = detectPlatform();
         }
 
         /* Persist */
@@ -291,11 +288,11 @@
 
         // Map platform-specific IDs for easier tracking integration
         const platformMap = {
-            "instagram": "meta_device_id",
-            "facebook": "meta_device_id",
-            "tiktok": "tiktok_device_id",
-            "snapchat": "snapchat_device_id",
-            "google": "google_device_id",
+            instagram: "meta_device_id",
+            facebook: "meta_device_id",
+            tiktok: "tiktok_device_id",
+            snapchat: "snapchat_device_id",
+            google: "google_device_id",
         };
 
         const specificKey = platformMap[platform];
@@ -305,6 +302,7 @@
             localStorage.setItem(specificKey, deviceId);
         }
 
+        _cachedPlatformIdentity = ids;
         return ids;
     }
 
@@ -346,22 +344,36 @@
     //     return fingerprintPromise;
     // }
     // ------------------- Fingerprint End -------------------
+    function generateUUID() {
+        if (typeof crypto !== "undefined" && crypto.randomUUID) {
+            return crypto.randomUUID();
+        }
+        return Date.now().toString(36) + "-" + Math.random().toString(36).substring(2, 15);
+    }
 
     function getOrCreateCookie(name, days = 365) {
         const existing = document.cookie.split('; ').find(row => row.startsWith(name + '='));
         if (existing) return existing.split('=')[1];
-        const id = crypto.randomUUID();
+        const id = generateUUID();
         document.cookie = `${name}=${id}; path=/; max-age=${days * 86400}`;
         return id;
     }
 
     function getOrCreateSessionId() {
-        let sid = sessionStorage.getItem("session_id");
-        if (!sid) {
-            sid = crypto.randomUUID();
-            sessionStorage.setItem("session_id", sid);
+        try {
+            let sid = sessionStorage.getItem("session_id");
+            if (!sid) {
+                sid = generateUUID(); // FIX #7: use safe UUID wrapper
+                sessionStorage.setItem("session_id", sid);
+            }
+            _memorySessionId = sid;
+            return sid;
+        } catch {
+            if (!_memorySessionId) {
+                _memorySessionId = generateUUID();
+            }
+            return _memorySessionId;
         }
-        return sid;
     }
 
     function getUTMParams() {
@@ -416,11 +428,7 @@
         // ---------------------------
         // 2. Get existing cookie
         // ---------------------------
-        const cookies = document.cookie.split("; ").reduce((acc, c) => {
-            const [k, v] = c.split("=");
-            acc[k] = decodeURIComponent(v);
-            return acc;
-        }, {});
+        const cookies = getAllCookies();
 
         let existing = null;
 
@@ -442,7 +450,7 @@
 
         if (!existingSource) {
             shouldOverride = true;
-        } else if (existingSource === "google") {
+        } else if (existingSource === "google" && incomingSource !== "direct") {
             shouldOverride = true;
         } else if (existingSource !== "google" && incomingSource === "google") {
             shouldOverride = false;
@@ -465,19 +473,14 @@
     setUTMCookie();
 
     function getUTMFromCookie() {
-        const name = "track_utms=";
-        const decodedCookie = decodeURIComponent(document.cookie);
-        const ca = decodedCookie.split(';');
+        const cookies = getAllCookies();
         let savedData = null;
 
-        for (let i = 0; i < ca.length; i++) {
-            let c = ca[i].trim();
-            if (c.indexOf(name) == 0) {
-                try {
-                    savedData = JSON.parse(c.substring(name.length, c.length));
-                } catch (e) {
-                    savedData = null;
-                }
+        if (cookies["track_utms"]) {
+            try {
+                savedData = JSON.parse(cookies["track_utms"]);
+            } catch {
+                savedData = null;
             }
         }
 
@@ -586,10 +589,52 @@
 
     // ------------------- Tracking -------------------
     const BACKEND_URL = "https://testing-within.onrender.com";
+    const _eventQueue = [];
+    let _isFlushing = false;
 
-    
-    function sendTrackingEvent(type, details = {}) {
-        setUTMCookie();
+    function flushQueue() {
+        if (_isFlushing || _eventQueue.length === 0) return;
+        _isFlushing = true;
+
+        const item = _eventQueue[0];
+
+        fetch(`${BACKEND_URL}/save_tracking/`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(item.payload)
+        })
+        .then(res => {
+            console.log("Tracking response:", res.status);
+            _eventQueue.shift(); // remove successfully sent item
+            _isFlushing = false;
+            if (_eventQueue.length > 0) flushQueue(); // continue draining
+        })
+        .catch(err => {
+            console.error("Tracking error:", err);
+            item.attempts = (item.attempts || 0) + 1;
+            _isFlushing = false;
+
+            if (item.attempts >= MAX_RETRIES) {
+                console.warn("Dropping event after", MAX_RETRIES, "failed attempts:", item.payload.event_type);
+                _eventQueue.shift();
+                if (_eventQueue.length > 0) flushQueue();
+                return;
+            }
+
+            const delay = Math.pow(2, item.attempts - 1) * 1000;
+            setTimeout(flushQueue, delay);
+        });
+    }
+
+    function debounce(fn, wait) {
+        let timer;
+        return function (...args) {
+            clearTimeout(timer);
+            timer = setTimeout(() => fn.apply(this, args), wait);
+        };
+    }
+
+    function buildPayload(type, details) {
         const urlUtms = getUTMParams();
         const cookieUtms = getUTMFromCookie();
         const utm = urlUtms.utm_source ? urlUtms : cookieUtms;
@@ -598,12 +643,10 @@
         const inferred = inferSource(utm, referrer);
         const firstTouchContext = identifyFirstTouch();
 
-        // const fingerprint = await getFingerprint(); 
-
-        const platformIdentity = getOrCreateDeviceIdentity() || {};
+        const identity = getOrCreateDeviceIdentity() || {};
         const cookieIntel = extractAnalyticsCookies();
 
-        const payload = {
+        return {
             visitor_id: getOrCreateCookie("visitor_id"),
             cookie_id: cookieIntel,
             session_id: getOrCreateSessionId(),
@@ -614,16 +657,12 @@
             event_type: type,
             event_details: details,
 
-            // fingerprint_id: fingerprint?.visitor_id || null,
-            // fingerprint_confidence: fingerprint?.confidence || null,
-
-            device_id: platformIdentity.device_id,
-            sleecid: platformIdentity.device_id,
-
-            meta_device_id: platformIdentity.meta_device_id,
-            tiktok_device_id: platformIdentity.tiktok_device_id,
-            snapchat_device_id: platformIdentity.snapchat_device_id,
-            google_device_id: platformIdentity.google_device_id,
+            device_id: identity.device_id,
+            sleecid: identity.device_id,
+            meta_device_id: identity.meta_device_id,
+            tiktok_device_id: identity.tiktok_device_id,
+            snapchat_device_id: identity.snapchat_device_id,
+            google_device_id: identity.google_device_id,
 
             utm_params: utm,
             traffic_source: inferred,
@@ -641,95 +680,24 @@
             visitor_info: getVisitorInfo(),
             timestamp: new Date().toISOString()
         };
-
-        fetch(`${BACKEND_URL}/save_tracking/`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-        })
-        .then(res => {
-            console.log("Tracking response:", res.status);
-            return res.text();
-        })
-        .then(data => console.log("Response body:", data))
-        .catch(err => console.error("Tracking error:", err));
     }
 
+    function sendTrackingEvent(type, details = {}) {
+        const payload = buildPayload(type, details);
+
+        _eventQueue.push({ payload, attempts: 0 });
+        flushQueue();
+    }
+
+    window.sendTrackingEvent = sendTrackingEvent;
+
+    const _debouncedAddToCart = debounce((p) => sendTrackingEvent("add_to_cart", p || {}), 300);
+    const _debouncedAddToWishlist = debounce((pid) => sendTrackingEvent("add_to_wishlist", { product_id: pid }), 300);
 
     // ------------------- Base Events -------------------
     window.addEventListener("load", () => sendTrackingEvent("pageview"));
     window.addToCartEvent = p => sendTrackingEvent("add_to_cart", p || {});
     window.addToWishlist = pid => sendTrackingEvent("add_to_wishlist", { product_id: pid });
     window.purchaseEvent = p => sendTrackingEvent("purchase", p || {});
-
-    window.purchaseEvent = (order) => {
-        // 1. Extract the currency (the function needs this for the items)
-        const currency = order.currency?.code || "AED";
-
-        // 2. Use the existing function to get the clean array of items
-        const items = getOrderItems(order, currency);
-
-        // 3. Prepare the purchase details payload
-        const purchaseDetails = {
-            order_id: order.id,
-            total_value: roundPrice(order.total || 0),
-            subtotal: getSubTotalWithoutVAT(order),
-            tax: getOrderVat(order),
-            shipping: getOrderShipping(order),
-            coupon: getOrderCoupon(order),
-            currency: currency,
-            items: items // This is the data from getOrderItems
-        };
-
-        // 4. Send it to your Render backend
-        console.log("purchase Details",purchaseDetails)
-        sendTrackingEvent("purchase", purchaseDetails);
-    };
-
-    (function() {
-        const dl = window.gtmDataLayer || window.dataLayer || [];
-        const processedEvents = new Set(); // To prevent duplicates
-
-        function extractData(obj) {
-            if (!obj || !obj.event) return;
-
-            // Use GTM's unique ID to ensure we don't process the same push twice
-            const eventKey = obj['gtm.uniqueEventId'] || JSON.stringify(obj);
-            if (processedEvents.has(eventKey)) return;
-            processedEvents.add(eventKey);
-
-            const eventMap = {
-                'purchase': 'purchase',
-                'begin_checkout': 'begin_checkout',
-                'initiate_checkout': 'begin_checkout',
-                'view_cart': 'view_cart',
-                'add_shipping_info': 'add_shipping_info',
-                'add_payment_info': 'add_payment_info',
-                'add_to_cart': 'add_to_cart'
-            };
-
-            const targetEvent = eventMap[obj.event];
-            if (targetEvent) {
-                // Priority: obj.ecommerce (GA4 Standard) -> obj.cart -> the object itself
-                const payload = obj.ecommerce || obj.cart || obj;
-                
-                console.log(`%c [Zid Captured: ${targetEvent}]`, "color: #00abff; font-weight: bold;", payload);
-                
-                if (typeof window.sendTrackingEvent === 'function') {
-                    console.log("Send GTM test",targetEvent, payload)
-                    // window.sendTrackingEvent(targetEvent, payload);
-                }
-            }
-        }
-
-        // 1. Process existing events
-        dl.forEach(extractData);
-
-        // 2. Intercept future events
-        const originalPush = dl.push;
-        dl.push = function() {
-            originalPush.apply(dl, arguments);
-            extractData(arguments[0]);
-        };
-    })();
+    
 })();
