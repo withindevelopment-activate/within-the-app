@@ -663,55 +663,11 @@
     window.purchaseEvent = p => sendTrackingEvent("purchase", p || {});
 
     // ------------------- Purchase Interception -------------------
-    (function interceptPurchaseEvent() {
-        if (typeof window.sendPurchaseEvent !== "function") return;
-        const originalSendPurchaseEvent = window.sendPurchaseEvent;
-
-        window.sendPurchaseEvent = function (payload) {
-            try {
-                const order = payload?.order || (payload && payload.id ? payload : null);
-
-                if (order && order.id) {
-                    const orderInfo = {
-                        order_id: order.id,
-                        customer_id: window.customer?.id || null,
-                        customer_name: window.customer?.name || null,
-                        customer_email: window.customer?.email || null,
-                        customer_mobile: window.customer?.mobile || null,
-                        order_total: Number(order.order_total) || null,
-                        order_total_string: order.order_total_string || null,
-                        currency: order.currency_code || "SAR",
-                        issue_date: order.issue_date || null,
-                        payment_method_name: order.payment?.method?.name || null,
-                        products: Array.isArray(order.products)
-                            ? order.products.map(p => ({
-                                  product_id: p.id || p.product_id || null,
-                                  name: p.name || null,
-                                  sku: p.sku || null,
-                                  price: Number(p.sale_price ?? p.price) || null,
-                                  quantity: Number(p.quantity) || 1
-                              }))
-                            : [],
-                        products_count:
-                            order.products_count ||
-                            (Array.isArray(order.products) ? order.products.length : 0)
-                    };
-
-                    sendTrackingEvent("purchase", orderInfo);
-                }
-
-            } catch (err) {
-                // silently fail
-            }
-
-            return originalSendPurchaseEvent.apply(this, arguments);
-        };
-    })();
     (function() {
         // We "wrap" the Zid function to catch the transactionItems argument
-        const originalZidPurchase = window.zidPurchaseEventTracking;
+        const originalZidPurchase = window.purchaseEvent;
 
-        window.zidPurchaseEventTracking = function(window, transactionItems) {
+        window.purchaseEvent = function(transactionItems) {
             console.log("%c [Intercepted Zid Purchase Data]", "color: #2ecc71; font-weight: bold;");
             
             // 1. Log the data to verify what's inside
@@ -724,7 +680,7 @@
 
             // 4. Execute the original Zid function so we don't break platform logic
             if (typeof originalZidPurchase === 'function') {
-                return originalZidPurchase(window, transactionItems);
+                return originalZidPurchase(transactionItems);
             }
         };
     })();
