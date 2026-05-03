@@ -680,15 +680,8 @@
                     // Safety check: ensure transactionItems isn't null
                     const data = transactionItems || {};
 
-                    const purchaseData = {
-                        transaction_id: data.id || data.order_id || 'unknown',
-                        value: data.total || data.value || 0,
-                        currency: data.currency || 'AED',
-                        items: data.items || data.products || []
-                    };
-
                     if (typeof window.sendTrackingEvent === 'function') {
-                        window.sendTrackingEvent("purchase", purchaseData);
+                        window.sendTrackingEvent("purchase", data);
                     }
 
                     // Call the actual function Zid just tried to set
