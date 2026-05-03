@@ -664,25 +664,38 @@
 
     // ------------------- Purchase Interception -------------------
     (function() {
-        // We "wrap" the Zid function to catch the transactionItems argument
-        const originalZidPurchase = window.purchaseEvent;
+        let _originalZidPurchase = null;
 
-        window.purchaseEvent = function(transactionItems) {
-            console.log("%c [Intercepted Zid Purchase Data]", "color: #2ecc71; font-weight: bold;");
-            
-            // 1. Log the data to verify what's inside
-            console.dir(transactionItems);
+        Object.defineProperty(window, 'zidPurchaseEventTracking', {
+            configurable: true,
+            enumerable: true,
+            get: function() {
+                return _originalZidPurchase;
+            },
+            set: function(newValue) {
+                // This runs the moment Zid tries to define the function
+                _originalZidPurchase = function(windowContext, transactionItems) {
+                    console.log("%c [Intercepted Zid Purchase Data]", "color: #2ecc71; font-weight: bold;");
+                    
+                    // Safety check: ensure transactionItems isn't null
+                    const data = transactionItems || {};
 
-            // 3. Send to your tracking dispatcher
-            if (typeof window.sendTrackingEvent === 'function') {
-                window.sendTrackingEvent("purchase", transactionItems);
+                    const purchaseData = {
+                        transaction_id: data.id || data.order_id || 'unknown',
+                        value: data.total || data.value || 0,
+                        currency: data.currency || 'AED',
+                        items: data.items || data.products || []
+                    };
+
+                    if (typeof window.sendTrackingEvent === 'function') {
+                        window.sendTrackingEvent("purchase", purchaseData);
+                    }
+
+                    // Call the actual function Zid just tried to set
+                    return newValue(windowContext, transactionItems);
+                };
             }
-
-            // 4. Execute the original Zid function so we don't break platform logic
-            if (typeof originalZidPurchase === 'function') {
-                return originalZidPurchase(transactionItems);
-            }
-        };
+        });
     })();
 
 })();
