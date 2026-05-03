@@ -663,4 +663,18 @@
     window.purchaseEvent = p => sendTrackingEvent("purchase", p || {});
     window.zidPurchaseEventTracking = p => sendTrackingEvent("purchase", p || {});
 
+
+    window.addEventListener('zid-checkout-confirm', function (e) {
+        const order = e.detail; // Zid provides the full order data here
+        consolel.log("Purchase done by zid")
+        if (!order) return;
+
+        // Send to your Render backend
+        sendTrackingEvent("purchase", order);
+        
+        // Keep your debug log synced
+        if (typeof debugLog === 'function') {
+            debugLog("purchase_captured_zid", formattedDetails, ["Render_Backend"]);
+        }
+    });
 })();
