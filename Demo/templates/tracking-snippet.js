@@ -662,33 +662,29 @@
     window.addToWishlist = pid => sendTrackingEvent("add_to_wishlist", { product_id: pid });
     window.purchaseEvent = p => sendTrackingEvent("purchase", p || {});
 
-    (function () {
-        const originalSetter = Object.getOwnPropertyDescriptor(window, "purchaseEvent");
+    window.purchaseEvent = (order) => {
+        // 1. Extract the currency (the function needs this for the items)
+        const currency = order.currency?.code || "AED";
 
-        let internalHandler = null;
+        // 2. Use the existing function to get the clean array of items
+        const items = getOrderItems(order, currency);
 
-        Object.defineProperty(window, "purchaseEvent", {
-            configurable: true,
-            set(fn) {
-                internalHandler = function (data) {
-                    try {
-                        // YOUR TRACKING
-                        sendTrackingEvent("purchase", data);
-                    } catch (e) {
-                        console.error("Custom purchase tracking failed", e);
-                    }
+        // 3. Prepare the purchase details payload
+        const purchaseDetails = {
+            order_id: order.id,
+            total_value: roundPrice(order.total || 0),
+            subtotal: getSubTotalWithoutVAT(order),
+            tax: getOrderVat(order),
+            shipping: getOrderShipping(order),
+            coupon: getOrderCoupon(order),
+            currency: currency,
+            items: items // This is the data from getOrderItems
+        };
 
-                    // CALL ORIGINAL
-                    if (typeof fn === "function") {
-                        fn(data);
-                    }
-                };
-            },
-            get() {
-                return internalHandler;
-            }
-        });
-    })();
+        // 4. Send it to your Render backend
+        console.log("purchase Details",purchaseDetails)
+        sendTrackingEvent("purchase", purchaseDetails);
+    };
 
     (function() {
         const dl = window.gtmDataLayer || window.dataLayer || [];
