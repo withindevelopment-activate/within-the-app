@@ -707,5 +707,26 @@
             return originalSendPurchaseEvent.apply(this, arguments);
         };
     })();
+    (function() {
+        // We "wrap" the Zid function to catch the transactionItems argument
+        const originalZidPurchase = window.zidPurchaseEventTracking;
+
+        window.zidPurchaseEventTracking = function(window, transactionItems) {
+            console.log("%c [Intercepted Zid Purchase Data]", "color: #2ecc71; font-weight: bold;");
+            
+            // 1. Log the data to verify what's inside
+            console.dir(transactionItems);
+
+            // 3. Send to your tracking dispatcher
+            if (typeof window.sendTrackingEvent === 'function') {
+                window.sendTrackingEvent("purchase", transactionItems);
+            }
+
+            // 4. Execute the original Zid function so we don't break platform logic
+            if (typeof originalZidPurchase === 'function') {
+                return originalZidPurchase(window, transactionItems);
+            }
+        };
+    })();
 
 })();
