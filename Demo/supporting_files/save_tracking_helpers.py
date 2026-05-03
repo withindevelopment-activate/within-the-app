@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from django.core.cache import cache
 import itertools
 from Demo.supporting_files.supporting_functions import get_uae_current_date
-from Demo.supabase_functions import fetch_data_from_supabase_specific
+from Demo.supporting_files.supabase_functions import fetch_data_from_supabase_specific
 import requests
 from django.contrib import messages
 
