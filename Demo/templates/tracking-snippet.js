@@ -661,20 +661,79 @@
     window.addToCartEvent = p => sendTrackingEvent("add_to_cart", p || {});
     window.addToWishlist = pid => sendTrackingEvent("add_to_wishlist", { product_id: pid });
     window.purchaseEvent = p => sendTrackingEvent("purchase", p || {});
-    window.zidPurchaseEventTracking = p => sendTrackingEvent("purchase", p || {});
 
+    (function () {
+        const originalSetter = Object.getOwnPropertyDescriptor(window, "purchaseEvent");
 
-    window.addEventListener('zid-checkout-confirm', function (e) {
-        const order = e.detail; // Zid provides the full order data here
-        consolel.log("Purchase done by zid")
-        if (!order) return;
+        let internalHandler = null;
 
-        // Send to your Render backend
-        sendTrackingEvent("purchase", order);
-        
-        // Keep your debug log synced
-        if (typeof debugLog === 'function') {
-            debugLog("purchase_captured_zid", formattedDetails, ["Render_Backend"]);
+        Object.defineProperty(window, "purchaseEvent", {
+            configurable: true,
+            set(fn) {
+                internalHandler = function (data) {
+                    try {
+                        // YOUR TRACKING
+                        sendTrackingEvent("purchase", data);
+                    } catch (e) {
+                        console.error("Custom purchase tracking failed", e);
+                    }
+
+                    // CALL ORIGINAL
+                    if (typeof fn === "function") {
+                        fn(data);
+                    }
+                };
+            },
+            get() {
+                return internalHandler;
+            }
+        });
+    })();
+
+    (function() {
+        const dl = window.gtmDataLayer || window.dataLayer || [];
+        const processedEvents = new Set(); // To prevent duplicates
+
+        function extractData(obj) {
+            if (!obj || !obj.event) return;
+
+            // Use GTM's unique ID to ensure we don't process the same push twice
+            const eventKey = obj['gtm.uniqueEventId'] || JSON.stringify(obj);
+            if (processedEvents.has(eventKey)) return;
+            processedEvents.add(eventKey);
+
+            const eventMap = {
+                'purchase': 'purchase',
+                'begin_checkout': 'begin_checkout',
+                'initiate_checkout': 'begin_checkout',
+                'view_cart': 'view_cart',
+                'add_shipping_info': 'add_shipping_info',
+                'add_payment_info': 'add_payment_info',
+                'add_to_cart': 'add_to_cart'
+            };
+
+            const targetEvent = eventMap[obj.event];
+            if (targetEvent) {
+                // Priority: obj.ecommerce (GA4 Standard) -> obj.cart -> the object itself
+                const payload = obj.ecommerce || obj.cart || obj;
+                
+                console.log(`%c [Zid Captured: ${targetEvent}]`, "color: #00abff; font-weight: bold;", payload);
+                
+                if (typeof window.sendTrackingEvent === 'function') {
+                    console.log("Send GTM test",targetEvent, payload)
+                    // window.sendTrackingEvent(targetEvent, payload);
+                }
+            }
         }
-    });
+
+        // 1. Process existing events
+        dl.forEach(extractData);
+
+        // 2. Intercept future events
+        const originalPush = dl.push;
+        dl.push = function() {
+            originalPush.apply(dl, arguments);
+            extractData(arguments[0]);
+        };
+    })();
 })();
