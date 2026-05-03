@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from django.core.cache import cache
 import itertools
 from Demo.supporting_files.supporting_functions import get_uae_current_date
+from Demo.supabase_functions import fetch_data_from_supabase_specific
 import requests
 from django.contrib import messages
 
@@ -341,5 +342,78 @@ def backfill_missing_utms(
 
 
 ####################################
-##################### Helpers in the Main Save Tracking function
+##################### BOOSTING ACCURACY MEASUREMENT 1 --> FETCHING OLD CANDIDATE ROWS, FINDING HIGHEST SCORE AND MERGIN WITH HISTORY ROWS IF APPLICABLE -- 
+from datetime import timedelta
+from dateutil import parser
 
+def get_time_minus_minutes(minutes: int, base_time=None):
+    base_time = base_time or get_uae_current_datetime()
+
+    if isinstance(base_time, str):
+        base_time = parser.parse(base_time)
+
+    return (base_time - timedelta(minutes=minutes)).isoformat()
+
+
+def get_uae_current_datetime():
+    """
+    MUST return ISO format for Supabase compatibility
+    """
+    from datetime import datetime
+    import pytz
+
+    tz = pytz.timezone("Asia/Dubai")
+    return datetime.now(tz).isoformat()
+
+def get_identity_candidates(ip_hash, timezone, resolution):
+    now = get_uae_current_datetime()  
+    past = get_time_minus_minutes(30)
+
+    filters = {
+        "Visited_at": ("between", past, now),
+        "Timezone": ("eq", timezone),
+        "Screen_Resolution": ("eq", resolution),
+        "Client_IP": ("eq", ip_hash),
+    }
+
+    df = fetch_data_from_supabase_specific(
+        table_name="Tracking_Visitors_duplicate",
+        filters=filters,
+        order_by="Visited_at",
+        limit=300
+    )
+
+    return df.to_dict(orient="records")
+
+def score_identity_candidate(row, incoming):
+    """
+    Assign a confidence score for identity match
+    """
+    score = 0
+
+    # Strong signal
+    if row.get("Client_IP") == incoming.get("Client_IP"):
+        score += 30
+
+    # Device similarity
+    if row.get("User_Agent") == incoming.get("User_Agent"):
+        score += 20
+
+    if row.get("Platform") == incoming.get("Platform"):
+        score += 10
+
+    if row.get("Timezone") == incoming.get("Timezone"):
+        score += 10
+
+    if row.get("Screen_Resolution") == incoming.get("Screen_Resolution"):
+        score += 10
+
+    # Time proximity
+    try:
+        delta = abs((row.get("Visited_at") - incoming.get("Visited_at")).total_seconds())
+        if delta < 600:  # within 10 minutes
+            score += 15
+    except:
+        pass
+
+    return score
