@@ -661,40 +661,6 @@
     window.addToCartEvent = p => sendTrackingEvent("add_to_cart", p || {});
     window.addToWishlist = pid => sendTrackingEvent("add_to_wishlist", { product_id: pid });
     window.purchaseEvent = p => sendTrackingEvent("purchase", p || {});
-
-    // ------------------- Purchase Interception -------------------
-    (function() {
-        const intercept = (transactionItems) => {
-            console.log("%c [Captured Purchase]", "color: #2ecc71; font-weight: bold;", transactionItems);
-            if (typeof window.sendTrackingEvent === 'function') {
-                window.sendTrackingEvent("purchase", transactionItems || {});
-            }
-        };
-
-        // 1. If the function ALREADY exists, wrap it immediately
-        if (typeof window.zidPurchaseEventTracking === 'function') {
-            const original = window.zidPurchaseEventTracking;
-            window.zidPurchaseEventTracking = function(win, items) {
-                intercept(items);
-                return original(win, items);
-            };
-        } 
-        // 2. If it DOESN'T exist yet, poll for it (Every 500ms)
-        else {
-            let attempts = 0;
-            const poll = setInterval(() => {
-                attempts++;
-                if (typeof window.zidPurchaseEventTracking === 'function') {
-                    const original = window.zidPurchaseEventTracking;
-                    window.zidPurchaseEventTracking = function(win, items) {
-                        intercept(items);
-                        return original(win, items);
-                    };
-                    clearInterval(poll);
-                }
-                if (attempts > 20) clearInterval(poll); // Stop looking after 10 seconds
-            }, 500);
-        }
-    })();
+    window.zidPurchaseEventTracking = p => sendTrackingEvent("purchase", p || {});
 
 })();
