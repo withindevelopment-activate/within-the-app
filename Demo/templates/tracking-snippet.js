@@ -664,31 +664,37 @@
 
     // ------------------- Purchase Interception -------------------
     (function() {
-        let _originalZidPurchase = null;
-
-        Object.defineProperty(window, 'zidPurchaseEventTracking', {
-            configurable: true,
-            enumerable: true,
-            get: function() {
-                return _originalZidPurchase;
-            },
-            set: function(newValue) {
-                // This runs the moment Zid tries to define the function
-                _originalZidPurchase = function(windowContext, transactionItems) {
-                    console.log("%c [Intercepted Zid Purchase Data]", "color: #2ecc71; font-weight: bold;");
-                    
-                    // Safety check: ensure transactionItems isn't null
-                    const data = transactionItems || {};
-
-                    if (typeof window.sendTrackingEvent === 'function') {
-                        window.sendTrackingEvent("purchase", data);
-                    }
-
-                    // Call the actual function Zid just tried to set
-                    return newValue(windowContext, transactionItems);
-                };
+        const intercept = (transactionItems) => {
+            console.log("%c [Captured Purchase]", "color: #2ecc71; font-weight: bold;", transactionItems);
+            if (typeof window.sendTrackingEvent === 'function') {
+                window.sendTrackingEvent("purchase", transactionItems || {});
             }
-        });
+        };
+
+        // 1. If the function ALREADY exists, wrap it immediately
+        if (typeof window.zidPurchaseEventTracking === 'function') {
+            const original = window.zidPurchaseEventTracking;
+            window.zidPurchaseEventTracking = function(win, items) {
+                intercept(items);
+                return original(win, items);
+            };
+        } 
+        // 2. If it DOESN'T exist yet, poll for it (Every 500ms)
+        else {
+            let attempts = 0;
+            const poll = setInterval(() => {
+                attempts++;
+                if (typeof window.zidPurchaseEventTracking === 'function') {
+                    const original = window.zidPurchaseEventTracking;
+                    window.zidPurchaseEventTracking = function(win, items) {
+                        intercept(items);
+                        return original(win, items);
+                    };
+                    clearInterval(poll);
+                }
+                if (attempts > 20) clearInterval(poll); // Stop looking after 10 seconds
+            }, 500);
+        }
     })();
 
 })();
