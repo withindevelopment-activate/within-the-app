@@ -9058,7 +9058,10 @@ def view_purchase_campaigns(request):
                     "creative{id,url_tags,object_story_spec,asset_feed_spec,call_to_action},"
                     f"insights.time_range({time_range}){{spend}}"
                 ),
-                "limit": 100
+                "filtering": [
+                    {"field": "effective_status", "operator": "IN", "value": ["ACTIVE","PAUSED", "PENDING_REVIEW", "PREAPPROVED"]},
+                ],
+                "limit": 1000
             }
 
             # 2. EXECUTE CALL & PROCESS
