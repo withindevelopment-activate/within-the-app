@@ -9058,7 +9058,7 @@ def view_purchase_campaigns(request):
                     "creative{id,url_tags,object_story_spec,asset_feed_spec,call_to_action},"
                     f"insights.time_range({time_range}){{spend}}"
                 ),
-                "limit": 200
+                "limit": 100
             }
 
             # 2. EXECUTE CALL & PROCESS
