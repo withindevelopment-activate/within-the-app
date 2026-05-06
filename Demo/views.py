@@ -8951,20 +8951,26 @@ def view_purchase_campaigns(request):
                 if not match.empty:
                     creative_stats = snapchat_api_call(request, f"creatives/{utm_ad_snapchat['id']}/stats", params=snap_params)
                     raw_stats_list = creative_stats.get("timeseries_stats", [])
-                    print(f"[Purchase Campaigns] Retrieved stats for Snapchat creative {utm_ad_snapchat['id']}: {raw_stats_list}")
-                    if raw_stats_list:
-                        inner_stats = raw_stats_list[0].get("timeseries_stat", [])
+                    
+                    if raw_stats_list and isinstance(raw_stats_list, list):
+                        ts_stat_container = raw_stats_list[0].get("timeseries_stat", {})
                         
-                        total_micros = sum(
-                            day.get("stats", {}).get("spend", 0) 
-                            for day in inner_stats
-                        )
+                        inner_stats = ts_stat_container.get("timeseries", [])
                         
-                        # 3. Currency Conversion (Using your 3.79 AED/USD multiplier)
-                        spend = (total_micros / 1_000_000) * 3.79
-                        
-                        camp_key = utm_ad_snapchat.get("utm_campaign", "missing_campaign")
-                        sources_spend["snapchat"][camp_key] = sources_spend["snapchat"].get(camp_key, 0) + spend
+                        if inner_stats:
+                            total_micros = sum(
+                                int(day.get("stats", {}).get("spend", 0)) 
+                                for day in inner_stats
+                            )
+                            
+                            spend = (total_micros / 1_000_000.0) * 3.79
+                            
+                            camp_key = utm_ad_snapchat.get("utm_campaign", "missing_campaign")
+                            
+                            if "snapchat" not in sources_spend:
+                                sources_spend["snapchat"] = {}
+                                
+                            sources_spend["snapchat"][camp_key] = sources_spend["snapchat"].get(camp_key, 0) + spend
 
             # TikTok
 
