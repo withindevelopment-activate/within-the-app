@@ -8872,12 +8872,7 @@ def view_purchase_campaigns(request):
     snap_end_time = to_dt.isoformat(timespec="milliseconds") + 'Z'
     
     #Snapchat 
-    snap_params = {
-        "fields": "impressions,spend,conversion_purchases,conversion_purchases_value",
-        "granularity": "DAY",
-        "start_time": snap_start_time,
-        "end_time": snap_end_time,
-    }
+    
     sources_spend = {"snapchat": {}, "tiktok": {}, "meta": {}}
 
     check_all_tokens = True
@@ -8946,23 +8941,30 @@ def view_purchase_campaigns(request):
                 ]
                 print(f"[Purchase Campaigns] Matching Snapchat creative {utm_ad_snapchat['id']} against log: found {len(match)} matches")
                 
+                snap_params = {
+                    "fields": "spend,purchases,purchase_value",
+                    "granularity": "DAY",
+                    "start_time": snap_start_time,
+                    "end_time": snap_end_time,
+                }
 
                 if not match.empty:
                     creative_stats = snapchat_api_call(request, f"creatives/{utm_ad_snapchat['id']}/stats", params=snap_params)
-                    raw_creatives_stats = creative_stats.get("timeseries_stats", [])
-                    print("[Purchase Campaigns] Raw creatives stats:", creative_stats)
-
-                    creative_stats_dict = raw_creatives_stats[0] if raw_creatives_stats else {}
-                    creative_timeseries = creative_stats_dict.get("timeseries_stat", [])
-                    print("[Purchase Campaigns] Creative timeseries:", creative_timeseries)
-                    total_micros = sum(
-                        day.get("stats", {}).get("spend", 0)
-                        for day in creative_timeseries
-                    )
-                    spend = total_micros / 1_000_000 * 3.79
-
-                    camp_key = utm_ad_snapchat.get("utm_campaign", "missing_campaign")
-                    sources_spend["snapchat"][camp_key] = sources_spend["snapchat"].get(camp_key, 0) + spend
+                    raw_stats_list = creative_stats.get("timeseries_stats", [])
+                    print(f"[Purchase Campaigns] Retrieved stats for Snapchat creative {utm_ad_snapchat['id']}: {raw_stats_list}")
+                    if raw_stats_list:
+                        inner_stats = raw_stats_list[0].get("timeseries_stat", [])
+                        
+                        total_micros = sum(
+                            day.get("stats", {}).get("spend", 0) 
+                            for day in inner_stats
+                        )
+                        
+                        # 3. Currency Conversion (Using your 3.79 AED/USD multiplier)
+                        spend = (total_micros / 1_000_000) * 3.79
+                        
+                        camp_key = utm_ad_snapchat.get("utm_campaign", "missing_campaign")
+                        sources_spend["snapchat"][camp_key] = sources_spend["snapchat"].get(camp_key, 0) + spend
 
             # TikTok
 
