@@ -8868,8 +8868,8 @@ def view_purchase_campaigns(request):
         from_dt, to_dt = to_dt, from_dt
 
     # Attach timezone offset instead of Z
-    snap_start_time = from_dt.isoformat(timespec="milliseconds") + 'Z'
-    snap_end_time = to_dt.isoformat(timespec="milliseconds") + 'Z'
+    snap_start_time = from_dt.isoformat(timespec="milliseconds")
+    snap_end_time = to_dt.isoformat(timespec="milliseconds")
     
     #Snapchat 
     
@@ -8942,7 +8942,7 @@ def view_purchase_campaigns(request):
                 print(f"[Purchase Campaigns] Matching Snapchat creative {utm_ad_snapchat['id']} against log: found {len(match)} matches")
                 
                 snap_params = {
-                    "fields": "spend,purchases,purchase_value",
+                    "fields": "spend,conversion_purchases_value,conversion_purchases",
                     "granularity": "DAY",
                     "start_time": snap_start_time,
                     "end_time": snap_end_time,
