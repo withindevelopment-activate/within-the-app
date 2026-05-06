@@ -5688,6 +5688,10 @@ def snapchat_api_call(request, endpoint, method="GET", params=None, data=None, j
             raise ValueError(f"Unsupported HTTP method: {method}")
 
         response.raise_for_status()
+        if response.raise_for_status() == 401:
+            return redirect("Demo:snapchat_login")
+        elif response.raise_for_status() != 200:
+            return messages.error(request, f"API error {response.status_code} on {endpoint}: {response.text}")
         return response.json()
 
     except requests.exceptions.RequestException as e:
@@ -8986,6 +8990,11 @@ def view_purchase_campaigns(request):
             headers = {"Access-Token": tiktok_access_token}
 
             resp = requests.get(url, headers=headers, params=Tiktok_params)
+            if resp.status_code == 401:
+                return redirect("Demo:tiktok_login")
+            elif resp.status_code != 200:
+                messages.error(request, f"TikTok API error: {resp.status_code} - {resp.text}")
+                return redirect("Demo:view_purchase_campaigns")
             resp_data = resp.json()
 
             
@@ -9083,6 +9092,12 @@ def view_purchase_campaigns(request):
 
             # 2. EXECUTE CALL & PROCESS
             ads_resp = requests.get(meta_ads_url, headers=meta_headers, params=meta_ads_params)
+            if ads_resp.status_code == 401:
+                return redirect("Demo:meta_login")
+            
+            elif ads_resp.status_code != 200:
+                messages.error(request, f"Meta API error: {ads_resp.status_code} - {ads_resp.text}")
+                return redirect("Demo:view_purchase_campaigns")
             ads_data = ads_resp.json().get("data", [])
 
             for ad in ads_data:
