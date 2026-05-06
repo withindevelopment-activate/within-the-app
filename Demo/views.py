@@ -5688,9 +5688,9 @@ def snapchat_api_call(request, endpoint, method="GET", params=None, data=None, j
             raise ValueError(f"Unsupported HTTP method: {method}")
 
         response.raise_for_status()
-        if response.raise_for_status() == 401:
+        if response.status_code == 401:
             return redirect("Demo:snapchat_login")
-        elif response.raise_for_status() != 200:
+        elif response.status_code != 200:
             return messages.error(request, f"API error {response.status_code} on {endpoint}: {response.text}")
         return response.json()
 
