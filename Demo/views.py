@@ -8901,21 +8901,30 @@ def view_purchase_campaigns(request):
             creatives_data = snapchat_api_call(request, f"adaccounts/{ad_account_id}/creatives")
             raw_creatives = creatives_data.get("creatives", [])
             for creative in raw_creatives:
-                utm_ad_snapchat = {}
-                utm_ad_snapchat["id"] = creative.get("id")
-                if creative.get("type") == "WEB_VIEW":
-                    url = creative.get("web_view_properties", {}).get("url", "")
-                elif creative.get("type") in ["PREVIEW", "COMPOSITE"]:
-                    # Fallback for preview/composite types found in raw data
-                    url = creative.get("preview_properties", {}).get("url", "")
-                props = creative.get("web_view_properties")
-                if not props:
-                    continue
+                inner = creative.get("creative", {}) # Handle the nested 'creative' key in your JSON
+                utm_ad_snapchat = {"id": inner.get("id")}
+                url = None
 
-                url = props.get("url", "").lower().strip()
-                if not url:
+                # 1. Standard Web View
+                if "web_view_properties" in inner:
+                    url = inner.get("web_view_properties", {}).get("url")
+
+                # 2. Composite / Story Ads (Common for Sleepy Cloud Packages)
+                elif "ad_link_properties" in inner:
+                    # Story ads often use this for the global swipe-up
+                    url = inner.get("ad_link_properties", {}).get("url")
+                
+                # 3. Fallback for Preview/Shareable types
+                elif "shareable_story_properties" in inner:
+                    url = inner.get("shareable_story_properties", {}).get("url")
+
+                # Final Check & Cleaning
+                if url:
+                    utm_ad_snapchat["url_utm"] = url.lower().strip()
+                    # Proceed with saving/processing utm_ad_snapchat
+                else:
+                    # Log or skip if no URL found in any expected field
                     continue
-                utm_ad_snapchat["url_utm"] = url
             
                 # Parse UTMs for THIS specific creative
                 parsed_url = urlparse(url)
