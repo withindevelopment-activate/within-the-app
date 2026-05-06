@@ -231,7 +231,7 @@
                             <td><span class="metric">{{ c.Total_Events }}</span></td>
                             <td class="metric conversion-cell"></td>
                             {% if check_all_tokens == True %}
-                            <td><span class="metric spend-cell">{{ c.Spend|floatformat:2 }}</span></td>
+                            <td><span class="metric">{{ c.Spend|floatformat:2 }}</span></td>
                             {% endif %}
                         </tr>
                         {% empty %}
@@ -252,12 +252,9 @@
 <script>
 const tokens = {{ tokens|safe }};
 const campaigns = {{ campaigns|safe }};
+const sourcesSpend = {{ sources_spend|safe }};
 console.log("Tokens available in template:", tokens);
-const spendUrls = {
-    {% if spend_endpoints.snapchat %}snapchat: "{% url 'Demo:snapchat_spend' %}",{% endif %}
-    {% if spend_endpoints.tiktok %}tiktok: "{% url 'Demo:tiktok_spend' %}",{% endif %}
-    {% if spend_endpoints.meta %}meta: "{% url 'Demo:meta_spend' %}",{% endif %}
-};
+console.log("sourcesSpend available in template:", sourcesSpend);
 
 (function initDateFilter() {
     const startInput = document.getElementById('startDateInput');
@@ -312,87 +309,6 @@ const spendUrls = {
 </script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-
-    (function hydrateSpendValues() {
-        const endpointEntries = Object.entries(spendUrls || {});
-        if (!endpointEntries.length) {
-            return;
-        }
-
-        const rows = Array.from(document.querySelectorAll('#tableBody tr[data-source]'));
-        if (!rows.length) {
-            return;
-        }
-
-        function normalizeText(value) {
-            return String(value || '').trim().toLowerCase();
-        }
-
-        function formatSpend(value) {
-            const numberValue = Number(value) || 0;
-            return numberValue.toFixed(2);
-        }
-
-        function buildSpendParams() {
-            const params = new URLSearchParams(window.location.search);
-            const startInput = document.getElementById('startDateInput');
-            const endInput = document.getElementById('endDateInput');
-
-            if (startInput && startInput.value && !params.has('start_time')) {
-                params.set('start_time', startInput.value);
-            }
-            if (endInput && endInput.value && !params.has('end_time')) {
-                params.set('end_time', endInput.value);
-            }
-            if (!params.has('tz_offset')) {
-                params.set('tz_offset', String(-new Date().getTimezoneOffset()));
-            }
-
-            return params.toString();
-        }
-
-        function applySpendMap(spendMap) {
-            Object.entries(spendMap || {}).forEach(([key, value]) => {
-                const parts = key.split('||');
-                if (parts.length !== 2) {
-                    return;
-                }
-
-                const source = normalizeText(parts[0]);
-                const campaign = normalizeText(parts[1]);
-
-                rows.forEach(row => {
-                    if (normalizeText(row.dataset.source) !== source || normalizeText(row.dataset.campaign) !== campaign) {
-                        return;
-                    }
-
-                    const spend = Number(value) || 0;
-                    row.dataset.spend = String(spend);
-
-                    const cell = row.querySelector('.spend-cell');
-                    if (cell) {
-                        cell.textContent = formatSpend(spend);
-                    }
-                });
-            });
-        }
-
-        const params = buildSpendParams();
-        endpointEntries.forEach(([, url]) => {
-            fetch(`${url}?${params}`, {
-                headers: {
-                    'Accept': 'application/json'
-                }
-            })
-            .then(res => res.ok ? res.json() : null)
-            .then(data => {
-                if (data && data.status === 'ok') {
-                    applySpendMap(data.spend);
-                }
-            })
-            .catch(err => console.error('Spend fetch failed:', err));
-        });
-    })();
 
     // The AJAX call to store selected products for the UTM_source/Camapign
     const saveBtn = document.getElementById('save-campaign-products');
