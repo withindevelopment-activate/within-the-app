@@ -8900,7 +8900,6 @@ def view_purchase_campaigns(request):
             # Step 2: Get campaigns
             creatives_data = snapchat_api_call(request, f"adaccounts/{ad_account_id}/creatives")
             raw_creatives = creatives_data.get("creatives", [])
-            print("[Purchase Campaigns] Raw creatives:", creatives_data)
             for creative in raw_creatives:
                 utm_ad_snapchat = {}
                 utm_ad_snapchat["id"] = creative.get("id")
@@ -9059,7 +9058,7 @@ def view_purchase_campaigns(request):
                     "creative{id,url_tags,object_story_spec,asset_feed_spec,call_to_action},"
                     f"insights.time_range({time_range}){{spend}}"
                 ),
-                "limit": 300
+                "limit": 200
             }
 
             # 2. EXECUTE CALL & PROCESS
