@@ -9144,7 +9144,7 @@ def view_purchase_campaigns(request):
                     f"insights.time_range({time_range}){{spend}}"
                 ),
                 "filtering": json.dumps(filters),
-                "limit": 1000
+                "limit": 50
             }
 
             # 2. EXECUTE CALL & PROCESS
