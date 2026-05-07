@@ -9067,67 +9067,71 @@ def view_purchase_campaigns(request):
             resp_data = resp.json()
 
             
+            # 1. Collect all valid ad_ids first
+            valid_ad_ids = []
+            ad_metadata_map = {} # To keep track of which ad belongs to which campaign locally
+
             ad_list = resp_data.get("data", {}).get("list", [])
             for ad in ad_list:
-                utm_ad_tiktok = {}
-                utm_ad_tiktok["id"] = ad.get("ad_id")
-                
+                current_ad_id = str(ad.get("ad_id"))
                 tiktok_utms = ad.get("utm_params", [])
-
-                # Check if we have the structured list first
+                
+                # Parse UTMs (using your existing logic)
                 if tiktok_utms:
-                    extracted_dict = {
-                        item["key"]: urllib.parse.unquote(item["value"]) 
-                        for item in tiktok_utms
-                    }
+                    extracted_dict = {item["key"]: urllib.parse.unquote(item["value"]) for item in tiktok_utms}
                 else:
-                    # Alternative: Parse from the landing_page_url
                     landing_url = ad.get("landing_page_url", "")
                     parsed_url = urlparse(landing_url)
                     query_params = parse_qs(parsed_url.query)
+                    extracted_dict = {k: urllib.parse.unquote(v[0]).replace("+", " ") if v else "" for k, v in query_params.items()}
+
+                utm_source = extracted_dict.get("utm_source", "").lower().strip()
+                utm_campaign = extracted_dict.get("utm_campaign", "").lower().strip()
+
+                # Check if this ad belongs to a campaign we care about
+                if (utm_source, utm_campaign) in valid_campaigns:
+                    valid_ad_ids.append(current_ad_id)
+                    # Store metadata so we can map the spend back to the campaign name later
+                    ad_metadata_map[current_ad_id] = utm_campaign
+
+            # 2. Make ONE API call for all collected ad_ids
+            if valid_ad_ids:
+                spend_tik_url = f"{API_BASE}/report/integrated/get/"
+                
+                # TikTok uses "field_name" and "filter_value" in the filtering object
+                filtering_data = [
+                    {
+                        "field_name": "ad_ids",
+                        "filter_type": "IN",
+                        "filter_value": json.dumps(valid_ad_ids) # Pass the whole list here
+                    }
+                ]
+                
+                spend_tik_params = {
+                    "advertiser_id": advertiser_id,
+                    "dimensions": json.dumps(["ad_id"]),
+                    "service_type": "AUCTION",
+                    "report_type": "BASIC",
+                    "data_level": "AUCTION_AD",
+                    "metrics": json.dumps(["spend"]),
+                    "start_date": start_time,
+                    "end_date": end_time,
+                    "filtering": json.dumps(filtering_data)
+                }
+                
+                spend_resp = requests.get(spend_tik_url, headers=headers, params=spend_tik_params)
+                spend_data = spend_resp.json()
+                
+                # 3. Process the results and attribute spend to your sources_dict
+                report_list = spend_data.get("data", {}).get("list", [])
+                for item in report_list:
+                    ad_id_from_report = str(item.get("dimensions", {}).get("ad_id"))
+                    ad_spend = float(item.get("metrics", {}).get("spend", 0))
                     
-                    # parse_qs returns lists, so we take the first element if it exists
-                    extracted_dict = {
-                        k: urllib.parse.unquote(v[0]).replace("+", " ") if v else ""
-                        for k, v in query_params.items()
-                    }
-
-                # Standardize the extracted data
-                utm_ad_tiktok["utm_source"] = extracted_dict.get("utm_source", "").lower().strip()
-                utm_ad_tiktok["utm_campaign"] = extracted_dict.get("utm_campaign", "").lower().strip()
-
-                # match = df[
-                #     (df['UTM_Source'] == utm_ad_tiktok["utm_source"]) & 
-                #     (df['UTM_Campaign'] == utm_ad_tiktok["utm_campaign"])
-                # ]
-
-                if (utm_ad_tiktok["utm_source"], utm_ad_tiktok["utm_campaign"]) in valid_campaigns:
-                    spend_tik_url = f"{API_BASE}/report/integrated/get/"
-                    filtering_data = [
-                        {
-                            "field_name": "ad_ids",
-                            "filter_type": "IN",
-                            "filter_value": json.dumps([str(utm_ad_tiktok['id'])])
-                        }
-                    ]
-                    spend_tik_params = {
-                        "advertiser_id": advertiser_id,
-                        "dimensions": json.dumps(["ad_id"]),
-                        "service_type": "AUCTION",
-                        "report_type": "BASIC",
-                        "data_level": "AUCTION_AD",
-                        "metrics": json.dumps(["spend", "ad_id"]),
-                        "start_date": start_time,
-                        "end_date": end_time,
-                        "filtering": json.dumps(filtering_data)
-                    }
-                    spend_resp = requests.get(spend_tik_url, headers=headers, params=spend_tik_params)
-                    spend_data = spend_resp.json()
-                    spend_list = spend_data.get("data", {}).get("list", [])
-                    total_spend = sum(float(item.get("metrics", {}).get("spend", 0)) for item in spend_list)
-
-                    tiktok_camp_key = utm_ad_tiktok.get("utm_campaign", "missing_campaign")
-                    sources_spend["tiktok"][tiktok_camp_key] = sources_spend["tiktok"].get(tiktok_camp_key, 0) + total_spend
+                    # Find which campaign this ad_id belongs to using our map
+                    campaign_name = ad_metadata_map.get(ad_id_from_report)
+                    if campaign_name:
+                        sources_spend["tiktok"][campaign_name] = sources_spend["tiktok"].get(campaign_name, 0) + ad_spend
 
 
             # =========================
