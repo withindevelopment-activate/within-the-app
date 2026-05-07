@@ -8904,11 +8904,24 @@ def view_purchase_campaigns(request):
     # df = fetch_data_from_supabase("Campaign_Event_Log")
 
     # --- Cleaning ---
-    df['Customer_ID'] = df['Customer_ID'].astype(int)
-    df['UTM_Source'] = df['UTM_Source'].str.strip().str.lower().astype(str)
-    df['UTM_Campaign'] = df['UTM_Campaign'].str.strip().str.lower().astype(str)
-    df['Event_Type'] = df['Event_Type'].str.strip().str.lower().astype(str)
-    df['Score'] = df['Score'].astype(float)
+    df['Customer_ID'] = pd.to_numeric(
+        df['Customer_ID'],
+        errors='coerce'
+    ).fillna(0).astype('int32')
+    df['UTM_Source'] = df['UTM_Source'].fillna('').str.strip().str.lower().astype(str)
+    df['UTM_Campaign'] = df['UTM_Campaign'].fillna('').str.strip().str.lower().astype(str)
+    df['Event_Type'] = df['Event_Type'].fillna('').str.strip().str.lower().astype(str)
+    df['Score'] = pd.to_numeric(
+        df['Score'],
+        errors='coerce'
+    ).fillna(0)
+
+    valid_campaigns = set(
+        zip(
+            df["UTM_Source"],
+            df["UTM_Campaign"]
+        )
+    )
 
 
     tz_offset_minutes = int(request.GET.get("tz_offset", 0))  # in minutes
@@ -8994,17 +9007,12 @@ def view_purchase_campaigns(request):
 
                 # --- MATCHING LOGIC ---
                 # Check if this creative's UTMs exist in your Supabase log
-                valid_campaigns = set(
-                    zip(
-                        df["UTM_Source"],
-                        df["UTM_Campaign"]
-                    )
-                )
+            
                 # match = df[
                 #     (df['UTM_Source'] == utm_ad_snapchat["utm_source"]) & 
                 #     (df['UTM_Campaign'] == utm_ad_snapchat["utm_campaign"])
                 # ]
-                print(f"[Purchase Campaigns] Matching Snapchat creative {utm_ad_snapchat['id']} against log: found {len(match)} matches")
+                # print(f"[Purchase Campaigns] Matching Snapchat creative {utm_ad_snapchat['id']} against log: found {len(match)} matches")
                 
                 snap_params = {
                     "fields": "spend,conversion_purchases_value,conversion_purchases",
@@ -9013,7 +9021,7 @@ def view_purchase_campaigns(request):
                     "end_time": snap_end_time,
                 }
 
-                if (source, campaign) in valid_campaigns:
+                if (utm_ad_snapchat["utm_source"], utm_ad_snapchat["utm_campaign"]) in valid_campaigns:
                     creative_stats = snapchat_api_call(request, f"creatives/{utm_ad_snapchat['id']}/stats", params=snap_params)
                     raw_stats_list = creative_stats.get("timeseries_stats", [])
                     
@@ -9087,19 +9095,13 @@ def view_purchase_campaigns(request):
                 # Standardize the extracted data
                 utm_ad_tiktok["utm_source"] = extracted_dict.get("utm_source", "").lower().strip()
                 utm_ad_tiktok["utm_campaign"] = extracted_dict.get("utm_campaign", "").lower().strip()
-                valid_campaigns = set(
-                    zip(
-                        df["UTM_Source"],
-                        df["UTM_Campaign"]
-                    )
-                )
 
                 # match = df[
                 #     (df['UTM_Source'] == utm_ad_tiktok["utm_source"]) & 
                 #     (df['UTM_Campaign'] == utm_ad_tiktok["utm_campaign"])
                 # ]
 
-                if (source, campaign) in valid_campaigns:
+                if (utm_ad_tiktok["utm_source"], utm_ad_tiktok["utm_campaign"]) in valid_campaigns:
                     spend_tik_url = f"{API_BASE}/report/integrated/get/"
                     filtering_data = [
                         {
@@ -9210,12 +9212,7 @@ def view_purchase_campaigns(request):
 
                     if source and campaign:
                         # Check against your Supabase dataframe (df)
-                        valid_campaigns = set(
-                            zip(
-                                df["UTM_Source"],
-                                df["UTM_Campaign"]
-                            )
-                        )
+
                         # match = df[(df["UTM_Source"] == source) & (df["UTM_Campaign"] == campaign)]
                         
                         if (source, campaign) in valid_campaigns:
@@ -9225,8 +9222,9 @@ def view_purchase_campaigns(request):
                             # Aggregate spend by source/campaign
                             sources_spend[source][campaign] = sources_spend[source].get(campaign, 0) + ad_spend
         except Exception as e:
+            messages.error(request, f"Error fetching ad spend data: {str(e)}")
             check_all_tokens = False
-            print("Error during token checks or API calls:", e)
+            traceback.print_exc()
 
 
 
