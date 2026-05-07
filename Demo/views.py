@@ -8929,8 +8929,8 @@ def view_purchase_campaigns(request):
     to_dt = datetime.strptime(end_time, "%Y-%m-%d") if end_time else (datetime.now())
 
     # Adjust start/end for user's timezone
-    from_dt = from_dt.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(minutes=tz_offset_minutes)
-    to_dt = to_dt.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(minutes=tz_offset_minutes)
+    from_dt = from_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+    to_dt = to_dt.replace(hour=0, minute=0, second=0, microsecond=0)
 
     if from_dt > to_dt:
         from_dt, to_dt = to_dt, from_dt
