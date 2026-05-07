@@ -8948,7 +8948,11 @@ def view_purchase_campaigns(request):
                 return redirect("Demo:snapchat_select_account", org_id=organization_id)
 
             # Step 2: Get campaigns
-            creatives_data = snapchat_api_call(request, f"adaccounts/{ad_account_id}/creatives")
+            params = {
+                "sort": "updated_at-desc",
+                "limit": 100
+            }
+            creatives_data = snapchat_api_call(request, f"adaccounts/{ad_account_id}/creatives",params=params)
             raw_creatives = creatives_data.get("creatives", [])
             for creative in raw_creatives:
                 inner = creative.get("creative", {}) # Handle the nested 'creative' key in your JSON
@@ -8990,10 +8994,16 @@ def view_purchase_campaigns(request):
 
                 # --- MATCHING LOGIC ---
                 # Check if this creative's UTMs exist in your Supabase log
-                match = df[
-                    (df['UTM_Source'] == utm_ad_snapchat["utm_source"]) & 
-                    (df['UTM_Campaign'] == utm_ad_snapchat["utm_campaign"])
-                ]
+                valid_campaigns = set(
+                    zip(
+                        df["UTM_Source"],
+                        df["UTM_Campaign"]
+                    )
+                )
+                # match = df[
+                #     (df['UTM_Source'] == utm_ad_snapchat["utm_source"]) & 
+                #     (df['UTM_Campaign'] == utm_ad_snapchat["utm_campaign"])
+                # ]
                 print(f"[Purchase Campaigns] Matching Snapchat creative {utm_ad_snapchat['id']} against log: found {len(match)} matches")
                 
                 snap_params = {
@@ -9003,7 +9013,7 @@ def view_purchase_campaigns(request):
                     "end_time": snap_end_time,
                 }
 
-                if not match.empty:
+                if (source, campaign) in valid_campaigns:
                     creative_stats = snapchat_api_call(request, f"creatives/{utm_ad_snapchat['id']}/stats", params=snap_params)
                     raw_stats_list = creative_stats.get("timeseries_stats", [])
                     
@@ -9077,12 +9087,19 @@ def view_purchase_campaigns(request):
                 # Standardize the extracted data
                 utm_ad_tiktok["utm_source"] = extracted_dict.get("utm_source", "").lower().strip()
                 utm_ad_tiktok["utm_campaign"] = extracted_dict.get("utm_campaign", "").lower().strip()
-                match = df[
-                    (df['UTM_Source'] == utm_ad_tiktok["utm_source"]) & 
-                    (df['UTM_Campaign'] == utm_ad_tiktok["utm_campaign"])
-                ]
+                valid_campaigns = set(
+                    zip(
+                        df["UTM_Source"],
+                        df["UTM_Campaign"]
+                    )
+                )
 
-                if not match.empty:
+                # match = df[
+                #     (df['UTM_Source'] == utm_ad_tiktok["utm_source"]) & 
+                #     (df['UTM_Campaign'] == utm_ad_tiktok["utm_campaign"])
+                # ]
+
+                if (source, campaign) in valid_campaigns:
                     spend_tik_url = f"{API_BASE}/report/integrated/get/"
                     filtering_data = [
                         {
@@ -9193,9 +9210,15 @@ def view_purchase_campaigns(request):
 
                     if source and campaign:
                         # Check against your Supabase dataframe (df)
-                        match = df[(df["UTM_Source"] == source) & (df["UTM_Campaign"] == campaign)]
+                        valid_campaigns = set(
+                            zip(
+                                df["UTM_Source"],
+                                df["UTM_Campaign"]
+                            )
+                        )
+                        # match = df[(df["UTM_Source"] == source) & (df["UTM_Campaign"] == campaign)]
                         
-                        if not match.empty:
+                        if (source, campaign) in valid_campaigns:
                             if source not in sources_spend:
                                 sources_spend[source] = {}
                             
