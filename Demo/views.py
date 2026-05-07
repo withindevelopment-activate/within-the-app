@@ -4217,6 +4217,10 @@ def save_tracking(request):
         ).strip()
         sleec_id = str(data.get("device_id") or "").strip()
 
+        ## The IP Address
+        ip = get_client_ip(request)
+        ip_hash = generate_ip_hash(ip)
+
         history_rows = get_history_rows(session_id, visitor_id, mobile, sleec_id)
         print(f"[DEBUG] history_rows returned: {len(history_rows)} rows")
 
@@ -4399,16 +4403,65 @@ def save_tracking(request):
 
             session_customer_info["Customer_Mobile"] = mobile
 
+        #######################
+        ## CASE 4: IP ADDRESS SOURCE MAPPING BLOCK -- 
+        if event_type == "purchase" and final_source in weak_sources:
+
+            dprint("[IP CHECK] purchase + weak source")
+
+            if not ip_hash:
+                dprint("[IP CHECK] no IP hash found")
+
+            else:
+                dprint(f"[IP HASH FOUND] {ip_hash}")
+
+                # ------------------- Fetch rows for same IP -------------------
+                ip_rows = fetch_data_from_supabase_specific(
+                    "Tracking_Visitors_duplicate",
+                    filters={
+                        "Client_IP": ('eq', ip_hash)
+                    }
+                )
+
+                ip_rows = [
+                    clean_utm(r)
+                    for r in ip_rows.to_dict(orient="records")
+                ]
+
+                # ------------------- Pick strongest source -------------------
+                strongest_ip_source = final_source
+
+                for row in ip_rows:
+
+                    existing = (row.get("UTM_Source") or "").lower()
+
+                    if source_weight(existing) > source_weight(strongest_ip_source):
+                        strongest_ip_source = existing
+
+                # ------------------- Apply rescue -------------------
+                if (
+                    strongest_ip_source != final_source
+                    and strongest_ip_source not in weak_sources
+                ):
+
+                    final_source = strongest_ip_source
+                    attribution_type = "ip_rescued_purchase"
+
+                    dprint(f"[IP RESCUED] final_source -- {final_source}")
+
+                    pending_source_updates.append(("Client_IP", ip_hash))
+
+                    print("[SAVE TRACKING ADDED IP UPDATE TO PENDING LIST]")
+
         ############################ This section is for whenever the case is purchase and the first page recorded is directly from a product
-        # ==================== CASE 4: FINGERPRINT RESCUE (PURCHASE ONLY) ====================
+        # ==================== CASE 5: FINGERPRINT RESCUE (PURCHASE ONLY) ====================
         # Conditions:
         # event_type == purchase
         # final_source still weak
         # first page / referrer is deep inside store (not homepage) -- without this condition.
         # fingerprint_id exists (even if from another visitor_id) -- instead of fingerprint we'll be looking at our sleecid  
         # --------------------------------------------------
-        # SLEECID / FINGERPRINT RESCUE BLOCK (OPTIMIZED)
-        # --------------------------------------------------
+        # SLEECID / FINGERPRINT RESCUE BLOCK
         if event_type == "purchase" and final_source in weak_sources:
 
             dprint("[FINGERPRINT CHECK] purchase + weak source")
@@ -4517,8 +4570,6 @@ def save_tracking(request):
         response = backfill_missing_utms(final_source, utm_medium, utm_campaign, utm_term, utm_content, visitor_id, session_id, mobile, sleec_id)
 
         ########################## Preparing to upsert the entry --- 
-        ip = get_client_ip(request)
-        ip_hash = generate_ip_hash(ip)
 
         ### Finding the best UTMs for the said source -- get all the history rows
         # --------------------------------------------------
