@@ -9077,6 +9077,14 @@ def view_purchase_campaigns(request):
             meta_ads_url = f"{meta_base_url}/{meta_account_id}/ads"
             time_range = json.dumps({"since": start_time, "until": end_time})
 
+            filters = [
+                {
+                    "field": "effective_status", 
+                    "operator": "IN", 
+                    "value": ["ACTIVE", "PAUSED", "PENDING_REVIEW", "PREAPPROVED"]
+                }
+            ]
+
             # We call the Ads endpoint and expand the creative and insights fields inline
             meta_ads_params = {
                 "fields": (
@@ -9084,9 +9092,7 @@ def view_purchase_campaigns(request):
                     "creative{id,url_tags,object_story_spec,asset_feed_spec,call_to_action},"
                     f"insights.time_range({time_range}){{spend}}"
                 ),
-                "filtering": [
-                    {"field": "effective_status", "operator": "IN", "value": ["ACTIVE","PAUSED", "PENDING_REVIEW", "PREAPPROVED"]},
-                ],
+                "filtering": json.dumps(filters),
                 "limit": 1000
             }
 
