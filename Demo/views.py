@@ -167,7 +167,7 @@ def zid_callback(request):
 
         # ## Add an entry with the tokens into the database
         tokens = {
-             "Distinct_ID": int(get_next_id_from_supabase_compatible_all(name='tokens', column='Distinct_ID')),
+             'Distinct_ID': int(get_next_id_from_supabase_compatible_all(name='tokens', column='Distinct_ID')),
              'Access': access_token,
              'Authorization': authorization_token,
              'Refresh': refresh_token,
@@ -9777,58 +9777,110 @@ def url_builder(request):
 
 @csrf_exempt
 def sgtm_webhook(request):
-    # 1. Basic Security: Verify a custom header token set in sGTM
     print("[SGTM WEBHOOK] Incoming request to sGTM webhook endpoint")
+
     sgtm_token = request.headers.get('X-SGTM-TOKEN')
     print(f"[SGTM WEBHOOK] Received token: {sgtm_token}")
+
     if sgtm_token != settings.SGTM_WEBHOOK_TOKEN:
         return JsonResponse({'error': 'Unauthorized'}, status=401)
 
-    if request.method == 'POST':
-        try:
-            data = json.loads(request.body)
-            
-            # --- Root Level ---
-            event_name = data.get('event_name')
-            event_id = data.get('event_id')
-            event_time = data.get('event_time')
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
 
-            # --- User Data & Identifiers ---
-            user_data = data.get('user_data', {})
-            email = user_data.get('email')
-            phone = user_data.get('phone')
-            
-            client_info = user_data.get('client_info', {})
-            sleecid = client_info.get('query_sleecid')
-            click_id = client_info.get('click_id') # sccid
+    try:
+        data = json.loads(request.body)
 
-            # --- Custom Data (Items & Value) ---
-            custom_data = data.get('custom_data', {})
-            transaction_id = custom_data.get('transaction_id')
-            total_value = custom_data.get('value')
-            items = custom_data.get('items') # This is usually a list/string
+        event_name = data.get('event_name')
+        event_id = data.get('event_id')
+        event_time = data.get('event_time')
 
-            # --- Marketing (UTMs) ---
-            marketing = data.get('marketing_parameters', {})
-            utm_source = marketing.get('utm_source')
-            utm_campaign = marketing.get('utm_campaign')
+        user_data = data.get('user_data', {})
 
-            # --- Platform Identifiers (Pixels/Tokens) ---
-            platforms = data.get('platform_identifiers', {})
-            fb_data = platforms.get('facebook', {})
-            tt_data = platforms.get('tiktok', {})
-            # Example: Accessing TikTok Pixel ID
-            tiktok_pixel = tt_data.get('pixel_id')
+        email = user_data.get('email')
 
-            # --- LOGIC: What to do with the data? ---
-            # Here you can save to a model, e.g.:
-            # Conversion.objects.create(event_id=event_id, sleecid=sleecid, source=utm_source)
-            
-            print(f"Successfully received {event_name} via {utm_source}. SleeCID: {sleecid}")
+        phone = user_data.get('phone')
 
-            return JsonResponse({'status': 'success', 'received_id': event_id}, status=200)
+        first_name = user_data.get('first_name')
+        last_name = user_data.get('last_name')
+        user_name = user_data.get('user_name')
 
-        except json.JSONDecodeError:
-            return JsonResponse({'error': 'Invalid JSON body'}, status=400)
 
-    return JsonResponse({'error': 'Method not allowed'}, status=405)
+        client_info = user_data.get('client_info', {})
+
+        click_id = client_info.get('click_id')          
+        sleecid = client_info.get('query_sleecid')
+
+        custom_data = data.get('custom_data', {})
+
+
+        marketing_parameters = data.get('marketing_parameters', {})
+
+        utm_source = marketing_parameters.get('utm_source')
+        utm_medium = marketing_parameters.get('utm_medium')
+        utm_campaign = marketing_parameters.get('utm_campaign')
+        utm_content = marketing_parameters.get('utm_content')
+        utm_term = marketing_parameters.get('utm_term')
+
+        platform_identifiers = data.get('platform_identifiers', {})
+
+        facebook = platform_identifiers.get('facebook', {})
+        google = platform_identifiers.get('google', {})
+        snapchat = platform_identifiers.get('snapchat', {})
+        tiktok = platform_identifiers.get('tiktok', {})
+
+        entry = {
+            'Distinct_ID': int(get_next_id_from_supabase_compatible_all(name='SGTM_Payload', column='Distinct_ID')),
+            'event_name': event_name,
+            'event_id': event_id,
+            'event_time': event_time,
+
+            'user_data': user_data,
+            'client_info': client_info,
+            'custom_data': custom_data,
+            'marketing_parameters': marketing_parameters,
+            'platform_identifiers': platform_identifiers,
+            'google': google,
+            'snapchat': snapchat,
+            'tiktok': tiktok,
+
+            'email': email,
+            'phone': phone,
+            'first_name': first_name,
+            'last_name': last_name,
+            'user_name': user_name,
+
+            'click_id': click_id,
+            'sleecid': sleecid,
+
+            'utm_source': utm_source,
+            'utm_medium': utm_medium,
+            'utm_campaign': utm_campaign,
+            'utm_content': utm_content,
+            'utm_term': utm_term,
+        }
+
+        batch_insert_to_supabase(
+            pd.DataFrame([entry]), 'SGTM_Payload'
+        )
+
+        print(
+            f"[SGTM WEBHOOK] Successfully saved "
+            f"{event_name} | {event_id} | SleeCID: {sleecid}"
+        )
+
+        return JsonResponse({
+            'status': 'success',
+            'received_id': event_id
+        }, status=200)
+
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON body'}, status=400)
+
+    except Exception as e:
+        print(f"[SGTM WEBHOOK ERROR] {str(e)}")
+
+        return JsonResponse({
+            'error': 'Internal server error',
+            'details': str(e)
+        }, status=500)
