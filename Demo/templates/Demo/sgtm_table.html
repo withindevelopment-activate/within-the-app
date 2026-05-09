@@ -11,10 +11,11 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
   :root {
-    --bg: #0d0f14;
-    --surface: #151820;
-    --surface2: #1c202c;
-    --border: rgba(255,255,255,0.07);
+    --bg: #f8fafc;           /* Light grey-blue background */
+    --surface: #ffffff;      /* White cards */
+    --surface2: #f1f5f9;     /* Light hover/input background */
+    --border: #e2e8f0;       /* Soft borders */
+    --border2: #cbd5e1;
     --border2: rgba(255,255,255,0.13);
     --text: #e8eaf0;
     --muted: #7a7f96;
@@ -46,7 +47,7 @@
     outline: none; transition: border-color 0.2s;
   }
   input:focus, select:focus { border-color: var(--accent); }
-  input[type="datetime-local"]::-webkit-calendar-picker-indicator { filter: invert(0.6); }
+  input[type="datetime-local"]::-webkit-calendar-picker-indicator { filter: none; }
 
   /* Checkboxes (event types) */
   .checkbox-group { display: flex; flex-direction: column; gap: 6px; }

@@ -9908,9 +9908,13 @@ def sgtm_table_view(request):
 
     # 2. Build Filters for SGTM_Payload columns
     filters = {}
+    # Change this in your view:
+    selected_events = request.GET.getlist("event_type")
+    if selected_events:
+        filters["event_name"] = ("in", selected_events)
 
-    if event_name:
-        filters["event_name"] = ("eq", event_name)
+    # if event_name:
+    #     filters["event_name"] = ("eq", event_name)
 
     if utm_source and utm_source != "None":
         filters["utm_source"] = ("eq", utm_source)
