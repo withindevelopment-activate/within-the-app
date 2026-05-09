@@ -9799,8 +9799,9 @@ def sgtm_webhook(request):
 @csrf_exempt
 def sgtm_webhook(request):
     # 1. Basic Security: Verify a custom header token set in sGTM
-    # Replace 'your_secret_token' with a value you define in sGTM
+    print("[SGTM WEBHOOK] Incoming request to sGTM webhook endpoint")
     sgtm_token = request.headers.get('X-SGTM-TOKEN')
+    print(f"[SGTM WEBHOOK] Received token: {sgtm_token}")
     if sgtm_token != settings.SGTM_WEBHOOK_TOKEN:
         return JsonResponse({'error': 'Unauthorized'}, status=401)
 
@@ -9827,6 +9828,8 @@ def sgtm_webhook(request):
             contents = data.get('contents', [])      # List of products
             value = data.get('value')
             currency = data.get('currency', 'AED')
+
+            print(f"[SGTM WEBHOOK] Processing event: {event_name}, User: {user_data['email']}")
 
             return JsonResponse({'status': 'received', 'event': event_name}, status=200)
 
