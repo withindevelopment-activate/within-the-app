@@ -1,9 +1,15 @@
-{% load static %}
-{% extends "Demo/base.html" %}
 
-{% block title %} SGTM - Table {% endblock title %}
+{% extends "Demo/base.html" %}
+{% load static %}
+
+{% block title %} SGTM Data Explorer {% endblock title %}
 
 {% block content %}
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
   :root {
     --bg: #0d0f14;
     --surface: #151820;
@@ -147,17 +153,6 @@
     <div class="sidebar-section">
       <div class="sidebar-label">Event Type</div>
       <div class="checkbox-group">
-        {% for ev in "purchase,page_view,add_to_cart"|split:"," %}
-        <label class="cb-item">
-          <input type="checkbox" name="event_type" value="{{ ev }}"
-            {% if ev in selected_events %}checked{% endif %}>
-          <span>{{ ev|title|cut:"_" }}</span>
-          <span class="cb-badge {% if ev == 'purchase' %}badge-purchase{% elif ev == 'page_view' %}badge-pageview{% else %}badge-addcart{% endif %}">
-            {{ ev|slice:":2"|upper }}
-          </span>
-        </label>
-        {% endfor %}
-        <!-- fallback if templatetag not available -->
         <label class="cb-item">
           <input type="checkbox" name="event_type" value="purchase"
             {% if "purchase" in selected_events %}checked{% endif %}>
@@ -229,11 +224,8 @@
         <div>
           <label>Row limit</label>
           <select name="limit">
-            {% for n in "100,500,1000,2000,5000"|split:"," %}
-            <option value="{{ n }}" {% if selected_limit|stringformat:"s" == n %}selected{% endif %}>{{ n }} rows</option>
-            {% endfor %}
-            <option value="100" {% if selected_limit == 100 or not selected_limit %}selected{% endif %}>100 rows</option>
-            <option value="500" {% if selected_limit == 500 %}selected{% endif %}>500 rows</option>
+            <option value="100"  {% if selected_limit == 100  or not selected_limit %}selected{% endif %}>100 rows</option>
+            <option value="500"  {% if selected_limit == 500  %}selected{% endif %}>500 rows</option>
             <option value="1000" {% if selected_limit == 1000 %}selected{% endif %}>1 000 rows</option>
             <option value="2000" {% if selected_limit == 2000 %}selected{% endif %}>2 000 rows</option>
             <option value="5000" {% if selected_limit == 5000 %}selected{% endif %}>5 000 rows</option>
@@ -553,17 +545,7 @@ function sortTable(col) {
 filteredRows = getAllRows();
 renderPage();
 
-// Deduplicate the hardcoded checkboxes vs template loop (remove one set)
-// Since Django template |split filter may not exist, we show only the second set.
-// Hide the template loop items (first 3 might not render if filter unavailable).
-document.querySelectorAll('.cb-item').forEach((el, i) => {
-  const vals = Array.from(document.querySelectorAll('.cb-item input[type=checkbox]')).map(c => c.value);
-  const seen = {};
-  document.querySelectorAll('.cb-item input[type=checkbox]').forEach(cb => {
-    if (seen[cb.value]) cb.closest('.cb-item').remove();
-    else seen[cb.value] = true;
-  });
-});
+
 </script>
 
 {% endblock %}
