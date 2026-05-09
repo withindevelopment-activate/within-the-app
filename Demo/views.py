@@ -9777,27 +9777,6 @@ def url_builder(request):
 
 @csrf_exempt
 def sgtm_webhook(request):
-    if request.method == 'POST':
-        try:
-            # Parse the JSON data sent from sGTM
-            data = json.loads(request.body)
-            print(f"[SGTM WEBHOOK] Received data: {data}")
-
-            event_name = data.get('event_name')
-            user_id = data.get('user_id')
-            
-            # Do your processing here (e.g., save to DB, trigger email)
-            print(f"Received {event_name} for user {user_id}")
-            
-            return JsonResponse({'status': 'success'}, status=200)
-        except json.JSONDecodeError:
-            return JsonResponse({'error': 'Invalid JSON'}, status=400)
-    
-    return JsonResponse({'error': 'Method not allowed'}, status=405)
-
-
-@csrf_exempt
-def sgtm_webhook(request):
     # 1. Basic Security: Verify a custom header token set in sGTM
     print("[SGTM WEBHOOK] Incoming request to sGTM webhook endpoint")
     sgtm_token = request.headers.get('X-SGTM-TOKEN')
@@ -9808,32 +9787,48 @@ def sgtm_webhook(request):
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
-            print(f"[SGTM WEBHOOK] Received data: {data}")
-
-            # 2. Extract Standard Marketing Event Data
-            event_name = data.get('event_name')      # e.g., 'Purchase', 'AddToCart'
-            event_id = data.get('event_id')          # Essential for deduplication
-            page_url = data.get('page_location')
             
-            # 3. Extract User Data (for matching)
-            user_data = {
-                'email': data.get('email'),
-                'phone': data.get('phone'),
-                'fbc': data.get('fbc'),              # Facebook Click ID
-                'fbp': data.get('fbp'),              # Facebook Browser ID
-                'ip_address': data.get('ip_override') # Often sent by sGTM
-            }
+            # --- Root Level ---
+            event_name = data.get('event_name')
+            event_id = data.get('event_id')
+            event_time = data.get('event_time')
+
+            # --- User Data & Identifiers ---
+            user_data = data.get('user_data', {})
+            email = user_data.get('email')
+            phone = user_data.get('phone')
             
-            # 4. Extract Object Data (for Purchases)
-            contents = data.get('contents', [])      # List of products
-            value = data.get('value')
-            currency = data.get('currency', 'AED')
+            client_info = user_data.get('client_info', {})
+            sleecid = client_info.get('query_sleecid')
+            click_id = client_info.get('click_id') # sccid
 
-            print(f"[SGTM WEBHOOK] Processing event: {event_name}, User: {user_data['email']}")
+            # --- Custom Data (Items & Value) ---
+            custom_data = data.get('custom_data', {})
+            transaction_id = custom_data.get('transaction_id')
+            total_value = custom_data.get('value')
+            items = custom_data.get('items') # This is usually a list/string
 
-            return JsonResponse({'status': 'received', 'event': event_name}, status=200)
+            # --- Marketing (UTMs) ---
+            marketing = data.get('marketing_parameters', {})
+            utm_source = marketing.get('utm_source')
+            utm_campaign = marketing.get('utm_campaign')
+
+            # --- Platform Identifiers (Pixels/Tokens) ---
+            platforms = data.get('platform_identifiers', {})
+            fb_data = platforms.get('facebook', {})
+            tt_data = platforms.get('tiktok', {})
+            # Example: Accessing TikTok Pixel ID
+            tiktok_pixel = tt_data.get('pixel_id')
+
+            # --- LOGIC: What to do with the data? ---
+            # Here you can save to a model, e.g.:
+            # Conversion.objects.create(event_id=event_id, sleecid=sleecid, source=utm_source)
+            
+            print(f"Successfully received {event_name} via {utm_source}. SleeCID: {sleecid}")
+
+            return JsonResponse({'status': 'success', 'received_id': event_id}, status=200)
 
         except json.JSONDecodeError:
             return JsonResponse({'error': 'Invalid JSON body'}, status=400)
-    
+
     return JsonResponse({'error': 'Method not allowed'}, status=405)
