@@ -9774,3 +9774,63 @@ def log_bridge_click(request, params, sleecid, target_url):
 
 def url_builder(request):
     return render(request, "Demo/url_builder.html", {})
+
+@csrf_exempt
+def sgtm_webhook(request):
+    if request.method == 'POST':
+        try:
+            # Parse the JSON data sent from sGTM
+            data = json.loads(request.body)
+            print(f"[SGTM WEBHOOK] Received data: {data}")
+
+            event_name = data.get('event_name')
+            user_id = data.get('user_id')
+            
+            # Do your processing here (e.g., save to DB, trigger email)
+            print(f"Received {event_name} for user {user_id}")
+            
+            return JsonResponse({'status': 'success'}, status=200)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON'}, status=400)
+    
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+@csrf_exempt
+def sgtm_webhook(request):
+    # 1. Basic Security: Verify a custom header token set in sGTM
+    # Replace 'your_secret_token' with a value you define in sGTM
+    sgtm_token = request.headers.get('X-SGTM-TOKEN')
+    if sgtm_token != 'your_secret_token':
+        return JsonResponse({'error': 'Unauthorized'}, status=401)
+
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            print(f"[SGTM WEBHOOK] Received data: {data}")
+            
+            # 2. Extract Standard Marketing Event Data
+            event_name = data.get('event_name')      # e.g., 'Purchase', 'AddToCart'
+            event_id = data.get('event_id')          # Essential for deduplication
+            page_url = data.get('page_location')
+            
+            # 3. Extract User Data (for matching)
+            user_data = {
+                'email': data.get('email'),
+                'phone': data.get('phone'),
+                'fbc': data.get('fbc'),              # Facebook Click ID
+                'fbp': data.get('fbp'),              # Facebook Browser ID
+                'ip_address': data.get('ip_override') # Often sent by sGTM
+            }
+            
+            # 4. Extract Object Data (for Purchases)
+            contents = data.get('contents', [])      # List of products
+            value = data.get('value')
+            currency = data.get('currency', 'AED')
+
+            return JsonResponse({'status': 'received', 'event': event_name}, status=200)
+
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON body'}, status=400)
+    
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
