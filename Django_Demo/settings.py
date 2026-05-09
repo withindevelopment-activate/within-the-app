@@ -212,3 +212,4 @@ SNAPCHAT_CLIENT_SECRET = "bb5299a6d31993ab2419"
 SNAPCHAT_REDIRECT_URI = "https://testing-within.onrender.com/oauth/snapchat/callback/"
 SNAPCHAT_OAUTH_SCOPE = "snapchat-profile-api snapchat-marketing-api snapchat-offline-conversions-api"
 
+SGTM_WEBHOOK_TOKEN = "slee_mMRM4pZaaB9Q1K41hqqvy+F$xlC/MvGgZkx9$og8/4Y"

@@ -9801,14 +9801,14 @@ def sgtm_webhook(request):
     # 1. Basic Security: Verify a custom header token set in sGTM
     # Replace 'your_secret_token' with a value you define in sGTM
     sgtm_token = request.headers.get('X-SGTM-TOKEN')
-    if sgtm_token != 'your_secret_token':
+    if sgtm_token != settings.SGTM_WEBHOOK_TOKEN:
         return JsonResponse({'error': 'Unauthorized'}, status=401)
 
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
             print(f"[SGTM WEBHOOK] Received data: {data}")
-            
+
             # 2. Extract Standard Marketing Event Data
             event_name = data.get('event_name')      # e.g., 'Purchase', 'AddToCart'
             event_id = data.get('event_id')          # Essential for deduplication
