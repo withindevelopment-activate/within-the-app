@@ -9884,3 +9884,118 @@ def sgtm_webhook(request):
             'error': 'Internal server error',
             'details': str(e)
         }, status=500)
+
+from collections import Counter
+
+def sgtm_table_view(request):
+    # 1. Extract GET Parameters
+    event_name = request.GET.get("event_name")
+    limit = min(int(request.GET.get("limit", 100)), 5000)
+    
+    date_after = request.GET.get("date_after")
+    date_end = request.GET.get("date_end")
+    
+    # Cleaning T from datetime-local inputs
+    if date_after: date_after = date_after.replace("T", " ")
+    if date_end: date_end = date_end.replace("T", " ")
+
+    email_search = request.GET.get("email", "")
+    phone_search = request.GET.get("phone", "")
+    sleecid = request.GET.get("sleecid", "")
+    utm_source = request.GET.get("utm_source", "")
+    sort_field = request.GET.get("sort_by", "Distinct_ID")
+    action = request.GET.get("action", "filter")
+
+    # 2. Build Filters for SGTM_Payload columns
+    filters = {}
+
+    if event_name:
+        filters["event_name"] = ("eq", event_name)
+
+    if utm_source and utm_source != "None":
+        filters["utm_source"] = ("eq", utm_source)
+
+    if phone_search and phone_search != "None":
+        filters["phone"] = ("eq", phone_search)
+
+    if sleecid and sleecid != "None":
+        filters["sleecid"] = ("eq", sleecid)
+
+    # Date Range Logic
+    if date_after and not date_end:
+        if len(date_after) == 10: date_after += "T00:00:00"
+        filters["event_time"] = ("gte", date_after)
+
+    if date_end and not date_after:
+        if len(date_end) == 10: date_end += "T23:59:59"
+        filters["event_time"] = ("lte", date_end)
+
+    if date_after and date_end:
+        if len(date_after) == 10: date_after += "T00:00:00"
+        elif len(date_after) == 16: date_after += ":00"
+        
+        if len(date_end) == 10: date_end += "T23:59:59"
+        elif len(date_end) == 16: date_end += ":00"
+
+        filters["event_time"] = ("between", date_after, date_end)
+
+    # 3. Fetch Data
+    df = fetch_data_from_supabase_specific(
+        table_name="SGTM_Payload",
+        columns=[
+            "Distinct_ID", "event_name", "event_id", "event_time", "email", 
+            "phone", "first_name", "last_name", "user_name", "click_id", 
+            "sleecid", "utm_source", "utm_medium", "utm_campaign", 
+            "utm_content", "utm_term", "user_data", "marketing_parameters"
+        ],
+        filters=filters,
+        order_by=sort_field,
+        limit=limit,
+    )
+
+    data = [] if df is None or df.empty else df.to_dict(orient="records")
+
+    # 4. Analytics: UTM Percentages
+    def to_pct(counter):
+        total = sum(counter.values())
+        return {k: round(v / total * 100, 2) for k, v in counter.items()} if total else {}
+
+    sources = [r["utm_source"] for r in data if r.get("utm_source")]
+    campaigns = [r["utm_campaign"] for r in data if r.get("utm_campaign")]
+
+    # 5. Handle Excel Export
+    if action == "export_excel" and df is not None:
+        from openpyxl import Workbook
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "SGTM Data"
+        headers = list(df.columns)
+        ws.append(headers)
+        for _, row in df.iterrows():
+            ws.append([str(row[h]) if row[h] is not None else "" for h in headers])
+        
+        response = HttpResponse(content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        response["Content-Disposition"] = "attachment; filename=sgtm_export.xlsx"
+        wb.save(response)
+        return response
+
+    # 6. Prepare Context
+    context = {
+        "data": data,
+        "row_count": len(df) if df is not None else 0,
+        "selected_event_name": event_name,
+        "selected_limit": limit,
+        "selected_date": date_after,
+        "selected_date_end": date_end,
+        "email_search": email_search,
+        "phone_search": phone_search,
+        "sleecid": sleecid,
+        "utm_source": utm_source,
+        "sort_field": sort_field,
+        "utm_source_labels": json.dumps(list(to_pct(Counter(sources)).keys())),
+        "utm_source_values": json.dumps(list(to_pct(Counter(sources)).values())),
+        "utm_campaign_labels": json.dumps(list(to_pct(Counter(campaigns)).keys())),
+        "utm_campaign_values": json.dumps(list(to_pct(Counter(campaigns)).values())),
+    }
+
+    return render(request, "Demo/sgtm_table.html", context)

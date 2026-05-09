@@ -85,4 +85,5 @@ urlpatterns = [
     path("url-builder/", views.url_builder, name="url_builder"),
 
     path("api/webhooks/sgtm/", views.sgtm_webhook, name="sgtm_webhook"),
+    path("sgtm-table/", views.sgtm_table_view, name="sgtm_table_view"),
     ]

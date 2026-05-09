@@ -1,0 +1,569 @@
+{% load static %}
+{% extends "Demo/base.html" %}
+
+{% block title %} SGTM - Table {% endblock title %}
+
+{% block content %}
+  :root {
+    --bg: #0d0f14;
+    --surface: #151820;
+    --surface2: #1c202c;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.13);
+    --text: #e8eaf0;
+    --muted: #7a7f96;
+    --accent: #5b8af0;
+    --accent2: #3ecf8e;
+    --accent3: #f0a05b;
+    --danger: #e05c5c;
+    --pill-bg: rgba(91,138,240,0.13);
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px; min-height: 100vh; }
+
+  /* Layout */
+  .shell { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
+  .sidebar { background: var(--surface); border-right: 1px solid var(--border); padding: 28px 20px; position: sticky; top: 0; height: 100vh; overflow-y: auto; display: flex; flex-direction: column; gap: 24px; }
+  .main { padding: 28px 32px; overflow: hidden; }
+
+  /* Sidebar */
+  .logo { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 17px; letter-spacing: -0.3px; color: var(--text); display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .logo-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); display: inline-block; }
+  .sidebar-section { display: flex; flex-direction: column; gap: 6px; }
+  .sidebar-label { font-size: 10px; font-weight: 500; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+  label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px; }
+  input[type="text"], input[type="datetime-local"], select {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border2); border-radius: var(--radius-sm);
+    color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 13px; padding: 8px 10px;
+    outline: none; transition: border-color 0.2s;
+  }
+  input:focus, select:focus { border-color: var(--accent); }
+  input[type="datetime-local"]::-webkit-calendar-picker-indicator { filter: invert(0.6); }
+
+  /* Checkboxes (event types) */
+  .checkbox-group { display: flex; flex-direction: column; gap: 6px; }
+  .cb-item { display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 6px 8px; border-radius: var(--radius-sm); border: 1px solid transparent; transition: all 0.15s; }
+  .cb-item:hover { background: var(--surface2); border-color: var(--border2); }
+  .cb-item input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; flex-shrink: 0; }
+  .cb-item span { font-size: 13px; color: var(--text); }
+  .cb-badge { margin-left: auto; font-size: 10px; font-family: 'DM Mono', monospace; padding: 2px 6px; border-radius: 20px; }
+  .badge-purchase { background: rgba(62,207,142,0.15); color: var(--accent2); }
+  .badge-pageview { background: rgba(91,138,240,0.15); color: var(--accent); }
+  .badge-addcart { background: rgba(240,160,91,0.15); color: var(--accent3); }
+
+  /* Buttons */
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px; border-radius: var(--radius-sm); font-size: 13px; font-family: 'DM Sans', sans-serif; font-weight: 500; cursor: pointer; border: none; transition: all 0.15s; text-decoration: none; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #4a79df; }
+  .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border2); }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-export { background: rgba(62,207,142,0.13); color: var(--accent2); border: 1px solid rgba(62,207,142,0.25); }
+  .btn-export:hover { background: rgba(62,207,142,0.22); }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+  .btn-row { display: flex; flex-direction: column; gap: 8px; }
+
+  /* Header */
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+  .page-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 22px; letter-spacing: -0.5px; }
+  .row-badge { background: var(--surface2); border: 1px solid var(--border2); border-radius: 20px; padding: 4px 12px; font-size: 12px; font-family: 'DM Mono', monospace; color: var(--muted); }
+
+  /* Stats row */
+  .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; }
+  .stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); margin-bottom: 6px; }
+  .stat-val { font-family: 'DM Mono', monospace; font-size: 24px; font-weight: 500; }
+  .stat-val.accent { color: var(--accent); }
+  .stat-val.accent2 { color: var(--accent2); }
+  .stat-val.accent3 { color: var(--accent3); }
+
+  /* Charts */
+  .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+  .chart-title { font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 16px; }
+  .chart-empty { height: 200px; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 13px; border: 1px dashed var(--border2); border-radius: var(--radius-sm); }
+
+  /* Table */
+  .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .table-toolbar { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+  .search-input { flex: 1; max-width: 280px; background: var(--surface2); border: 1px solid var(--border2); border-radius: var(--radius-sm); color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 13px; padding: 7px 10px; outline: none; }
+  .search-input:focus { border-color: var(--accent); }
+  .table-scroll { overflow-x: auto; max-height: 520px; overflow-y: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th { background: var(--surface2); padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); position: sticky; top: 0; z-index: 1; white-space: nowrap; border-bottom: 1px solid var(--border); }
+  thead th.sortable { cursor: pointer; user-select: none; }
+  thead th.sortable:hover { color: var(--accent); }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+  tbody tr:hover { background: var(--surface2); }
+  tbody tr:last-child { border-bottom: none; }
+  td { padding: 10px 14px; color: var(--text); white-space: nowrap; max-width: 160px; overflow: hidden; text-overflow: ellipsis; font-family: 'DM Mono', monospace; font-size: 12px; }
+  td.name-col { font-family: 'DM Sans', sans-serif; font-size: 13px; font-family: unset; }
+  .event-pill { display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 500; white-space: nowrap; font-family: 'DM Sans', sans-serif; }
+  .ep-purchase { background: rgba(62,207,142,0.15); color: var(--accent2); }
+  .ep-pageview, .ep-page_view { background: rgba(91,138,240,0.15); color: var(--accent); }
+  .ep-add_to_cart { background: rgba(240,160,91,0.15); color: var(--accent3); }
+  .ep-default { background: rgba(255,255,255,0.07); color: var(--muted); }
+  .utm-tag { display: inline-block; background: rgba(91,138,240,0.1); color: var(--accent); padding: 2px 7px; border-radius: 4px; font-size: 11px; }
+
+  /* Pagination */
+  .pagination { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-top: 1px solid var(--border); }
+  .page-info { font-size: 12px; color: var(--muted); font-family: 'DM Mono', monospace; }
+  .page-btns { display: flex; gap: 6px; }
+  .page-btn { background: var(--surface2); border: 1px solid var(--border2); color: var(--text); border-radius: var(--radius-sm); padding: 5px 12px; cursor: pointer; font-size: 12px; font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
+  .page-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .page-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  /* Empty */
+  .empty-state { padding: 60px 20px; text-align: center; color: var(--muted); }
+  .empty-state svg { margin-bottom: 12px; opacity: 0.3; }
+  .empty-state p { font-size: 15px; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 10px; }
+
+  @media (max-width: 900px) {
+    .shell { grid-template-columns: 1fr; }
+    .sidebar { position: static; height: auto; }
+    .charts-row { grid-template-columns: 1fr; }
+    .stats-row { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+
+<form method="GET" id="filterForm">
+<div class="shell">
+
+  <!-- ── SIDEBAR ─────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="logo">
+      <span class="logo-dot"></span>
+      SGTM Explorer
+    </div>
+
+    <!-- Event type checkboxes -->
+    <div class="sidebar-section">
+      <div class="sidebar-label">Event Type</div>
+      <div class="checkbox-group">
+        {% for ev in "purchase,page_view,add_to_cart"|split:"," %}
+        <label class="cb-item">
+          <input type="checkbox" name="event_type" value="{{ ev }}"
+            {% if ev in selected_events %}checked{% endif %}>
+          <span>{{ ev|title|cut:"_" }}</span>
+          <span class="cb-badge {% if ev == 'purchase' %}badge-purchase{% elif ev == 'page_view' %}badge-pageview{% else %}badge-addcart{% endif %}">
+            {{ ev|slice:":2"|upper }}
+          </span>
+        </label>
+        {% endfor %}
+        <!-- fallback if templatetag not available -->
+        <label class="cb-item">
+          <input type="checkbox" name="event_type" value="purchase"
+            {% if "purchase" in selected_events %}checked{% endif %}>
+          <span>Purchase</span>
+          <span class="cb-badge badge-purchase">PU</span>
+        </label>
+        <label class="cb-item">
+          <input type="checkbox" name="event_type" value="page_view"
+            {% if "page_view" in selected_events %}checked{% endif %}>
+          <span>Page View</span>
+          <span class="cb-badge badge-pageview">PV</span>
+        </label>
+        <label class="cb-item">
+          <input type="checkbox" name="event_type" value="add_to_cart"
+            {% if "add_to_cart" in selected_events %}checked{% endif %}>
+          <span>Add to Cart</span>
+          <span class="cb-badge badge-addcart">AC</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Date Range -->
+    <div class="sidebar-section">
+      <div class="sidebar-label">Date Range</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div>
+          <label>From</label>
+          <input type="datetime-local" name="date_after" value="{{ selected_date|default:'' }}">
+        </div>
+        <div>
+          <label>To</label>
+          <input type="datetime-local" name="date_end" value="{{ selected_date_end|default:'' }}">
+        </div>
+      </div>
+    </div>
+
+    <!-- Identifiers -->
+    <div class="sidebar-section">
+      <div class="sidebar-label">Identifiers</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div>
+          <label>Email</label>
+          <input type="text" name="email" value="{{ email_search|default:'' }}" placeholder="user@example.com">
+        </div>
+        <div>
+          <label>Phone</label>
+          <input type="text" name="phone" value="{{ phone_search|default:'' }}" placeholder="+9715...">
+        </div>
+        <div>
+          <label>Slee CID</label>
+          <input type="text" name="sleecid" value="{{ sleecid|default:'' }}" placeholder="cid_...">
+        </div>
+      </div>
+    </div>
+
+    <!-- UTM -->
+    <div class="sidebar-section">
+      <div class="sidebar-label">UTM</div>
+      <div>
+        <label>Source</label>
+        <input type="text" name="utm_source" value="{{ utm_source|default:'' }}" placeholder="google, facebook...">
+      </div>
+    </div>
+
+    <!-- Limit & Sort -->
+    <div class="sidebar-section">
+      <div class="sidebar-label">Options</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div>
+          <label>Row limit</label>
+          <select name="limit">
+            {% for n in "100,500,1000,2000,5000"|split:"," %}
+            <option value="{{ n }}" {% if selected_limit|stringformat:"s" == n %}selected{% endif %}>{{ n }} rows</option>
+            {% endfor %}
+            <option value="100" {% if selected_limit == 100 or not selected_limit %}selected{% endif %}>100 rows</option>
+            <option value="500" {% if selected_limit == 500 %}selected{% endif %}>500 rows</option>
+            <option value="1000" {% if selected_limit == 1000 %}selected{% endif %}>1 000 rows</option>
+            <option value="2000" {% if selected_limit == 2000 %}selected{% endif %}>2 000 rows</option>
+            <option value="5000" {% if selected_limit == 5000 %}selected{% endif %}>5 000 rows</option>
+          </select>
+        </div>
+        <div>
+          <label>Sort by</label>
+          <select name="sort_by">
+            <option value="Distinct_ID" {% if sort_field == "Distinct_ID" %}selected{% endif %}>Distinct ID</option>
+            <option value="event_time" {% if sort_field == "event_time" %}selected{% endif %}>Event Time</option>
+            <option value="event_name" {% if sort_field == "event_name" %}selected{% endif %}>Event Name</option>
+            <option value="utm_source" {% if sort_field == "utm_source" %}selected{% endif %}>UTM Source</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="btn-row" style="margin-top:auto;">
+      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        Apply Filters
+      </button>
+      <button type="submit" name="action" value="export_excel" class="btn btn-export" style="width:100%;justify-content:center;">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+        Export Excel
+      </button>
+      <a href="?" class="btn btn-secondary" style="width:100%;justify-content:center;">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 109-9M3 3v6h6"/></svg>
+        Reset
+      </a>
+    </div>
+  </aside>
+
+  <!-- ── MAIN ───────────────────────────────── -->
+  <main class="main">
+
+    <!-- Header -->
+    <div class="page-header">
+      <div>
+        <div class="page-title">Data Explorer</div>
+        <div style="color:var(--muted);font-size:13px;margin-top:4px;">SGTM Payload · Server-side tagging</div>
+      </div>
+      <span class="row-badge">{{ row_count }} rows</span>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-label">Total Events</div>
+        <div class="stat-val accent">{{ row_count }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">UTM Sources</div>
+        <div class="stat-val" id="srcCount">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Campaigns</div>
+        <div class="stat-val accent3" id="campCount">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Filter Applied</div>
+        <div class="stat-val accent2" style="font-size:16px;">{{ selected_event_name|default:"All" }}</div>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    {% if utm_source_labels != "[]" or utm_campaign_labels != "[]" %}
+    <div class="charts-row">
+      <div class="chart-card">
+        <div class="chart-title">UTM Source Distribution</div>
+        {% if utm_source_labels != "[]" %}
+        <div id="srcLegend" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;font-size:11px;color:var(--muted);"></div>
+        <div style="position:relative;height:200px;">
+          <canvas id="srcChart" role="img" aria-label="UTM source distribution doughnut chart"></canvas>
+        </div>
+        {% else %}
+        <div class="chart-empty">No UTM source data</div>
+        {% endif %}
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Campaign Performance</div>
+        {% if utm_campaign_labels != "[]" %}
+        <div id="campLegend" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;font-size:11px;color:var(--muted);"></div>
+        <div style="position:relative;height:200px;">
+          <canvas id="campChart" role="img" aria-label="UTM campaign distribution bar chart"></canvas>
+        </div>
+        {% else %}
+        <div class="chart-empty">No campaign data</div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Table -->
+    <div class="table-wrap">
+      <div class="table-toolbar">
+        <input class="search-input" type="text" id="tableSearch" placeholder="Quick search in current results…" oninput="filterTable()">
+        <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+          <span style="font-size:12px;color:var(--muted);">Page <span id="pageNum">1</span> of <span id="pageTotal">1</span></span>
+        </div>
+      </div>
+
+      {% if data %}
+      <div class="table-scroll">
+        <table id="dataTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th class="sortable" onclick="sortTable(1)">Distinct ID ↕</th>
+              <th class="sortable" onclick="sortTable(2)">Event</th>
+              <th class="sortable" onclick="sortTable(3)">Time</th>
+              <th>Email</th>
+              <th>Phone</th>
+              <th>Name</th>
+              <th class="sortable" onclick="sortTable(7)">UTM Source</th>
+              <th>UTM Campaign</th>
+              <th>UTM Medium</th>
+              <th>Click ID</th>
+              <th>Slee CID</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+            {% for row in data %}
+            <tr data-search="{{ row.Distinct_ID }} {{ row.event_name }} {{ row.email }} {{ row.phone }} {{ row.utm_source }} {{ row.utm_campaign }}">
+              <td style="color:var(--muted);">{{ forloop.counter }}</td>
+              <td title="{{ row.Distinct_ID }}">{{ row.Distinct_ID|truncatechars:16 }}</td>
+              <td>
+                {% with ev=row.event_name %}
+                <span class="event-pill ep-{{ ev }}">{{ ev }}</span>
+                {% endwith %}
+              </td>
+              <td>{{ row.event_time|default:"—" }}</td>
+              <td title="{{ row.email }}">{{ row.email|default:"—"|truncatechars:20 }}</td>
+              <td>{{ row.phone|default:"—" }}</td>
+              <td class="name-col">{{ row.first_name|default:"" }} {{ row.last_name|default:"" }}</td>
+              <td>{% if row.utm_source %}<span class="utm-tag">{{ row.utm_source }}</span>{% else %}—{% endif %}</td>
+              <td title="{{ row.utm_campaign }}">{{ row.utm_campaign|default:"—"|truncatechars:18 }}</td>
+              <td>{{ row.utm_medium|default:"—" }}</td>
+              <td title="{{ row.click_id }}">{{ row.click_id|default:"—"|truncatechars:14 }}</td>
+              <td title="{{ row.sleecid }}">{{ row.sleecid|default:"—"|truncatechars:14 }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination -->
+      <div class="pagination">
+        <span class="page-info">Showing <span id="showFrom">1</span>–<span id="showTo">100</span> of <span id="showTotal">0</span></span>
+        <div class="page-btns" id="pageBtns"></div>
+      </div>
+
+      {% else %}
+      <div class="empty-state">
+        <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+        <p>No data matched your filters.</p>
+        <p style="font-size:12px;margin-top:6px;">Try relaxing the date range or clearing event filters.</p>
+      </div>
+      {% endif %}
+    </div>
+
+  </main>
+</div>
+</form>
+
+<script>
+// ── Chart data from Django context ──
+const srcLabels  = {{ utm_source_labels|safe }};
+const srcValues  = {{ utm_source_values|safe }};
+const campLabels = {{ utm_campaign_labels|safe }};
+const campValues = {{ utm_campaign_values|safe }};
+
+const PALETTE = ['#5b8af0','#3ecf8e','#f0a05b','#e05c5c','#b45bf0','#5bcde0','#f05bb3','#8af05b','#f0d45b','#a0a0c0'];
+
+function buildLegend(containerId, labels, values, colors) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = labels.map((l,i) =>
+    `<span style="display:flex;align-items:center;gap:4px;">
+      <span style="width:9px;height:9px;border-radius:2px;background:${colors[i % colors.length]};flex-shrink:0;"></span>
+      ${l} <strong style="color:#e8eaf0;">${values[i]}%</strong>
+    </span>`
+  ).join('');
+}
+
+// Update stat counters
+document.getElementById('srcCount').textContent  = srcLabels.length  || '—';
+document.getElementById('campCount').textContent = campLabels.length || '—';
+
+// Source doughnut
+if (srcLabels.length) {
+  buildLegend('srcLegend', srcLabels, srcValues, PALETTE);
+  new Chart(document.getElementById('srcChart'), {
+    type: 'doughnut',
+    data: {
+      labels: srcLabels,
+      datasets: [{
+        data: srcValues,
+        backgroundColor: PALETTE.slice(0, srcLabels.length),
+        borderWidth: 2,
+        borderColor: '#151820',
+        hoverBorderColor: '#151820'
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '65%',
+      plugins: { legend: { display: false }, tooltip: {
+        callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed}%` }
+      }}
+    }
+  });
+}
+
+// Campaign bar
+if (campLabels.length) {
+  buildLegend('campLegend', campLabels, campValues, PALETTE);
+  const barH = Math.max(200, campLabels.length * 36);
+  const campWrap = document.getElementById('campChart')?.parentElement;
+  if (campWrap) campWrap.style.height = barH + 'px';
+  new Chart(document.getElementById('campChart'), {
+    type: 'bar',
+    data: {
+      labels: campLabels,
+      datasets: [{
+        label: '%',
+        data: campValues,
+        backgroundColor: campLabels.map((_,i) => PALETTE[i % PALETTE.length]),
+        borderRadius: 4
+      }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: {
+        callbacks: { label: ctx => ` ${ctx.parsed.x}%` }
+      }},
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#7a7f96', font: { size: 11 }, callback: v => v + '%' } },
+        y: { grid: { display: false }, ticks: { color: '#e8eaf0', font: { size: 11 } } }
+      }
+    }
+  });
+}
+
+// ── Pagination ──
+const PAGE_SIZE = 100;
+let currentPage = 1;
+let filteredRows = [];
+
+function getAllRows() {
+  return Array.from(document.querySelectorAll('#tableBody tr'));
+}
+
+function filterTable() {
+  const q = document.getElementById('tableSearch').value.toLowerCase();
+  filteredRows = getAllRows().filter(tr => {
+    const text = (tr.dataset.search || tr.textContent).toLowerCase();
+    return !q || text.includes(q);
+  });
+  currentPage = 1;
+  renderPage();
+}
+
+function renderPage() {
+  const allRows = getAllRows();
+  allRows.forEach(r => r.style.display = 'none');
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const end   = Math.min(start + PAGE_SIZE, filteredRows.length);
+  filteredRows.slice(start, end).forEach(r => r.style.display = '');
+
+  const total = filteredRows.length;
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  document.getElementById('showFrom').textContent  = total ? start + 1 : 0;
+  document.getElementById('showTo').textContent    = end;
+  document.getElementById('showTotal').textContent = total;
+  document.getElementById('pageNum').textContent   = currentPage;
+  document.getElementById('pageTotal').textContent = pages;
+
+  // Build page buttons (window of 5)
+  const btns = document.getElementById('pageBtns');
+  btns.innerHTML = '';
+  const addBtn = (label, page, disabled, active) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'page-btn' + (active ? ' active' : '');
+    b.textContent = label;
+    b.disabled = disabled;
+    b.onclick = () => { currentPage = page; renderPage(); };
+    btns.appendChild(b);
+  };
+  addBtn('«', 1, currentPage === 1, false);
+  addBtn('‹', currentPage - 1, currentPage === 1, false);
+
+  const winStart = Math.max(1, currentPage - 2);
+  const winEnd   = Math.min(pages, winStart + 4);
+  for (let p = winStart; p <= winEnd; p++) addBtn(p, p, false, p === currentPage);
+
+  addBtn('›', currentPage + 1, currentPage === pages, false);
+  addBtn('»', pages, currentPage === pages, false);
+}
+
+// Sort table
+let sortDir = {};
+function sortTable(col) {
+  sortDir[col] = !sortDir[col];
+  filteredRows.sort((a, b) => {
+    const aT = a.cells[col]?.textContent.trim() || '';
+    const bT = b.cells[col]?.textContent.trim() || '';
+    return sortDir[col] ? aT.localeCompare(bT) : bT.localeCompare(aT);
+  });
+  currentPage = 1;
+  renderPage();
+}
+
+// Init
+filteredRows = getAllRows();
+renderPage();
+
+// Deduplicate the hardcoded checkboxes vs template loop (remove one set)
+// Since Django template |split filter may not exist, we show only the second set.
+// Hide the template loop items (first 3 might not render if filter unavailable).
+document.querySelectorAll('.cb-item').forEach((el, i) => {
+  const vals = Array.from(document.querySelectorAll('.cb-item input[type=checkbox]')).map(c => c.value);
+  const seen = {};
+  document.querySelectorAll('.cb-item input[type=checkbox]').forEach(cb => {
+    if (seen[cb.value]) cb.closest('.cb-item').remove();
+    else seen[cb.value] = true;
+  });
+});
+</script>
+
+{% endblock %}
