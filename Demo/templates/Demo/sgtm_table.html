@@ -347,6 +347,14 @@
               <th>UTM Medium</th>
               <th>Click ID</th>
               <th>Slee CID</th>
+              <th>User Data</th>
+              <th>Client Info</th>
+              <th>Custom Data</th>
+              <th>Marketing Params</th>
+              <th>Platform IDs</th>
+              <th>Google</th>
+              <th>Snapchat</th>
+              <th>TikTok</th>
             </tr>
           </thead>
           <tbody id="tableBody">
@@ -368,6 +376,14 @@
               <td>{{ row.utm_medium|default:"—" }}</td>
               <td title="{{ row.click_id }}">{{ row.click_id|default:"—"|truncatechars:14 }}</td>
               <td title="{{ row.sleecid }}">{{ row.sleecid|default:"—"|truncatechars:14 }}</td>
+              <td title="{{ row.user_data }}">{{ row.user_data|default:"—" }}</td>
+              <td title="{{ row.client_info }}">{{ row.client_info|default:"—" }}</td>
+              <td title="{{ row.custom_data }}">{{ row.custom_data|default:"—" }}</td>
+              <td title="{{ row.marketing_parameters }}">{{ row.marketing_parameters|default:"—" }}</td>
+              <td>{{ row.platform_ids|default:"—" }}</td>
+              <td>{{ row.google_aid|default:"—" }}</td>
+              <td>{{ row.snap_aid|default:"—" }}</td>
+              <td>{{ row.tiktok_aid|default:"—" }}</td>
             </tr>
             {% endfor %}
           </tbody>

@@ -9946,12 +9946,6 @@ def sgtm_table_view(request):
     # 3. Fetch Data
     df = fetch_data_from_supabase_specific(
         table_name="SGTM_Payload",
-        columns=[
-            "Distinct_ID", "event_name", "event_id", "event_time", "email", 
-            "phone", "first_name", "last_name", "user_name", "click_id", 
-            "sleecid", "utm_source", "utm_medium", "utm_campaign", 
-            "utm_content", "utm_term", "user_data", "marketing_parameters"
-        ],
         filters=filters,
         order_by=sort_field,
         limit=limit,
