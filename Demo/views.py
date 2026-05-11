@@ -4404,7 +4404,7 @@ def save_tracking(request):
             session_customer_info["Customer_Mobile"] = mobile
 
         #######################
-        ## CASE 4: IP ADDRESS SOURCE MAPPING BLOCK -- 
+        '''## CASE 4: IP ADDRESS SOURCE MAPPING BLOCK -- 
         if event_type == "purchase" and final_source in weak_sources:
 
             dprint("[IP CHECK] purchase + weak source")
@@ -4451,7 +4451,7 @@ def save_tracking(request):
 
                     pending_source_updates.append(("Client_IP", ip_hash))
 
-                    print("[SAVE TRACKING ADDED IP UPDATE TO PENDING LIST]")
+                    print("[SAVE TRACKING ADDED IP UPDATE TO PENDING LIST]")'''
 
         ############################ This section is for whenever the case is purchase and the first page recorded is directly from a product
         # ==================== CASE 5: FINGERPRINT RESCUE (PURCHASE ONLY) ====================
