@@ -126,6 +126,15 @@ nav {
   --border: rgba(0, 0, 0, 0.08);
   --border-md: rgba(0, 0, 0, 0.13);
   --accent: #534AB7;
+  --accent-soft: rgba(83, 74, 183, 0.1);
+  --accent-blue: #0866ff;
+  --accent-blue-soft: rgba(8, 102, 255, 0.1);
+  --accent-red: #ff4025;
+  --accent-red-soft: rgba(255, 64, 37, 0.1);
+  --accent-yellow: #ffb100; 
+  --accent-yellow-soft: rgba(255, 177, 0, 0.15);
+  --accent-cyan: #69c9d0;
+  --accent-cyan-soft: rgba(105, 201, 208, 0.15);
 
   /* Typography & Radius */
   --ff-head: 'Syne', sans-serif;
@@ -711,12 +720,30 @@ table.orders tbody tr:hover td {
 }
 
 .src-instagram {
-  background: var(--accent-soft);
-  color: #3c3489;
+  background: var(--accent-red-soft);
+  color: #b31d09;
 }
 
 .src-instagram .badge-dot {
-  background: var(--accent);
+  background: var(--accent-red);
+}
+
+.src-tiktok {
+  background: var(--accent-cyan-soft);
+  color: #005a60;
+}
+
+.src-tiktok .badge-dot {
+  background: var(--accent-cyan);
+}
+
+.src-snapchat {
+  background: var(--accent-yellow-soft);
+  color: #855d00;
+}
+
+.src-snapchat .badge-dot {
+  background: var(--accent-yellow);
 }
 
 .src-google {
