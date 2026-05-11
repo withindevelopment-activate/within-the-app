@@ -9793,13 +9793,21 @@ def sgtm_webhook(request):
 
         event_name = data.get('event_name')
         event_id = data.get('event_id')
-        event_time = data.get('event_time')
+        # event_time = data.get('event_time')
 
         user_data = data.get('user_data', {})
 
         email = user_data.get('email')
 
         phone = user_data.get('phone')
+
+        page_location = user_data.get('address', {}).get('page_location')
+
+        custom_data = data.get('custom_data', {})
+
+        context = custom_data.get('context', {})
+
+        page_referrer = context.get('page_referrer')
 
         first_name = user_data.get('first_name')
         last_name = user_data.get('last_name')
@@ -9809,18 +9817,9 @@ def sgtm_webhook(request):
         client_info = user_data.get('client_info', {})
 
         click_id = client_info.get('click_id')          
-        sleecid = client_info.get('query_sleecid')
+        sleecid = client_info.get('query_string')
 
         custom_data = data.get('custom_data', {})
-
-
-        marketing_parameters = data.get('marketing_parameters', {})
-
-        utm_source = marketing_parameters.get('utm_source')
-        utm_medium = marketing_parameters.get('utm_medium')
-        utm_campaign = marketing_parameters.get('utm_campaign')
-        utm_content = marketing_parameters.get('utm_content')
-        utm_term = marketing_parameters.get('utm_term')
 
         platform_identifiers = data.get('platform_identifiers', {})
 
@@ -9833,12 +9832,11 @@ def sgtm_webhook(request):
             'Distinct_ID': int(get_next_id_from_supabase_compatible_all(name='SGTM_Payload', column='Distinct_ID')),
             'event_name': event_name,
             'event_id': event_id,
-            'event_time': event_time,
 
             'user_data': user_data,
             'client_info': client_info,
             'custom_data': custom_data,
-            'marketing_parameters': marketing_parameters,
+            'marketing_parameters': context,
             'platform_identifiers': platform_identifiers,
             'google': google,
             'snapchat': snapchat,
@@ -9853,11 +9851,8 @@ def sgtm_webhook(request):
             'click_id': click_id,
             'sleecid': sleecid,
 
-            'utm_source': utm_source,
-            'utm_medium': utm_medium,
-            'utm_campaign': utm_campaign,
-            'utm_content': utm_content,
-            'utm_term': utm_term,
+            'utm_source': page_location,
+            'utm_medium': page_referrer,
         }
 
         batch_insert_to_supabase(
