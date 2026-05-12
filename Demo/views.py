@@ -9807,7 +9807,6 @@ def sgtm_webhook(request):
 
         context = custom_data.get('context', {})
 
-        page_referrer = context.get('page_referrer')
 
         first_name = user_data.get('first_name')
         last_name = user_data.get('last_name')
@@ -9819,14 +9818,42 @@ def sgtm_webhook(request):
         click_id = client_info.get('click_id')          
         sleecid = client_info.get('query_string')
 
+        parsed_params = {k: v[0] for k, v in parse_qs(client_info.get('query_string')).items()}
+
+        # 2. Extract specific variables
+        measurement_id    = parsed_params.get('tid', '')
+        client_id         = parsed_params.get('cid', '')
+        user_id           = parsed_params.get('uid', '')
+        session_id        = parsed_params.get('sid', '')
+        page_url          = parsed_params.get('dl', '')
+        referrer          = parsed_params.get('dr', '')
+        currency          = parsed_params.get('cu', '')
+        screen_resolution = parsed_params.get('sr', '')
+        user_region       = parsed_params.get('ur', '')
+        user_language     = parsed_params.get('ul', '')
+
+        def get_utms(url):
+            """Extracts UTM parameters from a given URL into a dictionary."""
+            if not url:
+                return {}
+            
+            # Parse the query string from the URL
+            query_string = urlparse(url).query
+            params = {k: v[0] for k, v in parse_qs(query_string).items()}
+            
+            # Filter only for UTM parameters
+            return {k: v for k, v in params.items() if k.startswith('utm_')}
+        
+        utm_from_referrer = get_utms(referrer)
+        utm_from_page = get_utms(page_url)
+
+        dl_url = parsed_params.get('dl', '')
+        dl_params = {k: v[0] for k, v in parse_qs(urlparse(dl_url).query).items()}
+        sleecid_val = dl_params.get('sleecid')
+
         custom_data = data.get('custom_data', {})
 
-        platform_identifiers = data.get('platform_identifiers', {})
-
-        facebook = platform_identifiers.get('facebook', {})
-        google = platform_identifiers.get('google', {})
-        snapchat = platform_identifiers.get('snapchat', {})
-        tiktok = platform_identifiers.get('tiktok', {})
+        platform_identifiers = screen_resolution + "|" + user_region + "|" + user_language
 
         entry = {
             'Distinct_ID': int(get_next_id_from_supabase_compatible_all(name='SGTM_Payload', column='Distinct_ID')),
@@ -9838,9 +9865,9 @@ def sgtm_webhook(request):
             'custom_data': custom_data,
             'marketing_parameters': context,
             'platform_identifiers': platform_identifiers,
-            'google': google,
-            'snapchat': snapchat,
-            'tiktok': tiktok,
+            'google': client_id,
+            'snapchat': user_id,
+            'tiktok': session_id,
 
             'email': email,
             'phone': phone,
@@ -9849,10 +9876,13 @@ def sgtm_webhook(request):
             'user_name': user_name,
 
             'click_id': click_id,
-            'sleecid': sleecid,
+            'sleecid': sleecid_val,
 
-            'utm_source': page_location,
-            'utm_medium': page_referrer,
+            'utm_source': utm_from_referrer.get('utm_source') or utm_from_page.get('utm_source'),
+            'utm_medium': utm_from_referrer.get('utm_medium') or utm_from_page.get('utm_medium'),
+            'utm_campaign': utm_from_referrer.get('utm_campaign') or utm_from_page.get('utm_campaign'),
+            'utm_content': utm_from_referrer.get('utm_content') or utm_from_page.get('utm_content'),
+            'utm_term': utm_from_referrer.get('utm_term') or utm_from_page.get('utm_term'),
         }
 
         batch_insert_to_supabase(
@@ -9861,7 +9891,7 @@ def sgtm_webhook(request):
 
         print(
             f"[SGTM WEBHOOK] Successfully saved "
-            f"{event_name} | {event_id} | SleeCID: {sleecid}"
+            f"{event_name} | {event_id} | SleeCID: {sleecid_val}"
         )
 
         return JsonResponse({
