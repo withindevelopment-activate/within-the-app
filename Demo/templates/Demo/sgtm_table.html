@@ -309,7 +309,7 @@
         <div class="chart-title">UTM Source Distribution</div>
         {% if utm_source_labels != "[]" %}
         <div id="srcLegend" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;font-size:11px;color:var(--muted);"></div>
-        <div style="position:relative;height:200px;">
+        <div style="position:relative;height:250px;">
           <canvas id="srcChart" role="img" aria-label="UTM source distribution doughnut chart"></canvas>
         </div>
         {% else %}
@@ -320,7 +320,7 @@
         <div class="chart-title">Campaign Performance</div>
         {% if utm_campaign_labels != "[]" %}
         <div id="campLegend" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px;font-size:11px;color:var(--muted);"></div>
-        <div style="position:relative;height:200px;">
+        <div style="position:relative;height:250px;">
           <canvas id="campChart" role="img" aria-label="UTM campaign distribution bar chart"></canvas>
         </div>
         {% else %}
@@ -456,11 +456,10 @@ if (srcLabels.length) {
         borderWidth: 0,
         borderRadius: 10,
         spacing: 0,
-        radius: '80%',
       }]
     },
     options: {
-      responsive: true, maintainAspectRatio: false, cutout: '65%',
+      responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false }, tooltip: {
         callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed}%` }
       }}
