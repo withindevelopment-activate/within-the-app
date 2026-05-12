@@ -22,6 +22,7 @@
     --accent: #2563eb;       /* Vibrant blue */
     --accent2: #10b981;      /* Emerald green */
     --accent3: #f59e0b;      /* Amber */
+    --accent4: #ec4899;      /* Pink */
     --danger: #ef4444;       /* Red */
     --pill-bg: rgba(37, 99, 235, 0.1);
     --radius: 12px;
@@ -110,6 +111,7 @@
   .ep-purchase { background: rgba(62,207,142,0.15); color: var(--accent2); }
   .ep-pageview, .ep-page_view { background: rgba(91,138,240,0.15); color: var(--accent); }
   .ep-add_to_cart { background: rgba(240,160,91,0.15); color: var(--accent3); }
+  .ep-view_item { background: rgba(255,255,255,0.07); color: var(--accent4); }
   .ep-default { background: rgba(255,255,255,0.07); color: var(--muted); }
   .utm-tag { display: inline-block; background: rgba(91,138,240,0.1); color: var(--accent); padding: 2px 7px; border-radius: 4px; font-size: 11px; }
 
@@ -441,15 +443,17 @@ document.getElementById('campCount').textContent = campLabels.length || '—';
 if (srcLabels.length) {
   buildLegend('srcLegend', srcLabels, srcValues, PALETTE);
   new Chart(document.getElementById('srcChart'), {
-    type: 'doughnut',
+    type: 'pie',
     data: {
       labels: srcLabels,
       datasets: [{
         data: srcValues,
         backgroundColor: PALETTE.slice(0, srcLabels.length),
-        borderWidth: 2,
-        borderColor: '#151820',
-        hoverBorderColor: '#151820'
+        hoverOffset: 20,
+        borderWidth: 0,
+        borderRadius: 10,
+        spacing: 0,
+        radius: '80%',
       }]
     },
     options: {
@@ -485,7 +489,7 @@ if (campLabels.length) {
       }},
       scales: {
         x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#7a7f96', font: { size: 11 }, callback: v => v + '%' } },
-        y: { grid: { display: false }, ticks: { color: '#e8eaf0', font: { size: 11 } } }
+        y: { grid: { display: false }, ticks: { color: '#7a7f96', font: { size: 11 } } }
       }
     }
   });
