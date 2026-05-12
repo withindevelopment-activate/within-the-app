@@ -9924,13 +9924,13 @@ def sgtm_table_view(request):
     if date_after: date_after = date_after.replace("T", " ")
     if date_end: date_end = date_end.replace("T", " ")
 
-    email_search = request.GET.get("email", "")
-    phone_search = request.GET.get("phone", "")
-    sleecid = request.GET.get("sleecid", "")
-    client_id = '"'+ request.GET.get("client_id", "") + '"'
-    utm_source = request.GET.get("utm_source", "")
-    sort_field = request.GET.get("sort_by", "Distinct_ID")
-    action = request.GET.get("action", "filter")
+    email_search   = request.GET.get("email", "")
+    phone_search   = request.GET.get("phone", "")
+    sleecid        = request.GET.get("sleecid", "")
+    client_id      = request.GET.get("client_id", "")
+    utm_source     = request.GET.get("utm_source", "")
+    sort_field     = request.GET.get("sort_by", "Distinct_ID")
+    action         = request.GET.get("action", "filter")
 
     # 2. Build Filters for SGTM_Payload columns
     filters = {}
@@ -9952,6 +9952,7 @@ def sgtm_table_view(request):
         filters["sleecid"] = ("eq", sleecid)
 
     if client_id and client_id != "None":
+        client_id = '"' + client_id + '"'
         filters["google"] = ("eq", client_id)
 
     # Date Range Logic
