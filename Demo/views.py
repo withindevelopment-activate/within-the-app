@@ -10017,6 +10017,7 @@ def sgtm_table_view(request):
         "email_search": email_search,
         "phone_search": phone_search,
         "sleecid": sleecid,
+        "user_id": user_id,
         "utm_source": utm_source,
         "sort_field": sort_field,
         "utm_source_labels": json.dumps(list(to_pct(Counter(sources)).keys())),
