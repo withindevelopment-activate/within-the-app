@@ -1,243 +1,198 @@
-{% extends 'Demo/base.html' %}
+{% extends "Demo/base.html" %}
 {% load static %}
 
+{% block title %} Tracking Events Viewer {% endblock title %}
+
 {% block content %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 
-<div class="container mt-4">
-    <h3 class="mb-4">Tracking Events Viewer</h3>
+<style>
+  :root {
+    --bg: #f8fafc;
+    --surface: #ffffff;
+    --surface2: #f1f5f9;
+    --border: #e2e8f0;
+    --border2: #cbd5e1;
+    --text: #1e293b;
+    --muted: #64748b;
+    --accent: #6366F1; /* Indigo */
+    --accent2: #10b981; /* Emerald */
+    --accent3: #f59e0b; /* Amber */
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px; min-height: 100vh; }
 
-    <!-- Filters Form -->
-    <form method="GET" class="row g-3 mb-4">
+  .shell { display: grid; grid-template-columns: 280px 1fr; min-height: 100vh; }
+  .sidebar { background: var(--surface); border-right: 1px solid var(--border); padding: 24px 20px; position: sticky; top: 0; height: 100vh; overflow-y: auto; display: flex; flex-direction: column; gap: 20px; }
+  .main { padding: 28px 32px; overflow: hidden; }
 
-        <!-- Event Type -->
-        <div class="col-md-1">
-            <label class="form-label">Event Type</label>
-            <select name="event_type" class="form-select">
-                <option value="">All</option>
-                <option value="purchase" {% if selected_event_type == "purchase" %}selected{% endif %}>Purchase</option>
-                <option value="add_to_cart" {% if selected_event_type == "add_to_cart" %}selected{% endif %}>Add to Cart</option>
-                <option value="pageview" {% if selected_event_type == "pageview" %}selected{% endif %}>Pageview</option>
-            </select>
-        </div>
+  .logo { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 18px; color: var(--text); display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .logo-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
 
-        <!-- Limit -->
-        <div class="col-md-1">
-            <label class="form-label">Limit</label>
-            <select name="limit" class="form-select">
-                <option value="50" {% if selected_limit == 50 %}selected{% endif %}>50</option>
-                <option value="100" {% if selected_limit == 100 %}selected{% endif %}>100</option>
-                <option value="200" {% if selected_limit == 200 %}selected{% endif %}>200</option>
-                <option value="300" {% if selected_limit == 300 %}selected{% endif %}>300</option>
-                <option value="500" {% if selected_limit == 500 %}selected{% endif %}>500</option>
-                <option value="1000" {% if selected_limit == 1000 %}selected{% endif %}>1000</option>
-                <option value="2500" {% if selected_limit == 2500 %}selected{% endif %}>2500</option>
-            </select>
-        </div>
+  .sidebar-section { display: flex; flex-direction: column; gap: 8px; }
+  .sidebar-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 4px; }
+  
+  .form-control-custom {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border2); border-radius: var(--radius-sm);
+    color: var(--text); font-size: 13px; padding: 8px 10px; outline: none; transition: border-color 0.2s;
+  }
+  .form-control-custom:focus { border-color: var(--accent); }
 
-        <!-- from Date -->
-        <div class="col-md-2">
-            <label class="form-label">From Date</label>
-            <input type="datetime-local" name="date_after" value="{{ selected_date }}" class="form-control">
-        </div>
+  .btn-custom { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; cursor: pointer; border: none; transition: all 0.2s; text-decoration: none; width: 100%; }
+  .btn-primary-custom { background: var(--accent); color: #fff; }
+  .btn-export-custom { background: rgba(16, 185, 129, 0.1); color: var(--accent2); border: 1px solid rgba(16, 185, 129, 0.2); }
 
-        <!-- to Date -->
-        <div class="col-md-2">
-            <label class="form-label">To Date</label>
-            <input type="datetime-local" name="date_end" value="{{ selected_date_end }}" class="form-control">
-        </div>
+  /* Table styling */
+  .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-top: 20px; }
+  .table-scroll { overflow-x: auto; max-height: 600px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th { background: var(--surface2); padding: 12px 15px; text-align: left; font-size: 11px; color: var(--muted); text-transform: uppercase; position: sticky; top: 0; z-index: 10; border-bottom: 1px solid var(--border); }
+  tbody td { padding: 12px 15px; border-bottom: 1px solid var(--border); font-family: 'DM Mono', monospace; font-size: 12px; white-space: nowrap; }
+  
+  .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; }
+  .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; text-align: center; }
+  .chart-title { font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 600; margin-bottom: 15px; color: var(--muted); }
 
-        <!-- Sorting -->
-        <div class="col-md-2">
-            <label class="form-label">Sort By</label>
-            <select name="sort_by" class="form-select">
-                <option value="Distinct_ID">Distinct_ID</option>
-                <option value="Session_ID" {% if request.GET.sort_by == "Session_ID" %}selected{% endif %}>Session ID</option>
-                <option value="Visitor_ID" {% if request.GET.sort_by == "Visitor_ID" %}selected{% endif %}>Visitor ID</option>
-                <option value="SleecID" {% if request.GET.sort_by == "SleecID" %}selected{% endif %}>SleecID</option>
-            </select>
-        </div>
+  @media (max-width: 1024px) { .shell { grid-template-columns: 1fr; } .sidebar { height: auto; position: static; } .charts-row { grid-template-columns: 1fr; } }
+</style>
 
-        <!-- Search Session ID -->
-        <div class="col-md-2">
-            <label class="form-label">Session ID</label>
-            <input type="text" name="session_id" value="{{ session_search }}" placeholder="Session ID..." class="form-control">
-        </div>
+<form method="GET" id="filterForm">
+  <!-- Hidden action field for your existing logic -->
+  <input type="hidden" name="action" id="action-field" value="filter">
 
-        <!-- Search Visitor ID -->
-        <div class="col-md-2">
-            <label class="form-label">Visitor ID</label>
-            <input type="text" name="visitor_id" value="{{ visitor_search }}" placeholder="Visitor ID..." class="form-control">
-        </div>
+  <div class="shell">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="logo">
+        <span class="logo-dot"></span>
+        Events Viewer
+      </div>
 
-        <!-- Search Source -->
-        <div class="col-md-2">
-            <label class="form-label">Source</label>
-            <input type="text" name="source" value="{{ source }}" placeholder="Source ..." class="form-control">
-        </div>
+      <div class="sidebar-section">
+        <div class="sidebar-label">Core Filters</div>
+        <select name="event_type" class="form-control-custom">
+          <option value="">All Events</option>
+          <option value="purchase" {% if selected_event_type == "purchase" %}selected{% endif %}>Purchase</option>
+          <option value="add_to_cart" {% if selected_event_type == "add_to_cart" %}selected{% endif %}>Add to Cart</option>
+          <option value="pageview" {% if selected_event_type == "pageview" %}selected{% endif %}>Pageview</option>
+        </select>
+        <select name="limit" class="form-control-custom">
+          {% for l in "50,100,200,500,1000,2500"|split:"," %}
+            <option value="{{ l }}" {% if selected_limit|slugify == l %}selected{% endif %}>Limit: {{ l }}</option>
+          {% endfor %}
+        </select>
+      </div>
 
-        <div class="col-md-2">
-            <label class="form-label">SleecID</label>
-            <input type="text" name="sleecid" value="{{ sleecid }}" placeholder="SleecID..." class="form-control">
-        </div>
+      <div class="sidebar-section">
+        <div class="sidebar-label">Timeframe</div>
+        <input type="datetime-local" name="date_after" value="{{ selected_date }}" class="form-control-custom">
+        <input type="datetime-local" name="date_end" value="{{ selected_date_end }}" class="form-control-custom">
+      </div>
 
-        <!-- Search Number -->
-        <div class="col-md-2">
-            <label class="form-label">Customer Mobile</label>
-            <input type="text" name="number_search" value="{{ number_search }}" placeholder="Customer Mobile..." class="form-control">
-        </div>
+      <div class="sidebar-section">
+        <div class="sidebar-label">IDs & Search</div>
+        <input type="text" name="session_id" value="{{ session_search|default:'' }}" placeholder="Session ID" class="form-control-custom">
+        <input type="text" name="visitor_id" value="{{ visitor_search|default:'' }}" placeholder="Visitor ID" class="form-control-custom">
+        <input type="text" name="sleecid" value="{{ sleecid|default:'' }}" placeholder="SleecID" class="form-control-custom">
+        <input type="text" name="number_search" value="{{ number_search|default:'' }}" placeholder="Mobile Number" class="form-control-custom">
+      </div>
 
-        <div class="col-md-2">
-            <label class="form-label">Timezone</label>
-            <input type="text" name="timezone" value="{{ timezone_search }}" placeholder="Timezone..." class="form-control">
-        </div>
+      <div class="sidebar-section">
+        <div class="sidebar-label">Network & UTM</div>
+        <input type="text" name="source" value="{{ source|default:'' }}" placeholder="Source" class="form-control-custom">
+        <input type="text" name="client_ip" value="{{ client_ip|default:'' }}" placeholder="Client IP" class="form-control-custom">
+      </div>
 
-        <div class="col-md-2">
-            <label class="form-label">Custom ID</label>
-            <input type="text" name="custom_visitor_id" value="{{ custom_search }}" placeholder="Custom ID..." class="form-control">
-        </div>
-
-        <div class="col-md-2">
-            <label class="form-label">Client IP</label>
-            <input type="text" name="client_ip" value="{{ client_ip }}" placeholder="Custom ID..." class="form-control">
-        </div>
-
-        <div class="col-md-12 d-flex justify-content-end gap-2">
-            <button type="submit"
-                    class="btn btn-primary"
-                    onclick="document.getElementById('action-field').value='filter'">
-                Apply Filters
-            </button>
-
-            <button type="submit"
-                    class="btn btn-outline-success"
-                    onclick="document.getElementById('action-field').value='export_excel'">
-                Export Excel
-            </button>
-
-        </div>
-        <input type="hidden" name="action" id="action-field">
-    </form>
-
-    <div class="row mb-5">
-        <div class="col-md-6">
-            <h5 class="text-center">UTM Source Distribution (%)</h5>
-            <canvas id="utmSourceChart"></canvas>
-        </div>
-
-        <div class="col-md-6">
-            <h5 class="text-center">UTM Campaign Distribution (%)</h5>
-            <canvas id="utmCampaignChart"></canvas>
-        </div>
-    </div>
-    <p class="blockquote-footer">Total rows: {{ row_count }}</p>
-    <!-- Data Table -->
-    <div class="data-wrap">
-        <input id="table-search" class="form-control m-2 w-25" type="search" placeholder="Search" aria-label="Search">
-        <div class="data-viewport">
-            <div class="data-scroller" role="region" aria-label="Scrollable data table" tabindex="0">
-                <table class="data-table no-order" role="table" aria-label="Analytics dataset">
-                    <thead>
-                        <tr>
-                            {% if data %}
-                                {% for col in data.0.keys %}
-                                    <th>{{ col }}</th>
-                                {% endfor %}
-                            {% endif %}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for row in data %}
-                            <tr>
-                                {% for val in row.values %}
-                                    <td>{{ val }}</td>
-                                {% endfor %}
-                            </tr>
-                        {% empty %}
-                            <tr>
-                                <td colspan="20" class="text-center">No data found.</td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-        <nav aria-label="Table navigation">
-            <ul class="pagination justify-content-center mt-3">
-                <li class="page-item" id="prev-item">
-                    <button class="page-link" id="prev-btn" aria-label="Previous">
-                        <span aria-hidden="true">&laquo; Previous</span>
-                    </button>
-                </li>
-                
-                <li class="page-item disabled">
-                    <span class="page-link" id="page-status">Page 1 of 1</span>
-                </li>
-                
-                <li class="page-item" id="next-item">
-                    <button class="page-link" id="next-btn" aria-label="Next">
-                        <span aria-hidden="true">Next &raquo;</span>
-                    </button>
-                </li>
-            </ul>
-        </nav>
-    </div>
-</div>
-<!--
-<div class="container mt-4" style="max-width: 600px;">
-    <h4>WATI Template Manual Test</h4>
-
-    <form method="post" class="card p-3 mt-3">
-        {% csrf_token %}
-
-        <div class="mb-3">
-            <label class="form-label">Phone (E.164, no +)</label>
-            <input type="text" name="phone" class="form-control" placeholder="9715XXXXXXXX" required>
-        </div>
-
-        <div class="mb-3">
-            <label class="form-label">Customer Name</label>
-            <input type="text" name="customer_name" class="form-control" required>
-        </div>
-
-        <div class="mb-3">
-            <label class="form-label">Checkout URL</label>
-            <input type="text" name="checkout_url" class="form-control" required>
-        </div>
-
-        <button type="submit" class="btn btn-primary w-100">
-            Send WATI Template
+      <div style="margin-top: auto; display: flex; flex-direction: column; gap: 10px;">
+        <button type="submit" class="btn-custom btn-primary-custom" onclick="document.getElementById('action-field').value='filter'">
+          Apply Filters
         </button>
-    </form>
+        <button type="submit" class="btn-custom btn-export-custom" onclick="document.getElementById('action-field').value='export_excel'">
+          Export Excel
+        </button>
+      </div>
+    </aside>
 
-    {% if result %}
-        <div class="alert alert-success mt-3">
-            <strong>Response:</strong>
-            <pre>{{ result|safe }}</pre>
+    <!-- MAIN CONTENT -->
+    <main class="main">
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px;">
+        <div>
+          <h2 style="font-family: 'Syne', sans-serif; font-weight: 700;">Tracking Dashboard</h2>
+          <p style="color: var(--muted);">Real-time server-side event stream</p>
         </div>
-    {% endif %}
+        <div style="background: var(--surface2); padding: 5px 15px; border-radius: 20px; font-family: 'DM Mono'; font-size: 12px; color: var(--muted);">
+          Total: {{ row_count }} rows
+        </div>
+      </div>
 
-    {% if error %}
-        <div class="alert alert-danger mt-3">
-            {{ error }}
+      <!-- CHARTS -->
+      <div class="charts-row">
+        <div class="chart-card">
+          <div class="chart-title">UTM Source Distribution</div>
+          <div style="height: 220px;"><canvas id="utmSourceChart"></canvas></div>
         </div>
-    {% endif %}
-</div> -->
+        <div class="chart-card">
+          <div class="chart-title">UTM Campaign Distribution</div>
+          <div style="height: 220px;"><canvas id="utmCampaignChart"></canvas></div>
+        </div>
+      </div>
+
+      <!-- TABLE -->
+      <div class="table-wrap">
+        <div style="padding: 15px; border-bottom: 1px solid var(--border); display: flex; gap: 10px;">
+           <input id="table-search" class="form-control-custom" style="max-width: 300px;" type="search" placeholder="Quick search current page...">
+        </div>
+        <div class="table-scroll">
+          <table class="data-table no-order">
+            <thead>
+              <tr>
+                {% if data %}
+                  {% for col in data.0.keys %}
+                    <th>{{ col|replace:"_, " }}</th>
+                  {% endfor %}
+                {% endif %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in data %}
+                <tr>
+                  {% for val in row.values %}
+                    <td>{{ val|default:"—" }}</td>
+                  {% endfor %}
+                </tr>
+              {% empty %}
+                <tr><td colspan="100" style="text-align:center; padding: 40px;">No events found matching your criteria.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        
+        <!-- Pagination matched to your JS -->
+        <div style="padding: 15px; display: flex; justify-content: space-between; align-items: center; background: var(--surface2);">
+          <span id="page-status" style="font-family: 'DM Mono'; font-size: 12px; color: var(--muted);">Page 1 of 1</span>
+          <div style="display: flex; gap: 8px;">
+            <button id="prev-btn" class="btn-custom" style="width: auto; background: white; border: 1px solid var(--border2); padding: 5px 12px;">Previous</button>
+            <button id="next-btn" class="btn-custom" style="width: auto; background: white; border: 1px solid var(--border2); padding: 5px 12px;">Next</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</form>
 
 <script>
-    const modernColors = [
-    '#6366F1','#F59E0B','#10B981','#EF4444','#3B82F6',
-    '#8B5CF6','#EC4899','#14B8A6','#F97316','#84CC16',
-    "#3366CC","#DC3912","#FF9900","#109618","#990099",
-    "#0099C6","#DD4477","#66AA00","#B82E2E","#316395",
-    "#994499","#22AA99"
-    ];
+  // Chart initialization with your colors
+  const modernColors = ['#6366F1','#10B981','#F59E0B','#EF4444','#3B82F6','#8B5CF6','#EC4899'];
+  const pieOptions = {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } }
+  };
 
-    const chartOptions = {
-        responsive: true,
-        maintainAspectRatio: false,
-        layout: { padding: 20 }
-    };
-    const utmSourceData = {
+  const utmSourceData = {
         labels: {{ utm_source_labels|safe }},
         datasets: [{
             data: {{ utm_source_values|safe }},
@@ -263,109 +218,50 @@
         }]
     };
 
-    const pieOptions = {
-        plugins: {
-            tooltip: {
-                callbacks: {
-                    label: function(context) {
-                        return context.label + ': ' + context.parsed + '%';
-                    }
-                }
-            },
-            legend: {
-                position: 'bottom',
-                fullSize: false,
-                labels: {
-                    useBorderRadius: true,
-                    borderRadius: 8,
-                }
-            }
-        }
-    };
 
-    if (utmSourceData.labels.length) {
-        new Chart(document.getElementById('utmSourceChart'), {
-            type: 'pie',
-            data: utmSourceData,
-            options: pieOptions
-        });
-    }
+  if ({{ utm_source_values|safe }}.length) {
+    new Chart(document.getElementById('utmSourceChart'), {
+      type: 'pie',
+      data: utmSourceData,
+      options: pieOptions
+    });
+  }
 
-    if (utmCampaignData.labels.length) {
-        new Chart(document.getElementById('utmCampaignChart'), {
-            type: 'pie',
-            data: utmCampaignData,
-            options: pieOptions
-        });
-    }
+  if ({{ utm_campaign_values|safe }}.length) {
+    new Chart(document.getElementById('utmCampaignChart'), {
+      type: 'pie',
+      data: utmCampaignData,
+      options: pieOptions
+    });
+  }
 
-
-$(document).ready(function () {
-    // Logic to determine order based on a class name
-    let initialSort = [[0, 'desc']]; // Default
-
-    if ($('table').hasClass('default-order-1')) {
-        initialSort = [[1, 'desc']];
-    }
-
-    let ordering = true;
-
-    if ($('table').hasClass('no-order')) {
-        ordering = false;
-    }
-
+  // DataTable Logic (Keeping your specific pagination/search logic)
+  $(document).ready(function () {
     const table_big = $('.data-table').DataTable({
-        paging: true,
-        ordering: ordering,
-        order: initialSort,
-        searching: true,
-        info: false,
-        lengthChange: false,
-        deferRender: true,
-        pageLength: 100,
-        dom: 't',  // ← IMPORTANT: only table, no UI controls
+      paging: true,
+      ordering: !$('.data-table').hasClass('no-order'),
+      searching: true,
+      info: false,
+      lengthChange: false,
+      pageLength: 100,
+      dom: 't',
     });
 
-  // If you want to connect it to your own search input:
     $('#table-search').on('keyup', function () {
-        table_big.search(this.value).draw();
+      table_big.search(this.value).draw();
     });
 
-    // Function to refresh the Bootstrap UI
     function syncPagination() {
-        const info = table_big.page.info();
-        const currentPage = info.page + 1;
-        const totalPages = info.pages;
-
-        // Update the "Page X of Y" text
-        $('#page-status').text(`Page ${currentPage} of ${totalPages}`);
-
-        // Update Button States
-        $('#prev-item').toggleClass('disabled', info.page === 0);
-        $('#next-item').toggleClass('disabled', info.page >= totalPages - 1 || totalPages === 0);
+      const info = table_big.page.info();
+      $('#page-status').text(`Page ${info.page + 1} of ${info.pages}`);
+      $('#prev-btn').prop('disabled', info.page === 0);
+      $('#next-btn').prop('disabled', info.page >= info.pages - 1);
     }
 
-    table_big.on('load', function() {
-        syncPagination();
-    });
-
-    // Trigger sync on every draw (Pagination, Search, Sort)
-    table_big.on('draw', function() {
-        syncPagination();
-    });
-
-    // Bootstrap Button Click Events
-    $('#next-btn').on('click', function(e) {
-        e.preventDefault();
-        table_big.page('next').draw('page');
-    });
-
-    $('#prev-btn').on('click', function(e) {
-        e.preventDefault();
-        table_big.page('previous').draw('page');
-    });
-});
+    table_big.on('draw', syncPagination);
+    $('#next-btn').on('click', (e) => { e.preventDefault(); table_big.page('next').draw('page'); });
+    $('#prev-btn').on('click', (e) => { e.preventDefault(); table_big.page('previous').draw('page'); });
+    syncPagination();
+  });
 </script>
-
-
 {% endblock %}
