@@ -9927,7 +9927,7 @@ def sgtm_table_view(request):
     email_search = request.GET.get("email", "")
     phone_search = request.GET.get("phone", "")
     sleecid = request.GET.get("sleecid", "")
-    client_id = request.GET.get("client_id", "")
+    client_id = '"'+ request.GET.get("client_id", "") + '"'
     utm_source = request.GET.get("utm_source", "")
     sort_field = request.GET.get("sort_by", "Distinct_ID")
     action = request.GET.get("action", "filter")
