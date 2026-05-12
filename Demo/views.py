@@ -9927,7 +9927,7 @@ def sgtm_table_view(request):
     email_search = request.GET.get("email", "")
     phone_search = request.GET.get("phone", "")
     sleecid = request.GET.get("sleecid", "")
-    user_id = request.GET.get("user_id", "")
+    client_id = request.GET.get("client_id", "")
     utm_source = request.GET.get("utm_source", "")
     sort_field = request.GET.get("sort_by", "Distinct_ID")
     action = request.GET.get("action", "filter")
@@ -9951,8 +9951,8 @@ def sgtm_table_view(request):
     if sleecid and sleecid != "None":
         filters["sleecid"] = ("eq", sleecid)
 
-    if user_id and user_id != "None":
-        filters["tiktok"] = ("eq", user_id)
+    if client_id and client_id != "None":
+        filters["google"] = ("eq", client_id)
 
     # Date Range Logic
     if date_after and not date_end:
@@ -10017,7 +10017,7 @@ def sgtm_table_view(request):
         "email_search": email_search,
         "phone_search": phone_search,
         "sleecid": sleecid,
-        "user_id": user_id,
+        "client_id": client_id,
         "utm_source": utm_source,
         "sort_field": sort_field,
         "utm_source_labels": json.dumps(list(to_pct(Counter(sources)).keys())),
