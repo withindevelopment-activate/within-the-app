@@ -9847,6 +9847,12 @@ def sgtm_webhook(request):
         utm_from_referrer = get_utms(referrer)
         utm_from_page = get_utms(page_url)
 
+        utm_source = utm_from_referrer.get('utm_source') or utm_from_page.get('utm_source')
+        utm_medium = utm_from_referrer.get('utm_medium') or utm_from_page.get('utm_medium')
+        utm_campaign = utm_from_referrer.get('utm_campaign') or utm_from_page.get('utm_campaign')
+        utm_content = utm_from_referrer.get('utm_content') or utm_from_page.get('utm_content')
+        utm_term = utm_from_referrer.get('utm_term') or utm_from_page.get('utm_term')
+
         dl_url = parsed_params.get('dl', '')
         dl_params = {k: v[0] for k, v in parse_qs(urlparse(dl_url).query).items()}
         sleecid_val = dl_params.get('sleecid')
@@ -9878,11 +9884,11 @@ def sgtm_webhook(request):
             'click_id': click_id,
             'sleecid': sleecid_val,
 
-            'utm_source': utm_from_referrer.get('utm_source') or utm_from_page.get('utm_source'),
-            'utm_medium': utm_from_referrer.get('utm_medium') or utm_from_page.get('utm_medium'),
-            'utm_campaign': utm_from_referrer.get('utm_campaign') or utm_from_page.get('utm_campaign'),
-            'utm_content': utm_from_referrer.get('utm_content') or utm_from_page.get('utm_content'),
-            'utm_term': utm_from_referrer.get('utm_term') or utm_from_page.get('utm_term'),
+            'utm_source': utm_source.strip().lower() if utm_source else '',
+            'utm_medium': utm_medium.strip().lower().replace('+', ' ') if utm_medium else '',
+            'utm_campaign': utm_campaign.strip().lower().replace('+', ' ') if utm_campaign else '',
+            'utm_content': utm_content.strip().lower().replace('+', ' ') if utm_content else '',
+            'utm_term': utm_term.strip().lower().replace('+', ' ') if utm_term else '',
         }
 
         batch_insert_to_supabase(
