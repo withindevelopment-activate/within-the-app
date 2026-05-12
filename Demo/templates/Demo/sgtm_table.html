@@ -380,10 +380,10 @@
               <td title="{{ row.client_info }}">{{ row.client_info|default:"—" }}</td>
               <td title="{{ row.custom_data }}">{{ row.custom_data|default:"—" }}</td>
               <td title="{{ row.marketing_parameters }}">{{ row.marketing_parameters|default:"—" }}</td>
-              <td>{{ row.platform_ids|default:"—" }}</td>
-              <td>{{ row.google_aid|default:"—" }}</td>
-              <td>{{ row.snap_aid|default:"—" }}</td>
-              <td>{{ row.tiktok_aid|default:"—" }}</td>
+              <td>{{ row.platform_identifiers|default:"—" }}</td>
+              <td>{{ row.google|default:"—" }}</td>
+              <td>{{ row.snap|default:"—" }}</td>
+              <td>{{ row.tiktok|default:"—" }}</td>
             </tr>
             {% endfor %}
           </tbody>
