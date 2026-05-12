@@ -9927,6 +9927,7 @@ def sgtm_table_view(request):
     email_search = request.GET.get("email", "")
     phone_search = request.GET.get("phone", "")
     sleecid = request.GET.get("sleecid", "")
+    user_id = request.GET.get("user_id", "")
     utm_source = request.GET.get("utm_source", "")
     sort_field = request.GET.get("sort_by", "Distinct_ID")
     action = request.GET.get("action", "filter")
@@ -9949,6 +9950,9 @@ def sgtm_table_view(request):
 
     if sleecid and sleecid != "None":
         filters["sleecid"] = ("eq", sleecid)
+
+    if user_id and user_id != "None":
+        filters["tiktok"] = ("eq", user_id)
 
     # Date Range Logic
     if date_after and not date_end:
