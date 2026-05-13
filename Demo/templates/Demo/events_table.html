@@ -107,6 +107,7 @@
         <div class="sidebar-label">Network & UTM</div>
         <input type="text" name="source" value="{{ source|default:'' }}" placeholder="Source" class="form-control-custom">
         <input type="text" name="client_ip" value="{{ client_ip|default:'' }}" placeholder="Client IP" class="form-control-custom">
+        <input type="text" name="timezone" value="{{ timezone|default:'' }}" placeholder="Timezone" class="form-control-custom">
       </div>
 
       <div style="margin-top: auto; display: flex; flex-direction: column; gap: 10px;">
@@ -135,11 +136,11 @@
       <div class="charts-row">
         <div class="chart-card">
           <div class="chart-title">UTM Source Distribution</div>
-          <div style="height: 220px;"><canvas id="utmSourceChart"></canvas></div>
+          <div style="height: 250px;"><canvas id="utmSourceChart"></canvas></div>
         </div>
         <div class="chart-card">
           <div class="chart-title">UTM Campaign Distribution</div>
-          <div style="height: 220px;"><canvas id="utmCampaignChart"></canvas></div>
+          <div style="height: 250px;"><canvas id="utmCampaignChart"></canvas></div>
         </div>
       </div>
 
