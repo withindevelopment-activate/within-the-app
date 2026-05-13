@@ -9883,7 +9883,7 @@ def sgtm_webhook(request):
             'last_name': last_name,
             'user_name': user_name,
 
-            'click_id': click_id,
+            'click_id': user_id,
             'sleecid': sleecid_val,
 
             'utm_source': utm_source.strip().lower() if utm_source else '',
