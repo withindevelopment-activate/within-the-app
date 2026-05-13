@@ -9805,7 +9805,7 @@ def sgtm_webhook(request):
 
         custom_data = data.get('custom_data', {})
 
-        context = custom_data.get('context', {})
+        context = custom_data.get('transaction_id', '')
 
 
         first_name = user_data.get('first_name')
@@ -9831,6 +9831,7 @@ def sgtm_webhook(request):
         screen_resolution = parsed_params.get('sr', '')
         user_region       = parsed_params.get('ur', '')
         user_language     = parsed_params.get('ul', '')
+        user_address      = parsed_params.get('ep.user_data.address.0.country', '')
 
         def get_utms(url):
             """Extracts UTM parameters from a given URL into a dictionary."""
@@ -9865,15 +9866,16 @@ def sgtm_webhook(request):
             'Distinct_ID': int(get_next_id_from_supabase_compatible_all(name='SGTM_Payload', column='Distinct_ID')),
             'event_name': event_name,
             'event_id': event_id,
+            'event_time': get_uae_current_date(),
 
             'user_data': user_data,
-            'client_info': client_info,
+            'client_info': user_address,
             'custom_data': custom_data,
             'marketing_parameters': context,
             'platform_identifiers': platform_identifiers,
             'google': client_id,
-            'snapchat': user_id,
-            'tiktok': session_id,
+            'snapchat': referrer,
+            'tiktok': page_url,
 
             'email': email,
             'phone': phone,
