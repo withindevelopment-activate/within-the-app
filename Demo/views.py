@@ -27,6 +27,7 @@ from Demo.supporting_files.supporting_functions import get_uae_current_date, det
 from Demo.supporting_files.marketing_report import create_general_analysis, create_product_percentage_amount_spent, landing_performance_5_async, column_check
 # Webhook function imports
 from Demo.supporting_files.hook_tasks import track_price_changes, process_zid_order_logic, initial_fetch_products, fetch_product_name_skus
+from Retention.services import subscribe_store_to_order_update, subscribe_store_to_order_create, subscribe_store_to_customer_create
 ## import the save tracking heler functions
 from Demo.supporting_files.save_tracking_helpers import *
 
@@ -182,13 +183,12 @@ def zid_callback(request):
         batch_insert_to_supabase(tokens_df, 'tokens')
 
         #initial_fetch_products(authorization_token, access_token, store_id)
-
-        # ### Subscribe to the products webhook --
-        # print("Creating the product webhook")
-        # subscribe_store_to_product_update(authorization_token, access_token)
-        # ## Subscribe to the order webhook
-        # print("creating the new order webhook")
-        # #subscribe_store_to_order_create(authorization_token, access_token)
+        
+        # Subscribe to webhooks
+        subscribe_store_to_product_update(authorization_token, access_token)
+        # subscribe_store_to_order_update(authorization_token, access_token)
+        # subscribe_store_to_order_create(authorization_token, access_token)
+        # subscribe_store_to_customer_create(authorization_token, access_token)
 
         # ##### Initial fetch for the products and orders
         # threading.Thread(
@@ -5544,7 +5544,26 @@ def subscribe_store_to_product_update(authorization_token, access_token):
     except Exception as e:
         print(f"Failed to create webhook subscription: {e}")
         return None
-    
+
+########################################################################### Retention webhooks 
+@csrf_exempt
+def order_create_webhook(request):
+    if request.method == 'POST':
+        return JsonResponse({'status': 'success'}, status=200)
+    return JsonResponse({'status': 'ok'}, status=200)
+
+@csrf_exempt
+def order_update_webhook(request):
+    if request.method == 'POST':
+        return JsonResponse({'status': 'success'}, status=200)
+    return JsonResponse({'status': 'ok'}, status=200)
+
+@csrf_exempt
+def customer_create_webhook(request):
+    if request.method == 'POST':
+        return JsonResponse({'status': 'success'}, status=200)
+    return JsonResponse({'status': 'ok'}, status=200)
+
 ### THE FUNCITON THAT DOES THE UPDATES AFTER THE WEBHOOK IS TRIGGERED (A PRODUCT IS UPDATED)
 def product_update(request):
     """

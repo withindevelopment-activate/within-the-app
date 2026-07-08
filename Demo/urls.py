@@ -34,6 +34,9 @@ urlpatterns = [
 
 
     path('zid-webhook/product-update/', views.product_update, name='zid_product_update'),
+    path('zid-webhook/order-create/', views.order_create_webhook, name='order_create_webhook'),
+    path('zid-webhook/order-update/', views.order_update_webhook, name='order_update_webhook'),
+    path('zid-webhook/customer-create/', views.customer_create_webhook, name='customer_create_webhook'),
 
     # --- Meta ---
     path("meta/login/", views.meta_login, name="meta_login"),
