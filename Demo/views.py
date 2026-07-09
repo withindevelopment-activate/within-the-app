@@ -186,9 +186,9 @@ def zid_callback(request):
         
         # Subscribe to webhooks
         subscribe_store_to_product_update(authorization_token, access_token)
-        # subscribe_store_to_order_update(authorization_token, access_token)
-        # subscribe_store_to_order_create(authorization_token, access_token)
-        # subscribe_store_to_customer_create(authorization_token, access_token)
+        subscribe_store_to_order_update(authorization_token, access_token)
+        subscribe_store_to_order_create(authorization_token, access_token)
+        subscribe_store_to_customer_create(authorization_token, access_token)
 
         # ##### Initial fetch for the products and orders
         # threading.Thread(
@@ -5547,22 +5547,121 @@ def subscribe_store_to_product_update(authorization_token, access_token):
 
 ########################################################################### Retention webhooks 
 @csrf_exempt
+@require_POST
 def order_create_webhook(request):
-    if request.method == 'POST':
-        return JsonResponse({'status': 'success'}, status=200)
-    return JsonResponse({'status': 'ok'}, status=200)
+    try:
+        payload = json.loads(request.body)
+        order = payload.get("order", {})
+        customer_data = order.get("customer", {})
+        customer_id = customer_data.get("id")
+        order_total = float(order.get("total", 0.0))
+
+        if not customer_id:
+            return JsonResponse({'status': 'error', 'message': 'Customer ID missing in payload'}, status=400)
+
+        # Fetch the customer from your tracking table
+        customer_res = supabase.table("____").select("*").eq("Customer_ID", customer_id).execute()
+
+        if not customer_res.data:
+            # Customer does not exist, create a new one.
+            new_customer_payload = {
+                "Distinct_ID": int(get_next_id_from_supabase_compatible_all(name='____', column='Distinct_ID')),
+                "Customer_ID": customer_id,
+                "Customer_Info": {
+                    "name": customer_data.get("name"),
+                    "email": customer_data.get("email"),
+                    "mobile": customer_data.get("mobile")
+                },
+                "Purchases": 1,
+                "Customer_Orders_Total": order_total,
+                "Last_Updated": get_uae_current_date(),
+                "Is_Anonymous": False,
+            }
+            supabase.table("____").insert(new_customer_payload).execute()
+            return JsonResponse({'status': 'success', 'message': f'New customer {customer_id} created and order recorded.'})
+
+        customer_record = customer_res.data[0]
+        
+        # Safely increment purchases and LTV
+        current_purchases = int(customer_record.get("Purchases") or 0)
+        current_orders_total = float(customer_record.get("Customer_Orders_Total") or 0.0)
+
+        update_payload = {
+            "Purchases": current_purchases + 1,
+            "Customer_Orders_Total": current_orders_total + order_total,
+            "Last_Updated": get_uae_current_date()
+        }
+
+        # Update the record in Supabase
+        supabase.table("____").update(update_payload).eq("Customer_ID", customer_id).execute()
+
+        return JsonResponse({'status': 'success', 'message': f'Customer {customer_id} updated for new order.'})
+
+    except Exception as e:
+        traceback.print_exc()
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
 
 @csrf_exempt
+@require_POST
 def order_update_webhook(request):
-    if request.method == 'POST':
-        return JsonResponse({'status': 'success'}, status=200)
-    return JsonResponse({'status': 'ok'}, status=200)
+    try:
+        payload = json.loads(request.body)
+        order = payload.get("order", {})
+        order_status = order.get("order_status", {}).get("name", "").lower()
+
+        # We only care about cancellations
+        if "cancel" not in order_status and "مسترجع" not in order_status and "تم الإلغاء" not in order_status:
+            return JsonResponse({'status': 'skipped', 'message': 'Order status is not cancellation.'})
+
+        customer_data = order.get("customer", {})
+        customer_id = customer_data.get("id")
+        order_total = float(order.get("order_total", 0.0))
+
+        if not customer_id:
+            return JsonResponse({'status': 'error', 'message': 'Customer ID missing in payload'}, status=400)
+
+        # Fetch the customer
+        customer_res = supabase.table("____").select("*").eq("Customer_ID", customer_id).execute()
+
+        if not customer_res.data:
+            return JsonResponse({'status': 'skipped', 'message': f'Customer {customer_id} not found'}, status=200)
+
+        customer_record = customer_res.data[0]
+
+        # Safely decrement values, ensuring they don't go below zero
+        current_purchases = int(customer_record.get("Purchases") or 0)
+        current_orders_total = float(customer_record.get("Customer_Orders_Total") or 0.0)
+
+        update_payload = {
+            "Purchases": max(0, current_purchases - 1),
+            "Customer_Orders_Total": max(0.0, current_orders_total - order_total),
+            "Last_Updated": get_uae_current_date()
+        }
+
+        # Update the record in Supabase
+        supabase.table("____").update(update_payload).eq("Customer_ID", customer_id).execute()
+
+        return JsonResponse({'status': 'success', 'message': f'Customer {customer_id} updated for cancelled order.'})
+
+    except Exception as e:
+        traceback.print_exc()
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
 @csrf_exempt
+@require_POST
 def customer_create_webhook(request):
-    if request.method == 'POST':
-        return JsonResponse({'status': 'success'}, status=200)
-    return JsonResponse({'status': 'ok'}, status=200)
+    # This webhook can be used in the future to create a new entry
+    # in your Customer_Tracking_duplicate table if one doesn't exist.
+    # For now, we'll just acknowledge it.
+    try:
+        payload = json.loads(request.body)
+        customer_id = payload.get("customer", {}).get("id")
+        print(f"[INFO] Received customer.create event for Customer ID: {customer_id}")
+        return JsonResponse({'status': 'received'})
+    except Exception as e:
+        traceback.print_exc()
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
 ### THE FUNCITON THAT DOES THE UPDATES AFTER THE WEBHOOK IS TRIGGERED (A PRODUCT IS UPDATED)
 def product_update(request):
