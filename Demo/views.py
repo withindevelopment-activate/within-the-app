@@ -5555,13 +5555,15 @@ def order_create_webhook(request):
         customer_data = order.get("customer", {})
         customer_id = customer_data.get("id")
         order_total = float(order.get("total", 0.0))
+        logger.info(f"[Webhook Customer] Payload: {payload}")
+        logger.info(f"[Webhook Customer] Received order.create webhook for Customer ID: {customer_id}, Order Total: {order_total}")
 
         if not customer_id:
             return JsonResponse({'status': 'error', 'message': 'Customer ID missing in payload'}, status=400)
 
         # Fetch the customer from your tracking table
-        customer_res = supabase.table("____").select("*").eq("Customer_ID", customer_id).execute()
-
+        # customer_res = supabase.table("____").select("*").eq("Customer_ID", customer_id).execute()
+        customer_res = {}
         if not customer_res.data:
             # Customer does not exist, create a new one.
             new_customer_payload = {
@@ -5577,7 +5579,7 @@ def order_create_webhook(request):
                 "Last_Updated": get_uae_current_date(),
                 "Is_Anonymous": False,
             }
-            supabase.table("____").insert(new_customer_payload).execute()
+            # supabase.table("____").insert(new_customer_payload).execute()
             return JsonResponse({'status': 'success', 'message': f'New customer {customer_id} created and order recorded.'})
 
         customer_record = customer_res.data[0]
@@ -5593,7 +5595,7 @@ def order_create_webhook(request):
         }
 
         # Update the record in Supabase
-        supabase.table("____").update(update_payload).eq("Customer_ID", customer_id).execute()
+        # supabase.table("____").update(update_payload).eq("Customer_ID", customer_id).execute()
 
         return JsonResponse({'status': 'success', 'message': f'Customer {customer_id} updated for new order.'})
 
@@ -5609,6 +5611,9 @@ def order_update_webhook(request):
         payload = json.loads(request.body)
         order = payload.get("order", {})
         order_status = order.get("order_status", {}).get("name", "").lower()
+        logger.info(f"[Webhook Customer] Payload: {payload}")
+        logger.info(f"[Webhook Customer] Received order.update webhook for Order Status: {order_status}")
+
 
         # We only care about cancellations
         if "cancel" not in order_status and "مسترجع" not in order_status and "تم الإلغاء" not in order_status:
@@ -5622,7 +5627,8 @@ def order_update_webhook(request):
             return JsonResponse({'status': 'error', 'message': 'Customer ID missing in payload'}, status=400)
 
         # Fetch the customer
-        customer_res = supabase.table("____").select("*").eq("Customer_ID", customer_id).execute()
+        # customer_res = supabase.table("____").select("*").eq("Customer_ID", customer_id).execute()
+        customer_res = {}
 
         if not customer_res.data:
             return JsonResponse({'status': 'skipped', 'message': f'Customer {customer_id} not found'}, status=200)
@@ -5640,7 +5646,7 @@ def order_update_webhook(request):
         }
 
         # Update the record in Supabase
-        supabase.table("____").update(update_payload).eq("Customer_ID", customer_id).execute()
+        # supabase.table("____").update(update_payload).eq("Customer_ID", customer_id).execute()
 
         return JsonResponse({'status': 'success', 'message': f'Customer {customer_id} updated for cancelled order.'})
 
@@ -5657,7 +5663,8 @@ def customer_create_webhook(request):
     try:
         payload = json.loads(request.body)
         customer_id = payload.get("customer", {}).get("id")
-        print(f"[INFO] Received customer.create event for Customer ID: {customer_id}")
+        logger.info(f"[Webhook Customer] Payload: {payload}")
+        logger.info(f"[Webhook Customer] Received customer.create event for Customer ID: {customer_id}")
         return JsonResponse({'status': 'received'})
     except Exception as e:
         traceback.print_exc()
