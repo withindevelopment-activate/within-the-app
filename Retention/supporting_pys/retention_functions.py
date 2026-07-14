@@ -16,13 +16,13 @@ def update_customers_db(customer_id, customer_name, customer_mobile,
     of a customer or update an existing one --
     """
 
-    ## Fetch the customer if they already exist
-    customer_df = fetch_data_from_supabase_specific(
-        "Store_Customers",
-        filters={
-            "Customer_ID": ("eq", customer_id)
-        }
-    )
+    customer_df = pd.DataFrame()
+    # Only search by customer_id if it's a valid, non-zero ID
+    if customer_id and int(customer_id) != 0:
+        customer_df = fetch_data_from_supabase_specific(
+            "Store_Customers",
+            filters={"Customer_ID": ("eq", customer_id)}
+        )
 
     ## If not found, try fetching using the customer mobile
     if customer_df.empty and customer_mobile:
