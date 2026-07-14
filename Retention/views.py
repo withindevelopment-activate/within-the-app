@@ -241,7 +241,7 @@ def retention_dashboard(request):
             pass # Ignore if not a valid integer
 
     df = fetch_data_from_supabase_specific(
-        table_name="Store_Customers", limit=limit, filters=filters)
+        table_name="Store_Customers", limit=limit, filters=filters, order_by="Distinct_ID")
 
     # Apply Supabase-level filters for efficiency
     # if phone_filter:
