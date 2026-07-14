@@ -158,7 +158,7 @@
                 <td>{{ customer.Add_To_Cart_Count|default:"0" }}</td>
                 <td>
                     {% if customer.Last_Visit and customer.Last_Visit is not None %}
-                        {{ customer.Last_Visit }}
+                        {{ customer.Last_Visit|date:"Y-m-d H:i" }}
                     {% else %}
                         -
                     {% endif %}

@@ -315,6 +315,8 @@ def retention_dashboard(request):
     for customer in customers:
         customer['Customer_Name'] = customer.get('Customer_Name') or 'N/A'
         customer['Customer_Mobile'] = customer.get('Customer_Mobile') or ''
+        if pd.isna(customer.get('Last_Visit')):
+            customer['Last_Visit'] = None
 
     context = {
         "customers": customers,
