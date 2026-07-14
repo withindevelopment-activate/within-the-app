@@ -1,23 +1,7 @@
 import pandas as pd
-from datetime import datetime
 import os
-from io import BytesIO
-from fpdf import FPDF
 import logging
-import json
-import pdfkit
-import subprocess
 from supabase import create_client, Client
-import pytz
-from collections import Counter
-import requests
-from bs4 import BeautifulSoup
-from fuzzywuzzy import fuzz
-import ast
-import asyncio
-import aiohttp
-from concurrent.futures import ThreadPoolExecutor
-import threading
 
 url: str = os.environ.get('SUPABASE_URL')
 key: str = os.environ.get('SUPABASE_KEY')

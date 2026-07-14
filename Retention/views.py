@@ -1,7 +1,5 @@
 from django.shortcuts import render
-from django.http import JsonResponse
-import json, os, traceback
-from supabase import create_client, Client
+import json
 import logging
 from Demo.supporting_files.supabase_functions import get_next_id_from_supabase_compatible_all
 from Demo.supporting_files.supporting_functions import get_uae_current_date
@@ -304,7 +302,7 @@ def retention_dashboard(request):
         }
     }
 
-    return render(request, "Demo/retention_dashboard.html", context)
+    return render(request, "Retention/retention_dashboard.html", context)
 
 
 '''@csrf_exempt
