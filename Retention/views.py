@@ -221,6 +221,91 @@ def adding_order_to_db(payload):
 
     return True
 
+def retention_dashboard(request):
+    """
+    Displays customer data with filters for retention analysis.
+    """
+    # Fetch filter parameters from request
+    limit = request.GET.get("limit")
+    order_count_filter = request.GET.get("order_count")
+    order_date_filter = request.GET.get("order_date")
+    not_ordered_since_months = request.GET.get("not_ordered_since")
+    phone_filter = request.GET.get("phone")
+
+    # Base query
+    query = supabase.table("Customer_Tracking_duplicate").select("*")
+
+    # Apply filters
+    if phone_filter:
+        query = query.like("Customer_Info", f"%{phone_filter}%")
+
+    # Execute query to get all data for filtering in pandas
+    response = query.execute()
+    if not response.data:
+        return render(request, "Retention/retention_dashboard.html", {"customers": [], "row_count": 0})
+
+    df = pd.DataFrame(response.data)
+    df['Purchases'] = pd.to_numeric(df['Purchases'], errors='coerce').fillna(0).astype(int)
+    df['Last_Visit'] = pd.to_datetime(df['Last_Visit'], errors='coerce')
+
+    # Apply pandas-based filters
+    if order_count_filter:
+        df = df[df['Purchases'] == int(order_count_filter)]
+
+    if order_date_filter:
+        filter_date = pd.to_datetime(order_date_filter).date()
+        df = df[df['Last_Visit'].dt.date == filter_date]
+
+    if not_ordered_since_months:
+        months = int(not_ordered_since_months)
+        cutoff_date = datetime.now() - timedelta(days=months * 30)
+        df = df[df['Last_Visit'] < cutoff_date]
+
+    # Initial load or filtered load
+    is_filtered = any([order_count_filter, order_date_filter, not_ordered_since_months, phone_filter])
+    
+    if not is_filtered:
+        if limit:
+            df = df.head(int(limit))
+        else:
+            df = df.head(20) # Default limit
+
+    # Pagination would be applied here on the filtered `df` if a full pagination system is implemented.
+    # For now, we show all filtered results as requested.
+
+    customers = df.to_dict(orient="records")
+
+    # Format customer_info for display
+    for customer in customers:
+        info = customer.get('Customer_Info')
+        if isinstance(info, str):
+            try:
+                info = json.loads(info.replace("'", "\""))
+            except (json.JSONDecodeError, TypeError):
+                info = {}
+        elif not isinstance(info, dict):
+            info = {}
+        
+        customer['Customer_Name'] = info.get('name', 'N/A')
+        customer['Customer_Email'] = info.get('email', 'N/A')
+        customer['Customer_Mobile'] = info.get('mobile', 'N/A')
+
+
+    context = {
+        "customers": customers,
+        "row_count": len(customers),
+        "is_filtered": is_filtered,
+        "filters": {
+            "limit": limit or "20",
+            "order_count": order_count_filter,
+            "order_date": order_date_filter,
+            "not_ordered_since": not_ordered_since_months,
+            "phone": phone_filter,
+        }
+    }
+
+    return render(request, "Demo/retention_dashboard.html", context)
+
 
 '''@csrf_exempt
 @require_POST
