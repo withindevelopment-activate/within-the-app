@@ -224,7 +224,7 @@ def retention_dashboard(request):
     Displays customer data with filters for retention analysis.
     """
     # Fetch filter parameters from request
-    limit = request.GET.get("limit")
+    limit = request.GET.get("limit") or "20"
     order_count_filter = request.GET.get("order_count")
     order_date_filter = request.GET.get("order_date")
     not_ordered_since_months = request.GET.get("not_ordered_since")
