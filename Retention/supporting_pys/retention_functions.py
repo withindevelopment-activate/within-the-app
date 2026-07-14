@@ -3,7 +3,7 @@ import pandas as pd
 
 from Retention.supporting_pys.database_functions import *
 from Retention.supporting_pys.supporting_functions import *
-from Retention.supporting_pys.retention_functions import * 
+# from Retention.supporting_pys.retention_functions import * 
 
 ## Next is the funciton to call whenever an order is coming in to update the customers database as well -- Match on the phone number if it exists update the orders + the order count and other relevant fields
 ## If the customer doesnt exist, create an entry --- 
