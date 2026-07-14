@@ -8,73 +8,221 @@ from Demo.supporting_files.supporting_functions import get_uae_current_date
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
-# Create your views here.
-url: str = os.environ.get('SUPABASE_URL')
-key: str = os.environ.get('SUPABASE_KEY')
+## Import the database functions
+from Retention.supporting_pys.database_functions import *
+from Retention.supporting_pys.supporting_functions import *
+from Retention.supporting_pys.retention_functions import * 
 
-supabase: Client = create_client(url, key)
+
+import pandas as pd
+import pytz
 
 logger = logging.getLogger('Retention')
 ########################################################################### Retention webhooks 
 @csrf_exempt
 @require_POST
-def order_create_webhook(request):
-    try:
-        payload = json.loads(request.body)
-        order = payload.get("order", {})
-        customer_data = order.get("customer", {})
-        customer_id = customer_data.get("id")
-        order_total = float(order.get("total", 0.0))
-        logger.info(f"[Webhook Customer] Payload: {payload}")
-        logger.info(f"[Webhook Customer] Received order.create webhook for Customer ID: {customer_id}, Order Total: {order_total}")
+############
+#######
+# To get all the None values, I can create a seperate API call for the order
+#######
+###########
+def adding_order_to_db(payload):
+    """
+    Take the incoming payload from the webhook and adding it to the All ZID orders db --- 
+    """
 
-        if not customer_id:
-            return JsonResponse({'status': 'error', 'message': 'Customer ID missing in payload'}, status=400)
+    dubai = pytz.timezone("Asia/Dubai")
 
-        # Fetch the customer from your tracking table
-        # customer_res = supabase.table("____").select("*").eq("Customer_ID", customer_id).execute()
-        customer_res = {}
-        if not customer_res.data:
-            # Customer does not exist, create a new one.
-            new_customer_payload = {
-                "Distinct_ID": int(get_next_id_from_supabase_compatible_all(name='____', column='Distinct_ID')),
-                "Customer_ID": customer_id,
-                "Customer_Info": {
-                    "name": customer_data.get("name"),
-                    "email": customer_data.get("email"),
-                    "mobile": customer_data.get("mobile")
-                },
-                "Purchases": 1,
-                "Customer_Orders_Total": order_total,
-                "Last_Updated": get_uae_current_date(),
-                "Is_Anonymous": False,
-            }
-            # supabase.table("____").insert(new_customer_payload).execute()
-            return JsonResponse({'status': 'success', 'message': f'New customer {customer_id} created and order recorded.'})
+    def dubai_time(value):
+        if not value:
+            return None
 
-        customer_record = customer_res.data[0]
-        
-        # Safely increment purchases and LTV
-        current_purchases = int(customer_record.get("Purchases") or 0)
-        current_orders_total = float(customer_record.get("Customer_Orders_Total") or 0.0)
+        try:
+            dt = pd.to_datetime(value, utc=True)
+            return dt.tz_convert(dubai).strftime("%Y-%m-%d %I:%M %p")
+        except Exception:
+            return value
 
-        update_payload = {
-            "Purchases": current_purchases + 1,
-            "Customer_Orders_Total": current_orders_total + order_total,
-            "Last_Updated": get_uae_current_date()
+    def get_nested(data, *keys):
+        current = data
+        for key in keys:
+            if current is None:
+                return None
+
+            if isinstance(current, dict):
+                current = current.get(key)
+            else:
+                return None
+        return current
+
+    rows = []
+
+    products = payload.get("products", [])
+
+    customer = payload.get("customer", {})
+    shipping = payload.get("shipping", {})
+    payment = payload.get("payment", {})
+    coupon = payload.get("coupon")
+    address = get_nested(payload, "shipping", "address") or {}
+    utm = payload.get("utm", {})
+    analytics = payload.get("analytics", {})
+    split_payments = payload.get("split_payment_methods", [])
+
+    split1 = split_payments[0] if len(split_payments) > 0 else {}
+    split2 = split_payments[1] if len(split_payments) > 1 else {}
+
+    ## Extract order level info
+    order_id = payload.get("id")
+
+    customer_id = customer.get("id")
+    customer_name = customer.get("name")
+    customer_mobile = customer.get("mobile")
+    customer_email = customer.get("email")
+
+    customer_note = payload.get("customer_note")
+
+    utm_source = utm.get("source")
+
+    ## Get the distinct_id
+    distinct_id = int(get_next_id_from_supabase_compatible_all(
+                name='All_ZID_Orders', column='Distinct_ID'
+            ))
+    
+    ## Initialize a dictionary to store the products + their quans
+    products_dict = {}
+    ## We loop thru the products because an order has multiple orders = multiple rows
+    for product in products:
+        row = {
+            ## The Distinct ID
+            "Distinct_ID": distinct_id,
+
+            ## Product
+            "product name": product.get("name"),
+            "sku": product.get("sku"),
+            "quantity": int(product.get("quantity") or 0),
+            "order_products_cost": None,
+            "unit_price": product.get("price_with_additions"),
         }
 
-        # Update the record in Supabase
-        # supabase.table("____").update(update_payload).eq("Customer_ID", customer_id).execute()
+        rows.append(row)
+        distinct_id += 1
 
-        return JsonResponse({'status': 'success', 'message': f'Customer {customer_id} updated for new order.'})
+        ## Add the products and their quantity to a dict
+        sku = product.get("sku")
+        product_name = product.get("name")
+        quantity = int(product.get("quantity") or 0)
 
-    except Exception as e:
-        traceback.print_exc()
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+        if sku not in products_dict:
+            products_dict[sku] = {
+                "product_name": product_name,
+                "quantity": quantity
+            }
+        else:
+            products_dict[sku]["quantity"] += quantity
 
 
-@csrf_exempt
+    ## Convert to a df 
+    rows_df = pd.DataFrame(rows)
+    ## Add the row level info to the row after looping -- this populates all the fields for the said order id for easier future access -- 
+    ## Order Information
+    rows_df["id"] = order_id
+    rows_df["order_status"] = get_nested(payload, "order_status", "name")
+    rows_df["source"] = payload.get("source")
+
+    ## Customer info
+    rows_df["customer_note"] = customer_note
+    rows_df["customer_name"] = customer_name
+    rows_df["customer_email"] = customer_email
+    rows_df["customer_mobile"] = customer_mobile
+    rows_df["customer_id"] = customer_id
+
+    ## Payment
+    rows_df["payment_method"] = get_nested(payment, "method", "name")
+    rows_df["payment_status"] = payload.get("payment_status")
+    rows_df["transaction_reference"] = payload.get("transaction_reference")
+
+    ## Shipping
+    rows_df["shipping_method"] = None
+    rows_df["shipping_address"] = address.get("address")
+    rows_df["shipping_city"] = address.get("city")
+    rows_df["shipping_company_tracking_id"] = shipping.get("tracking_id")
+    rows_df["googlemaps_location"] = address.get("googlemaps_location")
+    rows_df["shipping_short_address"] = None
+
+    ## Coupon
+    rows_df["coupon_code"] = coupon
+    rows_df["coupon_name"] = None
+
+    ## Totals
+    order_total = float(payload.get("order_total") or 0)
+    rows_df["sub_totals"] = None
+    rows_df["vat"] = None
+    rows_df["shipping"] = None
+    rows_df["cod"] = None
+    rows_df["discount"] = None
+    rows_df["total"] = payload.get("total")
+    rows_df["currency"] = payload.get("currency_code")
+
+    ## Get the region
+    currency_code = payload.get("currency_code")
+
+    if currency_code == "OMR":
+        region = "OM"
+    elif currency_code == "AED":
+        region = "UAE"
+    elif currency_code == "QAR":
+        region = "Qatar"
+    else:
+        region = None
+
+    rows_df["region"] = region
+
+    ## Dates
+    added_at = dubai_time(payload.get("created_at"))
+    rows_df["added_at (Asia/Dubai)"] = added_at
+    rows_df["last_update_at (Asia/Dubai)"] = dubai_time(payload.get("updated_at"))
+
+    ## POS
+    rows_df["pos_inventory_location"] = None
+    rows_df["pos_cashier_user_name"] = None
+
+    ## Split Payments
+    rows_df["split_payment_method_1_name"] = split1.get("name")
+    rows_df["split_payment_method_1_total"] = split1.get("total")
+    rows_df["split_payment_method_2_name"] = split2.get("name")
+    rows_df["split_payment_method_2_total"] = split2.get("total")
+
+    ## UTMs
+    rows_df["utm_source"] = None
+    rows_df["utm_medium"] = None
+    rows_df["utm_campaign"] = None
+    rows_df["utm_term"] = None
+    rows_df["utm_content"] = None
+
+    ## Analytics
+    rows_df["referer"] = None
+    rows_df["platform"] = None
+    rows_df["device_type"] = None
+
+    rows_df["ip_country"] = None
+    rows_df["ip_city"] = None
+    rows_df["ip_region"] = None
+    rows_df["ip_timezone"] = None
+
+    ## Markings
+    rows_df['order_source'] = 'Webhook'
+    rows_df['last_updated'] = get_uae_current_date()
+
+    ## Append to the database
+    batch_insert_to_supabase(rows_df, "All_ZID_Orders")
+
+    ## Update the customers_db
+    verdict = update_customers_db(customer_id, customer_name, customer_mobile, order_id, products_dict, added_at, utm_source, order_total)
+
+    return True
+
+
+'''@csrf_exempt
 @require_POST
 def order_update_webhook(request):
     try:
@@ -138,4 +286,4 @@ def customer_create_webhook(request):
         return JsonResponse({'status': 'received'})
     except Exception as e:
         traceback.print_exc()
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)'''
