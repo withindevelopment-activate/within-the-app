@@ -231,7 +231,7 @@ def retention_dashboard(request):
     phone_filter = request.GET.get("phone")
 
     # Base query from the new customer tracking table
-    query = supabase.table("Customer_Tracking_duplicate").select("*")
+    query = supabase.table("Store_Customers").select("*")
 
     # Apply Supabase-level filters for efficiency
     if phone_filter:
