@@ -265,8 +265,27 @@ def retention_dashboard(request):
     df["Order_Count"] = df["Order_Count"].astype(int)
 
     # Convert date columns for filtering
-    # Convert Last_Visit to datetime for filtering
-    df['Last_Visit'] = pd.to_datetime(df['Last_Visit'], errors='coerce')
+    def get_last_visit(order_json):
+        if pd.isna(order_json):
+            return pd.NaT
+
+        try:
+            # Ensure it's a dictionary
+            if isinstance(order_json, str):
+                order_json = json.loads(order_json)
+            
+            if not isinstance(order_json, dict):
+                return pd.NaT
+
+            dates = [pd.to_datetime(order.get("added_at"), errors='coerce') 
+                     for order in order_json.values() if order.get("added_at")]
+            
+            return max(d for d in dates if pd.notna(d)) if dates else pd.NaT
+
+        except (json.JSONDecodeError, TypeError):
+            return pd.NaT
+
+    df['Last_Visit'] = df['Orders'].apply(get_last_visit)
 
     if order_date_filter:
         filter_date = pd.to_datetime(order_date_filter).date()
