@@ -4,144 +4,189 @@
 {% block title %}Retention Dashboard{% endblock %}
 
 {% block content %}
-<div class="container-fluid mt-4">
-    <div class="page-header">
-        <h1>Retention Dashboard</h1>
-        <div class="header-stats">
-            <div class="stat">
-                <div class="stat-val">{{ row_count }}</div>
-                <div class="stat-label">Customers Displayed</div>
-            </div>
-        </div>
-    </div>
-
-    <div class="card table-card">
-        <div class="toolbar">
-            <form method="get" action="{% url 'Retention:retention_dashboard' %}" class="filter-section">
-                <div class="toolbar-group">
-                    <label for="phone" class="toolbar-label">Phone Number</label>
-                    <input type="text" name="phone" id="phone" class="form-control" placeholder="Search by phone..." value="{{ filters.phone|default:'' }}">
-                </div>
-
-                <div class="toolbar-group">
-                    <label for="order_count" class="toolbar-label">Order Count</label>
-                    <input type="number" name="order_count" id="order_count" class="form-control" placeholder="e.g., 3" value="{{ filters.order_count|default:'' }}">
-                </div>
-
-                <div class="toolbar-group">
-                    <label for="order_date" class="toolbar-label">Last Order Date</label>
-                    <input type="date" name="order_date" id="order_date" class="form-control" value="{{ filters.order_date|default:'' }}">
-                </div>
-
-                <div class="toolbar-group">
-                    <label for="not_ordered_since" class="toolbar-label">Not Ordered Since</label>
-                    <select name="not_ordered_since" id="not_ordered_since" class="form-select">
-                        <option value="">Any</option>
-                        <option value="1" {% if filters.not_ordered_since == "1" %}selected{% endif %}>1 Month</option>
-                        <option value="2" {% if filters.not_ordered_since == "2" %}selected{% endif %}>2 Months</option>
-                        <option value="3" {% if filters.not_ordered_since == "3" %}selected{% endif %}>3 Months</option>
-                        <option value="4" {% if filters.not_ordered_since == "4" %}selected{% endif %}>4 Months</option>
-                        <option value="5" {% if filters.not_ordered_since == "5" %}selected{% endif %}>5 Months</option>
-                        <option value="12" {% if filters.not_ordered_since == "12" %}selected{% endif %}>1 Year</option>
-                    </select>
-                </div>
-
-                <div class="toolbar-group">
-                    <label for="limit" class="toolbar-label">Limit (no filter)</label>
-                    <input type="number" name="limit" id="limit" class="form-control" placeholder="e.g., 20" value="{{ filters.limit|default:'20' }}">
-                </div>
-
-                <div class="toolbar-group" style="align-self: flex-end;">
-                    <button type="submit" class="btn btn-primary">Filter</button>
-                    <a href="{% url 'Retention:retention_dashboard' %}" class="btn btn-secondary">Clear</a>
-                </div>
-            </form>
-        </div>
-
-        <div class="data-wrap">
-            <div class="data-viewport">
-                <div class="data-scroller" role="region" aria-label="Scrollable data table" tabindex="0">
-                    <table class="data-table" role="table" aria-label="Retention dataset">
-                        <thead>
-                            <tr>
-                                <th class="sticky-col sticky-corner">Customer ID</th>
-                                <th>Name</th>
-                                <th>Email</th>
-                                <th>Mobile</th>
-                                <th>Total Purchases</th>
-                                <th>Total ATCs</th>
-                                <th>Last Visit</th>
-                                <th>LTV</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for customer in customers %}
-                            <tr>
-                                <td class="sticky-col">{{ customer.Customer_ID }}</td>
-                                <td>{{ customer.Customer_Name }}</td>
-                                <td>{{ customer.Customer_Email }}</td>
-                                <td>{{ customer.Customer_Mobile }}</td>
-                                <td>{{ customer.Purchases }}</td>
-                                <td>{{ customer.Add_to_Cart }}</td>
-                                <td>{{ customer.Last_Visit|date:"Y-m-d H:i" }}</td>
-                                <td>{{ customer.Customer_LTV|floatformat:2 }}</td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="8" class="text-center text-muted">No customers found matching your criteria.</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
-    .filter-section {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 1.5rem;
-        align-items: flex-start;
-    }
-    .toolbar-group {
-        display: flex;
-        flex-direction: column;
-        gap: 0.5rem;
-    }
-    .toolbar-label {
-        font-size: 0.75rem;
-        font-weight: 600;
-        color: #6b7280;
-        text-transform: uppercase;
-    }
-    .form-control, .form-select {
-        padding: 0.5rem 0.75rem;
-        font-size: 0.875rem;
-        border-radius: 0.375rem;
-        border: 1px solid #d1d5db;
-    }
-    .btn {
-        padding: 0.5rem 1rem;
-        border-radius: 0.375rem;
-        border: none;
-        cursor: pointer;
-        font-weight: 600;
-    }
-    .btn-primary {
-        background-color: #3b82f6;
-        color: white;
-    }
-    .btn-secondary {
-        background-color: #6b7280;
-        color: white;
-    }
+  :root {
+    --bg: #f8fafc;
+    --surface: #ffffff;
+    --surface2: #f1f5f9;
+    --border: #e2e8f0;
+    --text: #1e293b;
+    --muted: #64748b;
+    --accent: #2563eb;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  .shell { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
+  .sidebar { background: var(--surface); border-right: 1px solid var(--border); padding: 28px 20px; position: sticky; top: 0; height: 100vh; overflow-y: auto; display: flex; flex-direction: column; gap: 24px; }
+  .main { padding: 28px 32px; overflow: hidden; }
+  .logo { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 17px; color: var(--text); display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .logo-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+  .sidebar-section { display: flex; flex-direction: column; gap: 6px; }
+  .sidebar-label { font-size: 10px; font-weight: 500; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+  label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px; }
+  input[type="text"], input[type="number"], input[type="date"], select {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 13px; padding: 8px 10px;
+    outline: none; transition: border-color 0.2s;
+  }
+  input:focus, select:focus { border-color: var(--accent); }
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px; border-radius: var(--radius-sm); font-size: 13px; font-family: 'DM Sans', sans-serif; font-weight: 500; cursor: pointer; border: none; transition: all 0.15s; text-decoration: none; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-row { display: flex; flex-direction: column; gap: 8px; }
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+  .page-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 22px; }
+  .row-badge { background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 4px 12px; font-size: 12px; font-family: 'DM Mono', monospace; color: var(--muted); }
+  .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .table-scroll { overflow-x: auto; max-height: 70vh; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th { background: var(--surface2); padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 500; text-transform: uppercase; color: var(--muted); position: sticky; top: 0; z-index: 1; }
+  tbody tr { border-bottom: 1px solid var(--border); }
+  tbody tr:hover { background: var(--surface2); }
+  td { padding: 10px 14px; color: var(--text); white-space: nowrap; }
+  td.name-col { font-weight: 500; }
+  .empty-state { text-align: center; padding: 40px; color: var(--muted); }
 </style>
+
+<form method="GET" id="filterForm">
+<div class="shell">
+
+  <!-- ── SIDEBAR ─────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="logo">
+      <span class="logo-dot"></span>
+      Retention Filters
+    </div>
+
+    <!-- Identifiers -->
+    <div class="sidebar-section">
+      <div class="sidebar-label">Identifiers</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div>
+          <label for="phone">Phone Number</label>
+          <input type="text" name="phone" id="phone" placeholder="Search by phone..." value="{{ filters.phone|default:'' }}">
+        </div>
+      </div>
+    </div>
+
+    <!-- Order Filters -->
+    <div class="sidebar-section">
+      <div class="sidebar-label">Order Filters</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div>
+            <label for="order_count">Order Count</label>
+            <input type="number" name="order_count" id="order_count" placeholder="e.g., 3" value="{{ filters.order_count|default:'' }}">
+        </div>
+        <div>
+            <label for="order_date">Last Order Date</label>
+            <input type="date" name="order_date" id="order_date" value="{{ filters.order_date|default:'' }}">
+        </div>
+        <div>
+            <label for="not_ordered_since">Not Ordered Since</label>
+            <select name="not_ordered_since" id="not_ordered_since">
+                <option value="">Any</option>
+                <option value="1" {% if filters.not_ordered_since == "1" %}selected{% endif %}>1 Month</option>
+                <option value="2" {% if filters.not_ordered_since == "2" %}selected{% endif %}>2 Months</option>
+                <option value="3" {% if filters.not_ordered_since == "3" %}selected{% endif %}>3 Months</option>
+                <option value="4" {% if filters.not_ordered_since == "4" %}selected{% endif %}>4 Months</option>
+                <option value="5" {% if filters.not_ordered_since == "5" %}selected{% endif %}>5 Months</option>
+                <option value="12" {% if filters.not_ordered_since == "12" %}selected{% endif %}>1 Year</option>
+            </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Options -->
+    <div class="sidebar-section">
+        <div class="sidebar-label">Options</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+            <div>
+                <label for="limit">Row limit (no filter)</label>
+                <input type="number" name="limit" id="limit" placeholder="e.g., 20" value="{{ filters.limit|default:'20' }}">
+            </div>
+        </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="btn-row" style="margin-top:auto;">
+      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        Apply
+      </button>
+      <a href="{% url 'Retention:retention_dashboard' %}" class="btn btn-secondary" style="width:100%;justify-content:center;">
+        Reset
+      </a>
+    </div>
+  </aside>
+
+  <!-- ── MAIN ───────────────────────────────── -->
+  <main class="main">
+
+    <!-- Header -->
+    <div class="page-header">
+      <div>
+        <div class="page-title">Retention Dashboard</div>
+      </div>
+      <span class="row-badge">{{ row_count }} Customers Displayed</span>
+    </div>
+
+    <!-- Table -->
+    <div class="table-wrap">
+      <div class="table-scroll">
+        <table id="dataTable">
+          <thead>
+            <tr>
+                <th>Customer ID</th>
+                <th>Name</th>
+                <th>Mobile</th>
+                <th>Orders</th>
+                <th>Add To Cart</th>
+                <th>Last Order</th>
+                <th>Total Spent</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+            {% for customer in customers %}
+            <tr>
+                <td>{{ customer.Customer_ID }}</td>
+                <td class="name-col">{{ customer.Customer_Name|default:"-" }}</td>
+                <td>{{ customer.Customer_Mobile|default:"-" }}</td>
+                <td>{{ customer.Order_Count|default:"0" }}</td>
+                <td>{{ customer.Add_To_Cart_Count|default:"0" }}</td>
+                <td>
+                    {% if customer.Last_Visit and customer.Last_Visit is not None %}
+                        {{ customer.Last_Visit|date:"Y-m-d H:i" }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td>{{ customer.Total_Spent|floatformat:2 }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7" class="empty-state">
+                    <p>No customers found matching your criteria.</p>
+                </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+</form>
 
 {% endblock %}
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'CSS/style.css' %}">
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'JS/retention_dashboard.js' %}"></script>
 {% endblock %}
