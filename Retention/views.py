@@ -289,15 +289,15 @@ def retention_dashboard(request):
 
     if order_date_filter:
         filter_date = pd.to_datetime(order_date_filter).date()
-        df = df[df["Last_Visit"].dt.date == filter_date]
+        df = df[df['Last_Visit'].notna() & (df['Last_Visit'].dt.date == filter_date)]
 
     if not_ordered_since_months:
         try:
             months = int(not_ordered_since_months)
             if months > 0:
                 cutoff_date = datetime.now() - timedelta(days=months * 30)
-                # Filter out customers who have a last visit date more recent than the cutoff
-                df = df[df['Last_Visit'] < cutoff_date]
+                # Filter for customers whose last visit is before the cutoff, excluding NaT
+                df = df[df['Last_Visit'].notna() & (df['Last_Visit'] < cutoff_date)]
         except (ValueError, TypeError):
             pass # Ignore if not a valid number
 
