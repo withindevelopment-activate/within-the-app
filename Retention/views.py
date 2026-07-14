@@ -231,7 +231,7 @@ def retention_dashboard(request):
     phone_filter = request.GET.get("phone")
 
     # Base query from the new customer tracking table
-    query = supabase.table("Store_Customers").select("*")
+    query = supabase.table("Store_Customers").select("*").order("Last_Updated", desc=True)
 
     # Apply Supabase-level filters for efficiency
     if phone_filter:
@@ -247,14 +247,14 @@ def retention_dashboard(request):
 
     df = pd.DataFrame(response.data)
 
-    # Ensure numeric types for calculations
-    numeric_cols = ["Order_Count", "Add_To_Cart_Count", "Total_Spent"]
+    # Ensure numeric types for calculations and display
+    numeric_cols = ["Order_Count", "Customer_Lifetime_Value"]
     for col in numeric_cols:
         df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
 
     df["Order_Count"] = df["Order_Count"].astype(int)
-    df["Add_To_Cart_Count"] = df["Add_To_Cart_Count"].astype(int)
 
+    # Convert date columns for filtering
     # Convert Last_Visit to datetime for filtering
     df['Last_Visit'] = pd.to_datetime(df['Last_Visit'], errors='coerce')
 
@@ -285,7 +285,7 @@ def retention_dashboard(request):
     # Clean up data for template
     for customer in customers:
         customer['Customer_Name'] = customer.get('Customer_Name') or 'N/A'
-        customer['Customer_Mobile'] = customer.get('Customer_Mobile') or 'N/A'
+        customer['Customer_Mobile'] = customer.get('Customer_Mobile') or ''
 
     context = {
         "customers": customers,
