@@ -230,15 +230,18 @@ def retention_dashboard(request):
     not_ordered_since_months = request.GET.get("not_ordered_since")
     phone_filter = request.GET.get("phone")
 
-    # Base query from the new customer tracking table
-    # query = supabase.table("Store_Customers").select("*").order("Last_Updated", desc=True)
+    # Build filters conditionally
+    filters = {}
+    if phone_filter:
+        filters["Customer_Mobile"] = ("eq", phone_filter)
+    if order_count_filter:
+        try:
+            filters["Order_Count"] = ("eq", int(order_count_filter))
+        except (ValueError, TypeError):
+            pass # Ignore if not a valid integer
+
     df = fetch_data_from_supabase_specific(
-        table_name="Store_Customers", limit=limit,
-        filters={
-                "Customer_Mobile": ("eq", phone_filter),
-                "Order_Count": ("eq", order_count_filter),
-            },
-        )
+        table_name="Store_Customers", limit=limit, filters=filters)
 
     # Apply Supabase-level filters for efficiency
     # if phone_filter:
