@@ -280,12 +280,18 @@ def retention_dashboard(request):
     df = fetch_data_from_supabase_specific(
         table_name="Store_Customers", limit=limit, filters=filters, order_by="Last_Updated")
 
-    # Ensure numeric types for calculations and display
-    numeric_cols = ["Order_Count", "Customer_Lifetime_Value"]
-    for col in numeric_cols:
-        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+    # --- Data Processing and Cleaning ---
+    # Ensure required columns exist, even if df is empty, to prevent KeyErrors
+    required_cols = [
+        "Order_Count", "Customer_Lifetime_Value", "Tags_List", 
+        "Orders", "Last_Visit", "Customer_Name", "Customer_Mobile"
+    ]
+    for col in required_cols:
+        if col not in df.columns:
+            df[col] = None
 
-    df["Order_Count"] = df["Order_Count"].astype(int)
+    df["Order_Count"] = pd.to_numeric(df["Order_Count"], errors='coerce').fillna(0).astype(int)
+    df["Customer_Lifetime_Value"] = pd.to_numeric(df["Customer_Lifetime_Value"], errors='coerce').fillna(0)
 
     # Convert date columns for filtering
     def get_last_visit(order_json):
