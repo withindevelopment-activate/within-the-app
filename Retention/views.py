@@ -261,16 +261,21 @@ def retention_dashboard(request):
     order_date_filter = request.GET.get("order_date")
     not_ordered_since_months = request.GET.get("not_ordered_since")
     phone_filter = request.GET.get("phone")
+    tags_filter = request.GET.getlist("tags") # Get list of selected tags
 
     # Build filters conditionally
     filters = {}
     if phone_filter:
         filters["Customer_Mobile"] = ("eq", phone_filter)
+
     if order_count_filter:
         try:
             filters["Order_Count"] = ("eq", int(order_count_filter))
         except (ValueError, TypeError):
             pass # Ignore if not a valid integer
+    
+    if tags_filter:
+        filters["Tags_List"] = ("cs", tags_filter) # cs = contains all elements in the list
 
     df = fetch_data_from_supabase_specific(
         table_name="Store_Customers", limit=limit, filters=filters, order_by="Last_Updated")
@@ -319,7 +324,7 @@ def retention_dashboard(request):
         except (ValueError, TypeError):
             pass # Ignore if not a valid number
 
-    is_filtered = any([order_count_filter, order_date_filter, not_ordered_since_months, phone_filter])
+    is_filtered = any([order_count_filter, order_date_filter, not_ordered_since_months, phone_filter, tags_filter])
 
     # Default limit if no filters are applied
     if not is_filtered and limit:
@@ -327,12 +332,26 @@ def retention_dashboard(request):
     elif not is_filtered:
         df = df.head(20) # Default to 20 if no limit and no filters
 
+    # --- Calculate KPIs ---
+    total_customers = len(df)
+    total_ltv = df["Customer_Lifetime_Value"].sum()
+    avg_ltv = total_ltv / total_customers if total_customers > 0 else 0
+    
+    # Ensure Tags_List is a list
+    df['Tags_List'] = df['Tags_List'].apply(lambda x: x if isinstance(x, list) else [])
+    
+    active_customers = df[df['Tags_List'].apply(lambda x: 'active' in x)].shape[0]
+    vip_customers = df[df['Tags_List'].apply(lambda x: 'vip' in x)].shape[0]
+
     customers = df.to_dict(orient="records")
 
     # Clean up data for template
     for customer in customers:
         customer['Customer_Name'] = customer.get('Customer_Name') or 'N/A'
         customer['Customer_Mobile'] = customer.get('Customer_Mobile') or ''
+        # Ensure tags are always a list for the template
+        tags = customer.get('Tags_List')
+        customer['Tags_List'] = tags if isinstance(tags, list) else []
         if pd.isna(customer.get('Last_Visit')):
             customer['Last_Visit'] = None
 
@@ -346,7 +365,14 @@ def retention_dashboard(request):
             "order_date": order_date_filter,
             "not_ordered_since": not_ordered_since_months,
             "phone": phone_filter,
-        }
+            "tags": tags_filter,
+        },
+        "kpis": {
+            "total_customers": total_customers,
+            "avg_ltv": avg_ltv,
+            "active_customers": active_customers,
+            "vip_customers": vip_customers,
+        },
     }
 
     return render(request, "Retention/retention_dashboard.html", context)

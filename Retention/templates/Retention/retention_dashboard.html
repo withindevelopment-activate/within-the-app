@@ -15,6 +15,10 @@
     --border: #e2e8f0;
     --text: #1e293b;
     --muted: #64748b;
+    --success: #16a34a;
+    --warning: #f97316;
+    --danger: #dc2626;
+    --info: #0ea5e9;
     --accent: #2563eb;
     --radius: 12px;
     --radius-sm: 8px;
@@ -33,6 +37,37 @@
     outline: none; transition: border-color 0.2s;
   }
   input:focus, select:focus { border-color: var(--accent); }
+  .tag-filter-group { display: flex; flex-wrap: wrap; gap: 6px; max-height: 200px; overflow-y: auto; background: var(--surface2); padding: 8px; border-radius: var(--radius-sm); border: 1px solid var(--border); }
+  .tag-filter-group label {
+    display: inline-block;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: 16px;
+    background-color: var(--surface);
+    color: var(--muted);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .tag-filter-group input[type="checkbox"] { display: none; }
+  .tag-filter-group input[type="checkbox"]:checked + span { background-color: var(--accent); color: #fff; border-color: var(--accent); }
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+  .kpi-label { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .kpi-value { font-family: 'Syne', sans-serif; font-size: 24px; font-weight: 700; color: var(--text); }
+  .tag-pill-container { display: flex; flex-wrap: wrap; gap: 4px; max-width: 300px; }
+  .tag-pill {
+    display: inline-block;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 500;
+    border-radius: 12px;
+    background-color: var(--surface2);
+    color: var(--muted);
+    border: 1px solid var(--border);
+    white-space: nowrap;
+  }
   .btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 16px; border-radius: var(--radius-sm); font-size: 13px; font-family: 'DM Sans', sans-serif; font-weight: 500; cursor: pointer; border: none; transition: all 0.15s; text-decoration: none; }
   .btn-primary { background: var(--accent); color: #fff; }
   .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
@@ -99,6 +134,21 @@
       </div>
     </div>
 
+    <!-- Tags Filter -->
+    <div class="sidebar-section">
+      <div class="sidebar-label">Tags</div>
+      {% with tags_list="active,inactive,at_risk,lost,vip,staff_order,First-time customer,orders_1,orders_2,orders_3,orders_4,orders_5_plus,aov_100_300,aov_400_600,aov_700_900,aov_1000_2000,aov_2000_plus" %}
+      <div class="tag-filter-group">
+        {% for tag in tags_list.split(',') %}
+          <label for="tag-{{ forloop.counter }}">
+            <input type="checkbox" name="tags" id="tag-{{ forloop.counter }}" value="{{ tag }}" {% if tag in filters.tags %}checked{% endif %}>
+            <span>{{ tag|replace:"_"|capfirst }}</span>
+          </label>
+        {% endfor %}
+      </div>
+      {% endwith %}
+    </div>
+
     <!-- Options -->
     <div class="sidebar-section">
         <div class="sidebar-label">Options</div>
@@ -133,6 +183,27 @@
       <span class="row-badge">{{ row_count }} Customers Displayed</span>
     </div>
 
+    <!-- KPIs -->
+    <div class="kpi-grid">
+        <div class="kpi-card">
+            <div class="kpi-label">Total Customers</div>
+            <div class="kpi-value">{{ kpis.total_customers }}</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Average LTV</div>
+            <div class="kpi-value">{{ kpis.avg_ltv|floatformat:2 }} <span style="font-size:16px; color: var(--muted);">SAR</span></div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Active Customers</div>
+            <div class="kpi-value">{{ kpis.active_customers }}</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">VIP Customers</div>
+            <div class="kpi-value">{{ kpis.vip_customers }}</div>
+        </div>
+    </div>
+
+
     <!-- Table -->
     <div class="table-wrap">
       <div class="table-scroll">
@@ -145,6 +216,7 @@
                 <th>Orders</th>
 ٍ                <th>Last Order</th>
                 <th>Total Spent</th>
+                <th>Tags</th>
             </tr>
           </thead>
           <tbody id="tableBody">
@@ -162,6 +234,13 @@
                     {% endif %}
                 </td>
                 <td>{{ customer.Customer_Lifetime_Value|floatformat:2 }}</td>
+                <td>
+                  <div class="tag-pill-container">
+                    {% for tag in customer.Tags_List %}
+                      <span class="tag-pill">{{ tag }}</span>
+                    {% endfor %}
+                  </div>
+                </td>
             </tr>
             {% empty %}
             <tr>
