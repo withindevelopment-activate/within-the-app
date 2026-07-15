@@ -1,5 +1,6 @@
 {% extends "Demo/base.html" %}
 {% load static %}
+{% load retention_extras %}
 
 {% block title %}Retention Dashboard{% endblock %}
 
@@ -141,7 +142,7 @@
         {% for tag in all_tags %}
           <label for="tag-{{ forloop.counter }}">
             <input type="checkbox" name="tags" id="tag-{{ forloop.counter }}" value="{{ tag }}" {% if tag in filters.tags %}checked{% endif %}>
-            <span>{{ tag|replace:"_"|capfirst }}</span>
+            <span>{{ tag|replace:"_,"|capfirst }}</span>
           </label>
         {% endfor %}
       </div>
