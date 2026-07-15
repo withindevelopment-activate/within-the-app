@@ -355,6 +355,13 @@ def retention_dashboard(request):
         if pd.isna(customer.get('Last_Visit')):
             customer['Last_Visit'] = None
 
+    all_tags = [
+        "active", "inactive", "at_risk", "lost", "vip", "staff_order",
+        "First-time customer", "orders_1", "orders_2", "orders_3", "orders_4",
+        "orders_5_plus", "aov_100_300", "aov_400_600", "aov_700_900",
+        "aov_1000_2000", "aov_2000_plus"
+    ]
+
     context = {
         "customers": customers,
         "row_count": len(customers),
@@ -367,6 +374,7 @@ def retention_dashboard(request):
             "phone": phone_filter,
             "tags": tags_filter,
         },
+        "all_tags": all_tags,
         "kpis": {
             "total_customers": total_customers,
             "avg_ltv": avg_ltv,

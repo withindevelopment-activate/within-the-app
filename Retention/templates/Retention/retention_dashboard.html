@@ -137,16 +137,14 @@
     <!-- Tags Filter -->
     <div class="sidebar-section">
       <div class="sidebar-label">Tags</div>
-      {% with tags_list="active,inactive,at_risk,lost,vip,staff_order,First-time customer,orders_1,orders_2,orders_3,orders_4,orders_5_plus,aov_100_300,aov_400_600,aov_700_900,aov_1000_2000,aov_2000_plus" %}
       <div class="tag-filter-group">
-        {% for tag in tags_list.split(',') %}
+        {% for tag in all_tags %}
           <label for="tag-{{ forloop.counter }}">
             <input type="checkbox" name="tags" id="tag-{{ forloop.counter }}" value="{{ tag }}" {% if tag in filters.tags %}checked{% endif %}>
             <span>{{ tag|replace:"_"|capfirst }}</span>
           </label>
         {% endfor %}
       </div>
-      {% endwith %}
     </div>
 
     <!-- Options -->
