@@ -143,8 +143,7 @@
                 <th>Name</th>
                 <th>Mobile</th>
                 <th>Orders</th>
-                <th>Add To Cart</th>
-                <th>Last Order</th>
+ٍ                <th>Last Order</th>
                 <th>Total Spent</th>
             </tr>
           </thead>
@@ -155,7 +154,6 @@
                 <td class="name-col">{{ customer.Customer_Name|default:"-" }}</td>
                 <td>{{ customer.Customer_Mobile|default:"-" }}</td>
                 <td>{{ customer.Order_Count|default:"0" }}</td>
-                <td>{{ customer.Add_To_Cart_Count|default:"0" }}</td>
                 <td>
                     {% if customer.Last_Visit and customer.Last_Visit is not None %}
                         {{ customer.Last_Visit|date:"Y-m-d H:i" }}
