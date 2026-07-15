@@ -154,6 +154,8 @@ def update_customers_db(customer_id, customer_name, customer_mobile,
 
             "Hook_Source": utm_source,
 
+            "Tags_List": [],
+
             "Last_Updated": get_uae_current_date()
 
         }])
