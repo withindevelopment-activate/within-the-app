@@ -51,8 +51,11 @@
     cursor: pointer;
     transition: all 0.2s;
   }
+  .tag-filter-group label:has(input[type="checkbox"]:checked) {
+    border-color: var(--text);
+    color: var(--text);
+  }
   .tag-filter-group input[type="checkbox"] { display: none; }
-  .tag-filter-group input[type="checkbox"]:checked + span { background-color: var(--accent); color: #fff; border-color: var(--accent); }
   .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
   .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
   .kpi-label { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
