@@ -52,10 +52,16 @@ def adding_order_to_db(payload):
             else:
                 return None
         return current
+    
+    print("=" * 80)
+    print("NEW WEBHOOK RECEIVED")
+    print(f"Order ID: {payload.get('id')}")
+    print(f"Payload Keys: {list(payload.keys())}")
 
     rows = []
 
     products = payload.get("products", [])
+    print(f"Number of products: {len(products)}")
 
     customer = payload.get("customer", {})
     shipping = payload.get("shipping", {})
@@ -77,6 +83,10 @@ def adding_order_to_db(payload):
     customer_mobile = customer.get("mobile")
     customer_email = customer.get("email")
 
+    print(f"Customer ID: {customer_id}")
+    print(f"Customer Name: {customer_name}")
+    print(f"Customer Mobile: {customer_mobile}")
+
     customer_note = payload.get("customer_note")
 
     utm_source = utm.get("source")
@@ -86,10 +96,18 @@ def adding_order_to_db(payload):
                 name='All_ZID_Orders', column='Distinct_ID'
             ))
     
+    print(f"Starting Distinct_ID: {distinct_id}")
+    
     ## Initialize a dictionary to store the products + their quans
     products_dict = {}
     ## We loop thru the products because an order has multiple orders = multiple rows
     for product in products:
+
+        print(f"\nProcessing product {product}")
+        print(f"SKU: {product.get('sku')}")
+        print(f"Name: {product.get('name')}")
+        print(f"Quantity: {product.get('quantity')}")
+
         row = {
             ## The Distinct ID
             "Distinct_ID": distinct_id,
@@ -173,12 +191,17 @@ def adding_order_to_db(payload):
     else:
         region = None
 
+    print(f"Currency: {currency_code}")
+    print(f"Region: {region}")
+
     rows_df["region"] = region
 
     ## Dates
     added_at = dubai_time(payload.get("created_at"))
     rows_df["added_at (Asia/Dubai)"] = added_at
     rows_df["last_update_at (Asia/Dubai)"] = dubai_time(payload.get("updated_at"))
+
+    print(f"Added At: {added_at}")
 
     ## POS
     rows_df["pos_inventory_location"] = None
@@ -212,11 +235,20 @@ def adding_order_to_db(payload):
     rows_df['last_updated'] = get_uae_current_date()
 
     ## Append to the database
+    print("About to insert into All_ZID_Orders...")
+    print(rows_df.to_string())
     batch_insert_to_supabase(rows_df, "All_ZID_Orders")
 
-    ## Update the customers_db
-    verdict = update_customers_db(customer_id, customer_name, customer_mobile, order_id, products_dict, added_at, utm_source, order_total)
+    print("Successfully inserted into All_ZID_Orders.")
 
+    ## Update the customers_db
+    print("Updating customer database...")
+    print(products_dict)
+    verdict = update_customers_db(customer_id, customer_name, customer_mobile, order_id, products_dict, added_at, utm_source, order_total)
+    print(f"Customer DB update verdict: {verdict}")
+
+    print(f"Finished processing Order {order_id}")
+    print("=" * 80)
     return True
 
 def retention_dashboard(request):

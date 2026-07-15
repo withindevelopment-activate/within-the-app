@@ -187,6 +187,7 @@ def zid_callback(request):
         subscribe_store_to_product_update(authorization_token, access_token)
         #subscribe_store_to_order_update(authorization_token, access_token)
         subscribe_store_to_order_create(authorization_token, access_token)
+        print("Subscribed to the Order Create webhook --------")
         #subscribe_store_to_customer_create(authorization_token, access_token)
 
         # ##### Initial fetch for the products and orders

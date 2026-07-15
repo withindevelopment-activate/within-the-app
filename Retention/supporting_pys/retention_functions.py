@@ -16,6 +16,8 @@ def update_customers_db(customer_id, customer_name, customer_mobile,
     of a customer or update an existing one --
     """
 
+    print(f"Entered the customer update funciton for customer {customer_name}")
+
     customer_df = pd.DataFrame()
     # Only search by customer_id if it's a valid, non-zero ID
     if customer_id and int(customer_id) != 0:
