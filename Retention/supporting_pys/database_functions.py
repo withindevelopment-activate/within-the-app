@@ -42,8 +42,6 @@ def fetch_data_from_supabase_specific(table_name, columns=None, filters=None, or
                             query = query.gte(column, value)
                         elif op == 'in':
                             query = query.in_(column, value)
-                        elif op == 'ov':
-                            query = query.ov(column, value)
                         elif op == 'not_in':
                             query = query.not_in(column, value)
             elif isinstance(condition, tuple) and len(condition) == 2:
@@ -62,8 +60,6 @@ def fetch_data_from_supabase_specific(table_name, columns=None, filters=None, or
                     query = query.gte(column, value)
                 elif op == 'in':
                     query = query.in_(column, value)
-                elif op == 'ov':
-                    query = query.ov(column, value)
                 elif op == 'not_in':
                     query = query.not_in(column, value)
             else:
