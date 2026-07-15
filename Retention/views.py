@@ -243,20 +243,6 @@ def retention_dashboard(request):
     df = fetch_data_from_supabase_specific(
         table_name="Store_Customers", limit=limit, filters=filters, order_by="Last_Updated")
 
-    # Apply Supabase-level filters for efficiency
-    # if phone_filter:
-    #     query = query.like("Customer_Mobile", f"%{phone_filter}%")
-    
-    # if order_count_filter:
-    #     query = query.eq("Order_Count", int(order_count_filter))
-
-    # Execute query to get all data for filtering in pandas
-    # response = query.execute()
-    # if not response.data:
-    #     return render(request, "Retention/retention_dashboard.html", {"customers": [], "row_count": 0})
-
-    # df = pd.DataFrame(response.data)
-
     # Ensure numeric types for calculations and display
     numeric_cols = ["Order_Count", "Customer_Lifetime_Value"]
     for col in numeric_cols:
