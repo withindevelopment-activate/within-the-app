@@ -275,7 +275,7 @@ def retention_dashboard(request):
             pass # Ignore if not a valid integer
     
     if tags_filter:
-        filters["Tags_List"] = ("cs", tags_filter) # cs = contains all elements in the list
+        filters["Tags_List"] = ("ov", tags_filter) # ov = overlaps (contains any of)
 
     df = fetch_data_from_supabase_specific(
         table_name="Store_Customers", limit=limit, filters=filters, order_by="Last_Updated")
