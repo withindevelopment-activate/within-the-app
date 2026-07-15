@@ -277,8 +277,8 @@ def retention_dashboard(request):
     if tags_filter:
         filters["Tags_List"] = ("in", tags_filter)
 
-    df = fetch_data_from_supabase_specific(
-        table_name="Store_Customers", limit=limit, filters=filters, order_by="Last_Updated")
+    df, total_customers = fetch_data_from_supabase_specific(
+        table_name="Store_Customers", limit=limit, filters=filters, order_by="Last_Updated", count='exact')
 
     # --- Data Processing and Cleaning ---
     # Ensure required columns exist, even if df is empty, to prevent KeyErrors
@@ -339,7 +339,6 @@ def retention_dashboard(request):
         df = df.head(20) # Default to 20 if no limit and no filters
 
     # --- Calculate KPIs ---
-    total_customers = len(df)
     total_ltv = df["Customer_Lifetime_Value"].sum()
     avg_ltv = total_ltv / total_customers if total_customers > 0 else 0
     

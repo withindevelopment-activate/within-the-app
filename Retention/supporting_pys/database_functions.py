@@ -8,7 +8,7 @@ key: str = os.environ.get('SUPABASE_KEY')
 
 supabase: Client = create_client(url, key)
 
-def fetch_data_from_supabase_specific(table_name, columns=None, filters=None, order_by=None, limit=None):
+def fetch_data_from_supabase_specific(table_name, columns=None, filters=None, order_by=None, limit=None, count=None):
     # Construct the select query with specified columns or all columns
     if columns:
         # Wrap problematic column names with double quotes
@@ -18,7 +18,7 @@ def fetch_data_from_supabase_specific(table_name, columns=None, filters=None, or
         select_query = "*"
 
         
-    query = supabase.table(table_name).select(select_query)
+    query = supabase.table(table_name).select(select_query, count=count)
 
     # Apply filters if specified
     if filters:
@@ -78,21 +78,22 @@ def fetch_data_from_supabase_specific(table_name, columns=None, filters=None, or
     
     if response.data is not None:
         df = pd.DataFrame(response.data)
+        total_count = response.count if hasattr(response, 'count') else len(df)
 
         # If DataFrame is empty, return an empty one with proper columns
         if df.empty:
             # Try to infer column names from the table structure using Supabase's metadata API
             # But for now, fallback to using the `columns` argument if provided
             if columns:
-                return pd.DataFrame(columns=columns)
+                return pd.DataFrame(columns=columns), 0
             else:
-                return pd.DataFrame()  # Empty with unknown columns
+                return pd.DataFrame(), 0  # Empty with unknown columns
 
         # Replace NaNs with 0 in the 'Quantity' column if the table is 'Inventory'
         if table_name == "Inventory" and 'Quantity' in df.columns:
             df['Quantity'].fillna(0, inplace=True)
 
-        return df
+        return df, total_count
     else:
         raise Exception("Error fetching data: " + response.error_message)
     
