@@ -339,9 +339,10 @@ def retention_dashboard(request):
         df = df.head(20) # Default to 20 if no limit and no filters
 
     # --- Calculate KPIs ---
+    total_customers_filtered = len(df)
     total_ltv = df["Customer_Lifetime_Value"].sum()
-    avg_ltv = total_ltv / total_customers if total_customers > 0 else 0
-    
+    avg_ltv = total_ltv / total_customers_filtered if total_customers_filtered > 0 else 0
+
     # Ensure Tags_List is a list
     df['Tags_List'] = df['Tags_List'].apply(lambda x: x if isinstance(x, list) else [])
     
