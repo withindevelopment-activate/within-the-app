@@ -166,8 +166,6 @@ def update_customers_db(customer_id, customer_name, customer_mobile,
 
         customer_df.at[customer_df.index[0], "Products"] = products
         
-        tags = get_customer_tags(order_count, new_ltv, ltv_averaged, orders)
-        customer_df.at[customer_df.index[0], "Tags_List"] = tags
         customer_df.at[customer_df.index[0], "Orders"] = orders
 
         customer_df.at[customer_df.index[0], "Hook_Source"] = utm_source
@@ -175,6 +173,9 @@ def update_customers_db(customer_id, customer_name, customer_mobile,
 
         ## Partially upsert the updated row
         upsert_partial(customer_df, "Store_Customers", "Distinct_ID")
+
+        ## Syncing to the customer tags
+        sync_customer_tags(customer_mobile=customer_mobile, order_count=order_count, ltv=new_ltv, ltv_averaged=ltv_averaged, orders_dict=orders)
 
         return True
 
@@ -226,7 +227,6 @@ def update_customers_db(customer_id, customer_name, customer_mobile,
 
             "LTV_Averaged": float(order_total or 0),
             "Hook_Source": utm_source,            
-            "Tags_List": get_customer_tags(1, float(order_total or 0), float(order_total or 0), orders),
             "Last_Updated": get_uae_current_date()
 
         }])
@@ -236,4 +236,93 @@ def update_customers_db(customer_id, customer_name, customer_mobile,
             "Store_Customers"
         )
 
+        ## Syncing to the customer tags
+        sync_customer_tags(customer_mobile=customer_mobile, order_count=order_count, ltv=new_ltv, ltv_averaged=ltv_averaged, orders_dict=orders)
+
         return True
+    
+
+## The function that finds the tag for the customer and updates the existing tags
+def sync_customer_tags(customer_mobile, order_count, ltv, ltv_averaged, orders_dict):
+    """
+    Finds the supposed tags for the customer, looks for them in the database, adds and omits as necessary -- 
+    """
+
+    if not customer_mobile:
+        return
+
+    # Calculate the tags the customer SHOULD have
+    new_tags = set(
+        get_customer_tags(
+            order_count=order_count,
+            ltv=ltv,
+            ltv_averaged=ltv_averaged,
+            orders_dict=orders_dict
+        )
+    )
+
+
+    # Fetch the customer's CURRENT tags 
+    current_tags_df = fetch_data_from_supabase_specific(
+        "Customer_Tag_Mapping",
+        filters={
+            "Customer_Mobile": ("eq", customer_mobile)
+        }
+    )
+
+    if current_tags_df.empty:
+        current_tags = set()
+    else:
+        current_tags = set(current_tags_df["Tag"].dropna().tolist())
+
+
+    # Find differences
+    tags_to_add = new_tags - current_tags
+    tags_to_remove = current_tags - new_tags
+
+
+    # Insert new tags
+    if tags_to_add:
+
+        next_id = int(
+            get_next_id_from_supabase_compatible_all(
+                name="Customer_Tag_Mapping",
+                column="Distinct_ID"
+            )
+        )
+
+        rows = []
+
+        for tag in sorted(tags_to_add):
+
+            rows.append({
+
+                "Distinct_ID": next_id,
+                "Customer_Mobile": customer_mobile,
+                "Tag": tag,
+                "Last_Updated": get_uae_current_date()
+
+            })
+
+            next_id += 1
+
+        batch_insert_to_supabase(
+            pd.DataFrame(rows),
+            "Customer_Tag_Mapping"
+        )
+
+
+    # Remove old tags
+    if tags_to_remove:
+
+        rows_to_delete = current_tags_df[
+            current_tags_df["Tag"].isin(tags_to_remove)
+        ][["Distinct_ID"]]
+
+        delete_row_from_supabase(
+            rows_to_delete,
+            "Customer_Tag_Mapping",
+            "Distinct_ID"
+        )
+
+    return True

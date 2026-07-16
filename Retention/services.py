@@ -52,16 +52,15 @@ def subscribe_store_to_order_create(authorization_token, access_token):
 
     payload = json.dumps({
         "event": "order.create",
-        "target_url": settings.TARGET_URL_ORDER_CREATE_HOOK,
-        "original_id": settings.ZID_CLIENT_ID,
-        "subscriber": settings.ZID_CLIENT_ID
-        
+        "target_url": settings.TARGET_URL_ORDER_HOOK,
+        "original_id": settings.ZID_CLIENT_ID
     })
 
     headers = {
-        'Authorization': f'Bearer {authorization_token}',
-        'X-Manager-Token': access_token,
-        'Content-Type': 'application/json'
+        "Authorization": f"Bearer {authorization_token}",
+        "X-Manager-Token": access_token,
+        "Accept-Language": "en",
+        "Content-Type": "application/json"
     }
 
     try:

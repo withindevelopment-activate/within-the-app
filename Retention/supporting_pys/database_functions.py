@@ -188,3 +188,27 @@ def upsert_partial(df, table_name, pk):
             .upsert(payload, on_conflict=pk) \
             .execute()
     
+def delete_row_from_supabase(df, table_name, pk):
+    """
+    Deletes rows from Supabase using the specified primary key column.
+    
+    """
+
+    if pk not in df.columns:
+        raise ValueError(f"Primary key '{pk}' missing from DataFrame")
+
+    ids = (
+        df[pk]
+        .dropna()
+        .unique()
+        .tolist()
+    )
+
+    if not ids:
+        return
+
+    supabase.table(table_name) \
+        .delete() \
+        .in_(pk, ids) \
+        .execute()
+    
