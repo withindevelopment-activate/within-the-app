@@ -1,5 +1,6 @@
 from django.shortcuts import render
 import json
+from io import BytesIO
 import logging
 from Demo.supporting_files.supabase_functions import get_next_id_from_supabase_compatible_all
 from Demo.supporting_files.supporting_functions import get_uae_current_date
@@ -261,6 +262,7 @@ def retention_dashboard(request):
     order_date_filter = request.GET.get("order_date")
     not_ordered_since_months = request.GET.get("not_ordered_since")
     phone_filter = request.GET.get("phone")
+    action = request.GET.get("action")
     tags_filter = request.GET.getlist("tags") # Get list of selected tags
 
     try:
@@ -305,8 +307,40 @@ def retention_dashboard(request):
         except (ValueError, TypeError):
             pass
 
-    df, total_customers = fetch_data_from_supabase_specific(
-        table_name="Store_Customers", limit=limit, filters=filters, order_by="Last_Updated", count='exact')
+    # First, get the total count of customers matching the filters without any limit.
+    _, total_customers = fetch_data_from_supabase_specific(
+        table_name="Store_Customers", columns=["Distinct_ID"], filters=filters, count='exact')
+    
+    # If the action is to download, fetch all data, otherwise fetch the paginated view.
+    if action == "download_excel":
+        df, _ = fetch_data_from_supabase_specific(
+            table_name="Store_Customers", filters=filters, order_by="Last_Updated")
+    else:
+        df, _ = fetch_data_from_supabase_specific(
+            table_name="Store_Customers", limit=limit, filters=filters, order_by="Last_Updated")
+
+    # --- Data Processing and Cleaning ---
+    # This block is now common for both display and download
+    required_cols = [
+        "Order_Count", "Customer_Lifetime_Value", "Orders", 
+        "Last_Visit", "Customer_Name", "Customer_Mobile", "Customer_ID"
+    ]
+    for col in required_cols:
+        if col not in df.columns:
+            df[col] = None
+
+    df["Order_Count"] = pd.to_numeric(df["Order_Count"], errors='coerce').fillna(0).astype(int)
+    df["Customer_Lifetime_Value"] = pd.to_numeric(df["Customer_Lifetime_Value"], errors='coerce').fillna(0)
+
+    def get_last_visit(order_json):
+        if pd.isna(order_json): return pd.NaT
+        try:
+            if isinstance(order_json, str): order_json = json.loads(order_json)
+            if not isinstance(order_json, dict): return pd.NaT
+            dates = [pd.to_datetime(order.get("added_at"), errors='coerce') for order in order_json.values() if order.get("added_at")]
+            return max(d for d in dates if pd.notna(d)) if dates else pd.NaT
+        except (json.JSONDecodeError, TypeError): return pd.NaT
+    df['Last_Visit'] = df['Orders'].apply(get_last_visit)
 
     # --- Data Processing and Cleaning ---
     # Ensure required columns exist, even if df is empty, to prevent KeyErrors
@@ -318,43 +352,32 @@ def retention_dashboard(request):
         if col not in df.columns:
             df[col] = None
 
-    df["Order_Count"] = pd.to_numeric(df["Order_Count"], errors='coerce').fillna(0).astype(int)
-    df["Customer_Lifetime_Value"] = pd.to_numeric(df["Customer_Lifetime_Value"], errors='coerce').fillna(0)
-
-    # Convert date columns for filtering
-    def get_last_visit(order_json):
-        if pd.isna(order_json):
-            return pd.NaT
-
-        try:
-            # Ensure it's a dictionary
-            if isinstance(order_json, str):
-                order_json = json.loads(order_json)
-            
-            if not isinstance(order_json, dict):
-                return pd.NaT
-
-            dates = [pd.to_datetime(order.get("added_at"), errors='coerce') 
-                     for order in order_json.values() if order.get("added_at")]
-            
-            return max(d for d in dates if pd.notna(d)) if dates else pd.NaT
-
-        except (json.JSONDecodeError, TypeError):
-            return pd.NaT
-
-    df['Last_Visit'] = df['Orders'].apply(get_last_visit)
-
     if order_date_filter:
         filter_date = pd.to_datetime(order_date_filter).date()
         df = df[df['Last_Visit'].notna() & (df['Last_Visit'].dt.date == filter_date)]
 
-    is_filtered = any([order_count_filter, order_date_filter, not_ordered_since_months, phone_filter, tags_filter])
+    # --- Handle Excel Download ---
+    if action == "download_excel":
+        from django.http import HttpResponse
 
-    # Default limit if no filters are applied
-    if not is_filtered and limit:
-        df = df.head(int(limit))
-    elif not is_filtered:
-        df = df.head(20) # Default to 20 if no limit and no filters
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            # Prepare data for export
+            df_export = df[[
+                "Customer_ID", "Customer_Name", "Customer_Mobile",
+                "Order_Count", "Last_Visit", "Customer_Lifetime_Value"
+            ]].copy()
+            df_export.rename(columns={
+                "Customer_ID": "Customer ID", "Customer_Name": "Name", "Customer_Mobile": "Mobile",
+                "Order_Count": "Orders", "Last_Visit": "Last Order", "Customer_Lifetime_Value": "Total Spent (AED)"
+            }, inplace=True)
+            df_export['Last Order'] = pd.to_datetime(df_export['Last Order']).dt.strftime('%Y-%m-%d %H:%M')
+            df_export.to_excel(writer, index=False, sheet_name='Customers')
+        
+        output.seek(0)
+        response = HttpResponse(output, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = 'attachment; filename="filtered_customers.xlsx"'
+        return response
 
     # --- Calculate KPIs ---
     total_customers_filtered = len(df)
