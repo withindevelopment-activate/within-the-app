@@ -218,7 +218,6 @@
                 <th>Orders</th>
 ٍ                <th>Last Order</th>
                 <th>Total Spent</th>
-                <th>Tags</th>
             </tr>
           </thead>
           <tbody id="tableBody">
@@ -236,13 +235,6 @@
                     {% endif %}
                 </td>
                 <td>{{ customer.Customer_Lifetime_Value|floatformat:2 }}</td>
-                <td>
-                  <div class="tag-pill-container">
-                    {% for tag in customer.Tags_List %}
-                      <span class="tag-pill">{{ tag }}</span>
-                    {% endfor %}
-                  </div>
-                </td>
             </tr>
             {% empty %}
             <tr>

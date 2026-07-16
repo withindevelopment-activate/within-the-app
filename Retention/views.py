@@ -297,7 +297,7 @@ def retention_dashboard(request):
     # --- Data Processing and Cleaning ---
     # Ensure required columns exist, even if df is empty, to prevent KeyErrors
     required_cols = [
-        "Order_Count", "Customer_Lifetime_Value", "Tags_List", 
+        "Order_Count", "Customer_Lifetime_Value", 
         "Orders", "Last_Visit", "Customer_Name", "Customer_Mobile"
     ]
     for col in required_cols:
@@ -357,30 +357,35 @@ def retention_dashboard(request):
     total_ltv = df["Customer_Lifetime_Value"].sum()
     avg_ltv = total_ltv / total_customers_filtered if total_customers_filtered > 0 else 0
 
-    # Ensure Tags_List is a list
-    df['Tags_List'] = df['Tags_List'].apply(lambda x: x if isinstance(x, list) else [])
-    
-    active_customers = df[df['Tags_List'].apply(lambda x: 'active' in x)].shape[0]
-    vip_customers = df[df['Tags_List'].apply(lambda x: 'vip' in x)].shape[0]
-
     customers = df.to_dict(orient="records")
 
     # Clean up data for template
     for customer in customers:
         customer['Customer_Name'] = customer.get('Customer_Name') or 'N/A'
         customer['Customer_Mobile'] = customer.get('Customer_Mobile') or ''
-        # Ensure tags are always a list for the template
-        tags = customer.get('Tags_List')
-        customer['Tags_List'] = tags if isinstance(tags, list) else []
+
         if pd.isna(customer.get('Last_Visit')):
             customer['Last_Visit'] = None
 
-    all_tags = [
-        "active", "inactive", "at_risk", "lost", "vip", "staff_order",
-        "First-time customer", "orders_1", "orders_2", "orders_3", "orders_4",
-        "orders_5_plus", "aov_100_300", "aov_400_600", "aov_700_900",
-        "aov_1000_2000", "aov_2000_plus"
-    ]
+    # Mapping from English tag values (database) to Arabic display names (UI)
+    tag_display_mapping = {
+        "active": "نشط",
+        "inactive": "غير نشط",
+        "at_risk": "في خطر",
+        "lost": "مفقود",
+        "vip": "عميل مميز",
+        "First-time customer": "عميل لأول مرة",
+        "orders_1": "طلب واحد",
+        "orders_2": "طلبان",
+        "orders_3": "3 طلبات",
+        "orders_4": "4 طلبات",
+        "orders_5_plus": "5 طلبات أو أكثر",
+        "aov_100_300": "متوسط قيمة الطلب 100-300",
+        "aov_400_600": "متوسط قيمة الطلب 400-600",
+        "aov_700_900": "متوسط قيمة الطلب 700-900",
+        "aov_1000_2000": "متوسط قيمة الطلب 1000-2000",
+        "aov_2000_plus": "متوسط قيمة الطلب +2000",
+    }
 
     context = {
         "customers": customers,
@@ -388,18 +393,18 @@ def retention_dashboard(request):
         "is_filtered": is_filtered,
         "filters": {
             "limit": limit or "20",
-            "order_count": order_count_filter,
-            "order_date": order_date_filter,
-            "not_ordered_since": not_ordered_since_months,
-            "phone": phone_filter,
+            "order_count": order_count_filter or "",
+            "order_date": order_date_filter or "",
+            "not_ordered_since": not_ordered_since_months or "",
+            "phone": phone_filter or "",
             "tags": tags_filter,
         },
-        "all_tags": all_tags,
+        "all_tags": tag_display_mapping,
         "kpis": {
-            "total_customers": total_customers,
-            "avg_ltv": avg_ltv,
-            "active_customers": active_customers,
-            "vip_customers": vip_customers,
+            "total_customers": f"{total_customers:,.2f}",
+            "avg_ltv": f"{avg_ltv:,.2f}",
+            "total_customers_filtered": total_customers_filtered,
+            "total_ltv": f"{total_ltv:,.2f}",
         },
     }
 
