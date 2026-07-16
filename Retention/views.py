@@ -391,6 +391,25 @@ def retention_dashboard(request):
         "aov_2000_plus": "متوسط قيمة الطلب +2000",
     }
 
+    tag_descriptions = {
+        "active": "العملاء الذين لديهم أكثر من طلب واحد وقاموا بالشراء خلال الـ 90 يومًا الماضية.",
+        "inactive": "العملاء الذين لم يقوموا بالشراء منذ أكثر من 90 يومًا.",
+        "at_risk": "العملاء الذين لم يقوموا بالشراء منذ أكثر من 180 يومًا.",
+        "lost": "العملاء الذين لم يقوموا بالشراء منذ أكثر من 365 يومًا.",
+        "vip": "العملاء ذوو القيمة العالية بناءً على إجمالي إنفاقهم.",
+        "First-time customer": "العملاء الذين أجروا عملية شراء واحدة فقط.",
+        "orders_1": "العملاء الذين لديهم طلب واحد بالضبط.",
+        "orders_2": "العملاء الذين لديهم طلبان بالضبط.",
+        "orders_3": "العملاء الذين لديهم 3 طلبات بالضبط.",
+        "orders_4": "العملاء الذين لديهم 4 طلبات بالضبط.",
+        "orders_5_plus": "العملاء الذين لديهم 5 طلبات أو أكثر.",
+        "aov_100_300": "العملاء الذين يتراوح متوسط قيمة طلبهم بين 100 و 300.",
+        "aov_400_600": "العملاء الذين يتراوح متوسط قيمة طلبهم بين 400 و 600.",
+        "aov_700_900": "العملاء الذين يتراوح متوسط قيمة طلبهم بين 700 و 900.",
+        "aov_1000_2000": "العملاء الذين يتراوح متوسط قيمة طلبهم بين 1000 و 2000.",
+        "aov_2000_plus": "العملاء الذين يزيد متوسط قيمة طلبهم عن 2000.",
+    }
+
     context = {
         "customers": customers,
         "row_count": len(customers),
@@ -404,8 +423,9 @@ def retention_dashboard(request):
             "tags": tags_filter,
         },
         "all_tags": tag_display_mapping,
+        "tag_descriptions": tag_descriptions,
         "kpis": {
-            "total_customers": f"{total_customers:,.2f}",
+            "total_customers": f"{total_customers:,.0f}",
             "avg_ltv": f"{avg_ltv:,.2f}",
             "total_customers_filtered": total_customers_filtered,
             "total_ltv": f"{total_ltv:,.2f}",

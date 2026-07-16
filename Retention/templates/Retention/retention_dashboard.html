@@ -88,6 +88,22 @@
   td { padding: 10px 14px; color: var(--text); white-space: nowrap; }
   td.name-col { font-weight: 500; }
   .empty-state { text-align: center; padding: 40px; color: var(--muted); }
+  .tooltip-container { position: relative; display: inline-block; }
+  .tooltip-icon { cursor: pointer; color: var(--muted); font-size: 14px; margin-left: 6px; }
+  .tooltip-content {
+    visibility: hidden; opacity: 0; position: absolute; background-color: #333; color: #fff;
+    text-align: right; border-radius: 6px; padding: 10px; z-index: 10;
+    bottom: 125%; left: 50%; margin-left: -150px; /* Adjust to center */
+    width: 300px; transition: opacity 0.3s;
+  }
+  .tooltip-content::after {
+    content: ""; position: absolute; top: 100%; left: 50%; margin-left: -5px;
+    border-width: 5px; border-style: solid; border-color: #333 transparent transparent transparent;
+  }
+  .tooltip-container:hover .tooltip-content { visibility: visible; opacity: 1; }
+  .tooltip-list { list-style: none; padding: 0; margin: 0; }
+  .tooltip-list li { padding: 5px 0; border-bottom: 1px solid #555; }
+  .tooltip-list li:last-child { border-bottom: none; }
 </style>
 
 <form method="GET" id="filterForm">
@@ -132,7 +148,9 @@
                 <option value="3" {% if filters.not_ordered_since == "3" %}selected{% endif %}>3 Months</option>
                 <option value="4" {% if filters.not_ordered_since == "4" %}selected{% endif %}>4 Months</option>
                 <option value="5" {% if filters.not_ordered_since == "5" %}selected{% endif %}>5 Months</option>
+                <option value="6" {% if filters.not_ordered_since == "6" %}selected{% endif %}>6 Months</option>
                 <option value="12" {% if filters.not_ordered_since == "12" %}selected{% endif %}>1 Year</option>
+                <option value="24" {% if filters.not_ordered_since == "24" %}selected{% endif %}>2 Years</option>
             </select>
         </div>
       </div>
@@ -140,7 +158,22 @@
 
     <!-- Tags Filter -->
     <div class="sidebar-section">
-      <div class="sidebar-label">Tags</div>
+      <div class="sidebar-label" style="display: flex; align-items: center;">
+        Tags
+        <div class="tooltip-container">
+          <span class="tooltip-icon">ⓘ</span>
+          <div class="tooltip-content">
+            <ul class="tooltip-list">
+              {% for tag_key, description in tag_descriptions.items %}
+                <li>
+                  <strong>{{ all_tags|get_item:tag_key }}:</strong>
+                  {{ description }}
+                </li>
+              {% endfor %}
+            </ul>
+          </div>
+        </div>
+      </div>
       <div class="tag-filter-group">
         {% for en_tag, ar_tag in all_tags.items %}
           <label for="tag-{{ en_tag }}">
@@ -196,11 +229,11 @@
             <div class="kpi-value">{{ kpis.avg_ltv }} <span style="font-size:16px; color: var(--muted);">AED</span></div>
         </div>
         <div class="kpi-card">
-            <div class="kpi-label">Active Customers</div>
+            <div class="kpi-label">Contacted Customers</div>
             <div class="kpi-value">{{ kpis.total_customers_filtered }}</div>
         </div>
         <div class="kpi-card">
-            <div class="kpi-label">VIP Customers</div>
+            <div class="kpi-label">Total Spent</div>
             <div class="kpi-value">{{ kpis.total_ltv }}</div>
         </div>
     </div>
