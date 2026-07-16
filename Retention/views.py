@@ -263,19 +263,33 @@ def retention_dashboard(request):
     phone_filter = request.GET.get("phone")
     tags_filter = request.GET.getlist("tags") # Get list of selected tags
 
+    phone_numbers_from_tags = []
+    filters_for_tags = {}
+    if tags_filter:
+        filters_for_tags["Tag"] = ("in", tags_filter)
+        # Fetch phone numbers from the Customer_Tags table based on the selected tags.
+        tags_df, _ = fetch_data_from_supabase_specific(
+            table_name="Customer_Tags",
+            filters=filters_for_tags
+        )
+        if not tags_df.empty:
+            # Get a unique list of phone numbers.
+            phone_numbers_from_tags = tags_df["customer phone number"].unique().tolist()
+
     # Build filters conditionally
     filters = {}
     if phone_filter:
         filters["Customer_Mobile"] = ("eq", phone_filter)
+
+    # If we have phone numbers from tags, use them to filter.
+    if phone_numbers_from_tags:
+        filters["Customer_Mobile"] = ("in", phone_numbers_from_tags)
 
     if order_count_filter:
         try:
             filters["Order_Count"] = ("eq", int(order_count_filter))
         except (ValueError, TypeError):
             pass # Ignore if not a valid integer
-    
-    if tags_filter:
-        filters["Tags_List"] = ("in", tags_filter)
 
     df, total_customers = fetch_data_from_supabase_specific(
         table_name="Store_Customers", limit=limit, filters=filters, order_by="Last_Updated", count='exact')
