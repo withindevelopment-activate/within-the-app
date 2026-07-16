@@ -274,7 +274,7 @@ def retention_dashboard(request):
         )
         if not tags_df.empty:
             # Get a unique list of phone numbers.
-            phone_numbers_from_tags = tags_df["customer phone number"].unique().tolist()
+            phone_numbers_from_tags = tags_df["Customer_Mobile"].unique().tolist()
 
     # Build filters conditionally
     filters = {}
