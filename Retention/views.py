@@ -263,6 +263,11 @@ def retention_dashboard(request):
     phone_filter = request.GET.get("phone")
     tags_filter = request.GET.getlist("tags") # Get list of selected tags
 
+    try:
+        limit = int(limit)
+    except (ValueError, TypeError):
+        limit = 20
+
     phone_numbers_from_tags = []
     filters_for_tags = {}
     if tags_filter:
@@ -274,7 +279,7 @@ def retention_dashboard(request):
         )
         if not tags_df.empty:
             # Get a unique list of phone numbers.
-            phone_numbers_from_tags = tags_df["Customer_Mobile"].unique().tolist()
+            phone_numbers_from_tags = tags_df["Customer_Mobile"].unique().tolist()[:limit]
 
     # Build filters conditionally
     filters = {}
@@ -290,6 +295,15 @@ def retention_dashboard(request):
             filters["Order_Count"] = ("eq", int(order_count_filter))
         except (ValueError, TypeError):
             pass # Ignore if not a valid integer
+
+    if not_ordered_since_months:
+        try:
+            months = int(not_ordered_since_months)
+            if months > 0:
+                cutoff_date = datetime.now() - timedelta(days=months * 30)
+                filters["Last_Updated"] = ("lt", cutoff_date.isoformat())
+        except (ValueError, TypeError):
+            pass
 
     df, total_customers = fetch_data_from_supabase_specific(
         table_name="Store_Customers", limit=limit, filters=filters, order_by="Last_Updated", count='exact')
@@ -333,16 +347,6 @@ def retention_dashboard(request):
     if order_date_filter:
         filter_date = pd.to_datetime(order_date_filter).date()
         df = df[df['Last_Visit'].notna() & (df['Last_Visit'].dt.date == filter_date)]
-
-    if not_ordered_since_months:
-        try:
-            months = int(not_ordered_since_months)
-            if months > 0:
-                cutoff_date = datetime.now() - timedelta(days=months * 30)
-                # Filter for customers whose last visit is before the cutoff, excluding NaT
-                df = df[df['Last_Visit'].notna() & (df['Last_Visit'] < cutoff_date)]
-        except (ValueError, TypeError):
-            pass # Ignore if not a valid number
 
     is_filtered = any([order_count_filter, order_date_filter, not_ordered_since_months, phone_filter, tags_filter])
 
