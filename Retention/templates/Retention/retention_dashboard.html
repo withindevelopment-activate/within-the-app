@@ -142,10 +142,10 @@
     <div class="sidebar-section">
       <div class="sidebar-label">Tags</div>
       <div class="tag-filter-group">
-        {% for tag in all_tags %}
-          <label for="tag-{{ forloop.counter }}">
-            <input type="checkbox" name="tags" id="tag-{{ forloop.counter }}" value="{{ tag }}" {% if tag in filters.tags %}checked{% endif %}>
-            <span>{{ tag|replace:"_,"|capfirst }}</span>
+        {% for en_tag, ar_tag in all_tags.items %}
+          <label for="tag-{{ en_tag }}">
+            <input type="checkbox" name="tags" id="tag-{{ en_tag }}" value="{{ en_tag }}" {% if en_tag in filters.tags %}checked{% endif %}>
+            <span>{{ ar_tag }}</span>
           </label>
         {% endfor %}
       </div>
@@ -193,15 +193,15 @@
         </div>
         <div class="kpi-card">
             <div class="kpi-label">Average LTV</div>
-            <div class="kpi-value">{{ kpis.avg_ltv|floatformat:2 }} <span style="font-size:16px; color: var(--muted);">AED</span></div>
+            <div class="kpi-value">{{ kpis.avg_ltv }} <span style="font-size:16px; color: var(--muted);">AED</span></div>
         </div>
         <div class="kpi-card">
             <div class="kpi-label">Active Customers</div>
-            <div class="kpi-value">{{ kpis.active_customers }}</div>
+            <div class="kpi-value">{{ kpis.total_customers_filtered }}</div>
         </div>
         <div class="kpi-card">
             <div class="kpi-label">VIP Customers</div>
-            <div class="kpi-value">{{ kpis.vip_customers }}</div>
+            <div class="kpi-value">{{ kpis.total_ltv }}</div>
         </div>
     </div>
 
