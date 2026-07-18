@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 <style>
   :root {
     --bg: #f8fafc;
@@ -114,6 +115,11 @@
     border-width: 5px; border-style: solid; border-color: #333 transparent transparent transparent;
   }
   .tooltip-container:hover .tooltip-content { visibility: visible; opacity: 1; }
+  .table-controls {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 12px;
+  }
   .tooltip-list { list-style: none; padding: 0; margin: 0; }
   .tooltip-list li { padding: 5px 0; border-bottom: 1px solid #555; font-size: 14px; }
   .tooltip-list li:last-child { border-bottom: none; }
@@ -202,21 +208,17 @@
         <div class="sidebar-label">Options</div>
         <div style="display:flex;flex-direction:column;gap:8px;">
             <div>
-                <label for="limit">Row limit (no filter)</label>
-                <select name="limit" id="rowsPerPage">
-                  <option value="20" {% if filters.limit == "20" %}selected{% endif %}>20</option>
+                <label for="limit">limit</label>
+                <select name="limit">
                   <option value="50" {% if filters.limit == "50" %}selected{% endif %}>50</option>
                   <option value="100" {% if filters.limit == "100" %}selected{% endif %}>100</option>
                   <option value="250" {% if filters.limit == "250" %}selected{% endif %}>250</option>
                   <option value="500" {% if filters.limit == "500" %}selected{% endif %}>500</option>
+                  <option value="1000" {% if filters.limit == "1000" %}selected{% endif %}>1000</option>
                 </select>
             </div>
-            <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
-              <input type="checkbox" name="contacted" id="contacted" value="true" {% if filters.contacted %}checked{% endif %} style="width: auto;">
-              <label for="contacted" style="margin-bottom: 0;">
-                Only show contacted
-              </label>
-            </div>
+            <input type="checkbox" name="contacted" id="contacted" value="true" {% if filters.contacted %}checked{% endif %} style="width: auto;">
+            <label for="contacted" style="margin-bottom: 0;">Only show contacted</label>
         </div>
     </div>
 
@@ -267,6 +269,20 @@
     </div>
 
 
+    <!-- Table Controls -->
+    <div class="table-controls">
+      <div>
+        <label for="rowsPerPage">Rows per page</label>
+        <select id="rowsPerPage">
+          <option value="20">20</option>
+          <option value="50" selected>50</option>
+          <option value="100">100</option>
+          <option value="250">250</option>
+          <option value="500">500</option>
+        </select>
+      </div>
+    </div>
+
     <!-- Table -->
     <div class="table-wrap">
       <div class="table-scroll">
@@ -288,7 +304,6 @@
       </div>
     </div>
     <div id="pagination" class="pagination-controls"></div>
-
 
   </main>
 </div>
@@ -432,6 +447,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Initial Render
     renderTable(); // First render on page load
+
+    // Initialize Select2
+    $('select[name="tags"]').select2({
+        theme: 'bootstrap-5'
+    });
 });
 </script>
 {% endblock %}
@@ -441,5 +461,6 @@ document.addEventListener('DOMContentLoaded', function() {
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script src="{% static 'JS/retention_dashboard.js' %}"></script>
 {% endblock %}
