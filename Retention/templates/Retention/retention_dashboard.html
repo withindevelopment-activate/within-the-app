@@ -211,8 +211,10 @@
                 <label for="limit">limit</label>
                 <input type="number" name="limit" value="{{ filters.limit|default:'500' }}" placeholder="e.g., 500">
             </div>
-            <input type="checkbox" name="contacted" id="contacted" value="true" {% if filters.contacted %}checked{% endif %} style="width: auto;">
-            <label for="contacted" style="margin-bottom: 0;">Only show contacted</label>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <input type="checkbox" name="contacted" id="contacted" value="true" {% if filters.contacted %}checked{% endif %} style="width: auto;">
+              <label for="contacted" style="margin-bottom: 0;">Only show contacted</label>
+            </div>
         </div>
     </div>
 
