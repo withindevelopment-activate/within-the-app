@@ -282,28 +282,7 @@
             </tr>
           </thead>
           <tbody id="tableBody">
-            {% for customer in customers %}
-            <tr>
-                <td>{{ customer.Customer_ID }}</td>
-                <td class="name-col">{{ customer.Customer_Name|default:"-" }}</td>
-                <td>{{ customer.Customer_Mobile|default:"-" }}</td>
-                <td>{{ customer.Order_Count|default:"0" }}</td>
-                <td>
-                    {% if customer.Last_Visit and customer.Last_Visit is not None %}
-                        {{ customer.Last_Visit|date:"Y-m-d H:i" }}
-                    {% else %}
-                        -
-                    {% endif %}
-                </td>
-                <td>{{ customer.Customer_Lifetime_Value|floatformat:2 }}</td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="7" class="empty-state">
-                    <p>No customers found matching your criteria.</p>
-                </td>
-            </tr>
-            {% endfor %}
+            <!-- Rows will be dynamically inserted here by JavaScript -->
           </tbody>
         </table>
       </div>
@@ -316,12 +295,12 @@
 </form>
 
 <script>
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', function() {
     const customersData = {{ customers|safe }};
     const tableBody = document.getElementById('tableBody');
     const paginationContainer = document.getElementById('pagination');
     const rowsPerPageSelect = document.getElementById('rowsPerPage');
-    const tableHeaders = document.querySelectorAll('#tableHeaders th');
+    const tableHeaders = document.querySelectorAll('#dataTable th[data-sort]');
 
     let currentPage = 1;
     let rowsPerPage = parseInt(rowsPerPageSelect.value, 10);
@@ -329,7 +308,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let sortDirection = 'desc';
 
     function renderTable() {
-        // 1. Sort data
+        // 1. Sort the data
         const sortedData = [...customersData].sort((a, b) => {
             let valA = a[sortColumn];
             let valB = b[sortColumn];
@@ -337,7 +316,7 @@ document.addEventListener('DOMContentLoaded', function () {
             // Handle nulls and different types
             if (valA === null || valA === undefined) return 1;
             if (valB === null || valB === undefined) return -1;
-
+            
             if (typeof valA === 'string' && valA.match(/^\d{4}-\d{2}-\d{2}/)) {
                 valA = new Date(valA);
                 valB = new Date(valB);
@@ -352,12 +331,12 @@ document.addEventListener('DOMContentLoaded', function () {
             return 0;
         });
 
-        // 2. Paginate data
+        // 2. Paginate the sorted data
         const startIndex = (currentPage - 1) * rowsPerPage;
         const endIndex = startIndex + rowsPerPage;
         const paginatedData = sortedData.slice(startIndex, endIndex);
 
-        // 3. Render rows
+        // 3. Render the table rows
         tableBody.innerHTML = '';
         if (paginatedData.length === 0) {
             tableBody.innerHTML = `<tr><td colspan="6" class="empty-state"><p>No customers found.</p></td></tr>`;
@@ -367,7 +346,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 const lastVisit = customer.Last_Visit ? new Date(customer.Last_Visit).toLocaleString('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).replace(',', '') : '-';
                 
                 row.innerHTML = `
-                    <td>${customer.Customer_ID || '-'}</td>
+                    <td>${customer.Customer_ID}</td>
                     <td class="name-col">${customer.Customer_Name || 'N/A'}</td>
                     <td>${customer.Customer_Mobile || '-'}</td>
                     <td>${customer.Order_Count || '0'}</td>
@@ -383,7 +362,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function renderPagination(totalRows) {
-        paginationContainer.innerHTML = '';
+        paginationContainer.innerHTML = ''; // Clear existing controls
         const totalPages = Math.ceil(totalRows / rowsPerPage);
 
         if (totalPages <= 1) return;
@@ -420,10 +399,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function updateHeaderStyles() {
         tableHeaders.forEach(th => {
-            const indicator = th.querySelector('.sort-indicator');
             th.classList.remove('sorted', 'asc', 'desc');
-            if (indicator) indicator.textContent = '';
-
+            const indicator = th.querySelector('.sort-indicator');
+            if (indicator) indicator.textContent = ' ';
+            
             if (th.dataset.sort === sortColumn) {
                 th.classList.add('sorted', sortDirection);
                 if (indicator) indicator.textContent = sortDirection === 'asc' ? '▲' : '▼';
@@ -435,8 +414,6 @@ document.addEventListener('DOMContentLoaded', function () {
     rowsPerPageSelect.addEventListener('change', (e) => {
         rowsPerPage = parseInt(e.target.value, 10);
         currentPage = 1; // Reset to first page
-        // We also need to update the hidden input for form submission to remember the choice
-        document.querySelector('input[name="limit"]').value = rowsPerPage;
         renderTable();
     });
 
@@ -454,7 +431,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     // Initial Render
-    renderTable();
+    renderTable(); // First render on page load
 });
 </script>
 {% endblock %}
