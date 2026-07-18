@@ -669,13 +669,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-<script src="{% static 'JS/retention_dashboard.js' %}"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
-    $(document).ready(function() {
-        // Initialize Select2 after the library is loaded
-        $('.sidebar select[name="not_ordered_since"]').select2({ theme: 'bootstrap-5' });
-    });
-
     // Date Range Picker Logic
     (function () {
       function startOfDay(d) { const x = new Date(d); x.setHours(0,0,0,0); return x; }
@@ -937,5 +932,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
       renderTrigger();
     })();
+
+    $(document).ready(function() {
+        // Initialize Select2 after the library is loaded
+        $('.sidebar select[name="not_ordered_since"]').select2({ theme: 'bootstrap-5' });
+    });
 </script>
+<script src="{% static 'JS/retention_dashboard.js' %}"></script>
 {% endblock %}
