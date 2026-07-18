@@ -2,6 +2,11 @@
 {% load static %}
 {% load retention_extras %}
 
+{% block extra_head %}
+  {{ block.super }}
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+{% endblock %}
+
 {% block title %}Retention Dashboard{% endblock %}
 
 {% block content %}
@@ -517,6 +522,13 @@
 </div>
 </form>
 
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'CSS/style.css' %}">
+{% endblock %}
+
+{% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const customersData = {{ customers|safe }};
@@ -661,15 +673,7 @@ document.addEventListener('DOMContentLoaded', function() {
     renderTable(); // First render on page load
 });
 </script>
-{% endblock %}
-
-{% block extra_css %}
-<link rel="stylesheet" href="{% static 'CSS/style.css' %}">
-{% endblock %}
-
-{% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
     // Date Range Picker Logic
     (function () {
