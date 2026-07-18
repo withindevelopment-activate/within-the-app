@@ -209,13 +209,7 @@
         <div style="display:flex;flex-direction:column;gap:8px;">
             <div>
                 <label for="limit">limit</label>
-                <select name="limit">
-                  <option value="50" {% if filters.limit == "50" %}selected{% endif %}>50</option>
-                  <option value="100" {% if filters.limit == "100" %}selected{% endif %}>100</option>
-                  <option value="250" {% if filters.limit == "250" %}selected{% endif %}>250</option>
-                  <option value="500" {% if filters.limit == "500" %}selected{% endif %}>500</option>
-                  <option value="1000" {% if filters.limit == "1000" %}selected{% endif %}>1000</option>
-                </select>
+                <input type="number" name="limit" value="{{ filters.limit|default:'500' }}" placeholder="e.g., 500">
             </div>
             <input type="checkbox" name="contacted" id="contacted" value="true" {% if filters.contacted %}checked{% endif %} style="width: auto;">
             <label for="contacted" style="margin-bottom: 0;">Only show contacted</label>
@@ -273,13 +267,7 @@
     <div class="table-controls">
       <div>
         <label for="rowsPerPage">Rows per page</label>
-        <select id="rowsPerPage">
-          <option value="20">20</option>
-          <option value="50" selected>50</option>
-          <option value="100">100</option>
-          <option value="250">250</option>
-          <option value="500">500</option>
-        </select>
+        <input type="number" id="rowsPerPage" value="50" min="1">
       </div>
     </div>
 
@@ -426,8 +414,12 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Event Listeners
-    rowsPerPageSelect.addEventListener('change', (e) => {
-        rowsPerPage = parseInt(e.target.value, 10);
+    rowsPerPageSelect.addEventListener('input', (e) => {
+        const newRowsPerPage = parseInt(e.target.value, 10);
+        if (isNaN(newRowsPerPage) || newRowsPerPage < 1) {
+            return; // Don't re-render if input is invalid
+        }
+        rowsPerPage = newRowsPerPage;
         currentPage = 1; // Reset to first page
         renderTable();
     });
