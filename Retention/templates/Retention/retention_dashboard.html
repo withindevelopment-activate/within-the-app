@@ -937,7 +937,7 @@ document.addEventListener('DOMContentLoaded', function() {
       function closePanel() { panel.classList.remove("open"); }
 
       trigger.addEventListener("click", () => { panel.classList.contains("open") ? closePanel() : openPanel(); });
-      document.addEventListener("mousedown", (e) => { if (!wrapper.contains(e.target)) closePanel(); });
+      document.addEventListener("mousedown", (e) => { if (!wrapper.contains(e.target) && !panel.contains(e.target)) closePanel(); });
 
       renderTrigger();
     })();
