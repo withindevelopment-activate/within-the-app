@@ -356,6 +356,14 @@ def retention_dashboard(request):
         filter_date = pd.to_datetime(order_date_filter).date()
         df = df[df['Last_Visit'].notna() & (df['Last_Visit'].dt.date == filter_date)]
 
+    is_filtered = any([order_count_filter, order_date_filter, not_ordered_since_months, phone_filter, tags_filter])
+
+    # Default limit if no filters are applied
+    if not is_filtered and limit:
+        df = df.head(int(limit))
+    elif not is_filtered:
+        df = df.head(20) # Default to 20 if no limit and no filters
+
     # --- Handle Excel Download ---
     if action == "download_excel":
         from django.http import HttpResponse
