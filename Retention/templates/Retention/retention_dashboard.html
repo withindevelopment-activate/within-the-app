@@ -50,7 +50,7 @@
     border-radius: 12px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.12);
     overflow: hidden;
-    z-index: 100;
+    z-index: 1050; /* Higher z-index to appear above other elements */
   }
   .drp-panel.open { display: flex; }
 
@@ -753,7 +753,7 @@ document.addEventListener('DOMContentLoaded', function() {
             </div>
           </div>
         </div>`;
-      wrapper.insertAdjacentHTML('beforeend', panelHTML);
+      document.body.insertAdjacentHTML('beforeend', panelHTML);
 
       const panel = document.getElementById("drpPanel");
       const presetsEl = document.getElementById("drpPresets");
@@ -927,6 +927,11 @@ document.addEventListener('DOMContentLoaded', function() {
         leftMonth = startOfMonth(addMonths(appliedEnd || today, -1));
         pickingStart = true;
         renderAll();
+
+        const rect = trigger.getBoundingClientRect();
+        panel.style.top = `${rect.bottom + window.scrollY + 8}px`;
+        panel.style.left = `${rect.left + window.scrollX}px`;
+
         panel.classList.add("open");
       }
       function closePanel() { panel.classList.remove("open"); }
@@ -942,5 +947,4 @@ document.addEventListener('DOMContentLoaded', function() {
         $('.sidebar select[name="not_ordered_since"]').select2({ theme: 'bootstrap-5' });
     });
 </script>
-<script src="{% static 'JS/retention_dashboard.js' %}"></script>
 {% endblock %}
