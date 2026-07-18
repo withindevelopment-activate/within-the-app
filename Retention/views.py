@@ -402,6 +402,11 @@ def retention_dashboard(request):
     total_ltv = df["Customer_Lifetime_Value"].sum()
     avg_ltv = total_ltv / total_customers_filtered if total_customers_filtered > 0 else 0
 
+    # Calculate the number of contacted customers from the filtered dataframe
+    contacted_count = 0
+    if 'Contacted' in df.columns:
+        contacted_count = df['Contacted'].sum()
+
     customers = df.to_dict(orient="records")
 
     # Clean up data for template
@@ -472,7 +477,7 @@ def retention_dashboard(request):
         "kpis": {
             "total_customers": f"{total_customers:,.0f}",
             "avg_ltv": f"{avg_ltv:,.2f}",
-            "total_customers_filtered": total_customers_filtered,
+            "contacted_count": f"{contacted_count:,.0f}",
             "total_ltv": f"{total_ltv:,.2f}",
         },
     }
