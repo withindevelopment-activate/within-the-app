@@ -405,6 +405,8 @@ def retention_dashboard(request):
 
         if pd.isna(customer.get('Last_Visit')):
             customer['Last_Visit'] = None
+        else:
+            customer['Last_Visit'] = customer['Last_Visit'].isoformat()
 
     # Mapping from English tag values (database) to Arabic display names (UI)
     tag_display_mapping = {
