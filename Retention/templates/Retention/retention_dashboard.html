@@ -61,6 +61,10 @@
   .kpi-label { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
   .kpi-value { font-family: 'Syne', sans-serif; font-size: 24px; font-weight: 700; color: var(--text); }
   .tag-pill-container { display: flex; flex-wrap: wrap; gap: 4px; max-width: 300px; }
+  .pagination-controls { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 20px; font-size: 13px; }
+  .pagination-controls button, .pagination-controls span { padding: 6px 12px; border-radius: var(--radius-sm); text-decoration: none; color: var(--muted); background: var(--surface); border: 1px solid var(--border); cursor: pointer; }
+  .pagination-controls button:hover { background: var(--surface2); }
+  .pagination-controls button.current { background: var(--accent); color: #fff; font-weight: 500; border-color: var(--accent); }
   .tag-pill {
     display: inline-block;
     padding: 2px 8px;
@@ -82,6 +86,15 @@
   .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
   .table-scroll { overflow-x: auto; max-height: 70vh; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th { cursor: pointer; user-select: none; }
+  thead th .sort-indicator {
+    display: inline-block;
+    margin-left: 6px;
+    color: var(--muted);
+    opacity: 0.5;
+  }
+  thead th.sorted .sort-indicator { opacity: 1; color: var(--accent); }
+
   thead th { background: var(--surface2); padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 500; text-transform: uppercase; color: var(--muted); position: sticky; top: 0; z-index: 1; }
   tbody tr { border-bottom: 1px solid var(--border); }
   tbody tr:hover { background: var(--surface2); }
@@ -190,7 +203,19 @@
         <div style="display:flex;flex-direction:column;gap:8px;">
             <div>
                 <label for="limit">Row limit (no filter)</label>
-                <input type="number" name="limit" id="limit" placeholder="e.g., 20" value="{{ filters.limit|default:'20' }}">
+                <select name="limit" id="rowsPerPage">
+                  <option value="20" {% if filters.limit == "20" %}selected{% endif %}>20</option>
+                  <option value="50" {% if filters.limit == "50" %}selected{% endif %}>50</option>
+                  <option value="100" {% if filters.limit == "100" %}selected{% endif %}>100</option>
+                  <option value="250" {% if filters.limit == "250" %}selected{% endif %}>250</option>
+                  <option value="500" {% if filters.limit == "500" %}selected{% endif %}>500</option>
+                </select>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+              <input type="checkbox" name="contacted" id="contacted" value="true" {% if filters.contacted %}checked{% endif %} style="width: auto;">
+              <label for="contacted" style="margin-bottom: 0;">
+                Only show contacted
+              </label>
             </div>
         </div>
     </div>
@@ -247,13 +272,13 @@
       <div class="table-scroll">
         <table id="dataTable">
           <thead>
-            <tr>
-                <th>Customer ID</th>
-                <th>Name</th>
-                <th>Mobile</th>
-                <th>Orders</th>
-ٍ                <th>Last Order</th>
-                <th>Total Spent</th>
+            <tr id="tableHeaders">
+                <th data-sort="Customer_ID">Customer ID<span class="sort-indicator"></span></th>
+                <th data-sort="Customer_Name">Name<span class="sort-indicator"></span></th>
+                <th data-sort="Customer_Mobile">Mobile<span class="sort-indicator"></span></th>
+                <th data-sort="Order_Count">Orders<span class="sort-indicator"></span></th>
+                <th data-sort="Last_Visit">Last Order<span class="sort-indicator"></span></th>
+                <th data-sort="Customer_Lifetime_Value">Total Spent<span class="sort-indicator"></span></th>
             </tr>
           </thead>
           <tbody id="tableBody">
@@ -283,11 +308,155 @@
         </table>
       </div>
     </div>
+    <div id="pagination" class="pagination-controls"></div>
+
 
   </main>
 </div>
 </form>
 
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const customersData = {{ customers|safe }};
+    const tableBody = document.getElementById('tableBody');
+    const paginationContainer = document.getElementById('pagination');
+    const rowsPerPageSelect = document.getElementById('rowsPerPage');
+    const tableHeaders = document.querySelectorAll('#tableHeaders th');
+
+    let currentPage = 1;
+    let rowsPerPage = parseInt(rowsPerPageSelect.value, 10);
+    let sortColumn = 'Last_Visit';
+    let sortDirection = 'desc';
+
+    function renderTable() {
+        // 1. Sort data
+        const sortedData = [...customersData].sort((a, b) => {
+            let valA = a[sortColumn];
+            let valB = b[sortColumn];
+
+            // Handle nulls and different types
+            if (valA === null || valA === undefined) return 1;
+            if (valB === null || valB === undefined) return -1;
+
+            if (typeof valA === 'string' && valA.match(/^\d{4}-\d{2}-\d{2}/)) {
+                valA = new Date(valA);
+                valB = new Date(valB);
+            }
+
+            if (valA < valB) {
+                return sortDirection === 'asc' ? -1 : 1;
+            }
+            if (valA > valB) {
+                return sortDirection === 'asc' ? 1 : -1;
+            }
+            return 0;
+        });
+
+        // 2. Paginate data
+        const startIndex = (currentPage - 1) * rowsPerPage;
+        const endIndex = startIndex + rowsPerPage;
+        const paginatedData = sortedData.slice(startIndex, endIndex);
+
+        // 3. Render rows
+        tableBody.innerHTML = '';
+        if (paginatedData.length === 0) {
+            tableBody.innerHTML = `<tr><td colspan="6" class="empty-state"><p>No customers found.</p></td></tr>`;
+        } else {
+            paginatedData.forEach(customer => {
+                const row = document.createElement('tr');
+                const lastVisit = customer.Last_Visit ? new Date(customer.Last_Visit).toLocaleString('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).replace(',', '') : '-';
+                
+                row.innerHTML = `
+                    <td>${customer.Customer_ID || '-'}</td>
+                    <td class="name-col">${customer.Customer_Name || 'N/A'}</td>
+                    <td>${customer.Customer_Mobile || '-'}</td>
+                    <td>${customer.Order_Count || '0'}</td>
+                    <td>${lastVisit}</td>
+                    <td>${(customer.Customer_Lifetime_Value || 0).toFixed(2)}</td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+
+        renderPagination(sortedData.length);
+        updateHeaderStyles();
+    }
+
+    function renderPagination(totalRows) {
+        paginationContainer.innerHTML = '';
+        const totalPages = Math.ceil(totalRows / rowsPerPage);
+
+        if (totalPages <= 1) return;
+
+        // Previous Button
+        const prevButton = document.createElement('button');
+        prevButton.textContent = 'Previous';
+        prevButton.disabled = currentPage === 1;
+        prevButton.addEventListener('click', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                renderTable();
+            }
+        });
+        paginationContainer.appendChild(prevButton);
+
+        // Page Info
+        const pageInfo = document.createElement('span');
+        pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+        paginationContainer.appendChild(pageInfo);
+
+        // Next Button
+        const nextButton = document.createElement('button');
+        nextButton.textContent = 'Next';
+        nextButton.disabled = currentPage === totalPages;
+        nextButton.addEventListener('click', () => {
+            if (currentPage < totalPages) {
+                currentPage++;
+                renderTable();
+            }
+        });
+        paginationContainer.appendChild(nextButton);
+    }
+
+    function updateHeaderStyles() {
+        tableHeaders.forEach(th => {
+            const indicator = th.querySelector('.sort-indicator');
+            th.classList.remove('sorted', 'asc', 'desc');
+            if (indicator) indicator.textContent = '';
+
+            if (th.dataset.sort === sortColumn) {
+                th.classList.add('sorted', sortDirection);
+                if (indicator) indicator.textContent = sortDirection === 'asc' ? '▲' : '▼';
+            }
+        });
+    }
+
+    // Event Listeners
+    rowsPerPageSelect.addEventListener('change', (e) => {
+        rowsPerPage = parseInt(e.target.value, 10);
+        currentPage = 1; // Reset to first page
+        // We also need to update the hidden input for form submission to remember the choice
+        document.querySelector('input[name="limit"]').value = rowsPerPage;
+        renderTable();
+    });
+
+    tableHeaders.forEach(header => {
+        header.addEventListener('click', () => {
+            const column = header.dataset.sort;
+            if (sortColumn === column) {
+                sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortColumn = column;
+                sortDirection = 'asc';
+            }
+            renderTable();
+        });
+    });
+
+    // Initial Render
+    renderTable();
+});
+</script>
 {% endblock %}
 
 {% block extra_css %}

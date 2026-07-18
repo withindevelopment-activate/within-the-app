@@ -263,6 +263,7 @@ def retention_dashboard(request):
     not_ordered_since_months = request.GET.get("not_ordered_since")
     phone_filter = request.GET.get("phone")
     action = request.GET.get("action")
+    contacted_filter = request.GET.get("contacted")
     tags_filter = request.GET.getlist("tags") # Get list of selected tags
 
     try:
@@ -287,6 +288,9 @@ def retention_dashboard(request):
     filters = {}
     if phone_filter:
         filters["Customer_Mobile"] = ("eq", phone_filter)
+
+    if contacted_filter:
+        filters["Contacted"] = ("eq", True)
 
     # If we have phone numbers from tags, use them to filter.
     if phone_numbers_from_tags:
@@ -356,9 +360,9 @@ def retention_dashboard(request):
         filter_date = pd.to_datetime(order_date_filter).date()
         df = df[df['Last_Visit'].notna() & (df['Last_Visit'].dt.date == filter_date)]
 
-    is_filtered = any([order_count_filter, order_date_filter, not_ordered_since_months, phone_filter, tags_filter])
+    is_filtered = any([order_count_filter, order_date_filter, not_ordered_since_months, phone_filter, tags_filter, contacted_filter])
 
-    # Default limit if no filters are applied
+        # Default limit if no filters are applied
     if not is_filtered and limit:
         df = df.head(int(limit))
     elif not is_filtered:
@@ -452,6 +456,7 @@ def retention_dashboard(request):
             "not_ordered_since": not_ordered_since_months or "",
             "phone": phone_filter or "",
             "tags": tags_filter,
+            "contacted": contacted_filter,
         },
         "all_tags": tag_display_mapping,
         "tag_descriptions": tag_descriptions,
