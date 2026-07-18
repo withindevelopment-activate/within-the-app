@@ -439,11 +439,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Initial Render
     renderTable(); // First render on page load
-
-    // Initialize Select2
-    $('select[name="tags"]').select2({
-        theme: 'bootstrap-5'
-    });
 });
 </script>
 {% endblock %}
@@ -455,4 +450,10 @@ document.addEventListener('DOMContentLoaded', function() {
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script src="{% static 'JS/retention_dashboard.js' %}"></script>
+<script>
+    $(document).ready(function() {
+        // Initialize Select2 after the library is loaded
+        $('select[name="tags"]').select2({ theme: 'bootstrap-5' });
+    });
+</script>
 {% endblock %}
