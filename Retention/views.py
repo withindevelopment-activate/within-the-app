@@ -259,7 +259,8 @@ def retention_dashboard(request):
     # Fetch filter parameters from request
     limit = request.GET.get("limit") or "20"
     order_count_filter = request.GET.get("order_count")
-    order_date_filter = request.GET.get("order_date")
+    order_date_from = request.GET.get("order_date_from")
+    order_date_to = request.GET.get("order_date_to")
     not_ordered_since_months = request.GET.get("not_ordered_since")
     phone_filter = request.GET.get("phone")
     action = request.GET.get("action")
@@ -356,11 +357,16 @@ def retention_dashboard(request):
         if col not in df.columns:
             df[col] = None
 
-    if order_date_filter:
-        filter_date = pd.to_datetime(order_date_filter).date()
-        df = df[df['Last_Visit'].notna() & (df['Last_Visit'].dt.date == filter_date)]
+    # Apply date range filter
+    if order_date_from:
+        from_date = pd.to_datetime(order_date_from).date()
+        df = df[df['Last_Visit'].notna() & (df['Last_Visit'].dt.date >= from_date)]
 
-    is_filtered = any([order_count_filter, order_date_filter, not_ordered_since_months, phone_filter, tags_filter, contacted_filter])
+    if order_date_to:
+        to_date = pd.to_datetime(order_date_to).date()
+        df = df[df['Last_Visit'].notna() & (df['Last_Visit'].dt.date <= to_date)]
+
+    is_filtered = any([order_count_filter, order_date_from, order_date_to, not_ordered_since_months, phone_filter, tags_filter, contacted_filter])
 
         # Default limit if no filters are applied
     if not is_filtered and limit:
@@ -454,7 +460,8 @@ def retention_dashboard(request):
         "filters": {
             "limit": limit or "20",
             "order_count": order_count_filter or "",
-            "order_date": order_date_filter or "",
+            "order_date_from": order_date_from or "",
+            "order_date_to": order_date_to or "",
             "not_ordered_since": not_ordered_since_months or "",
             "phone": phone_filter or "",
             "tags": tags_filter,

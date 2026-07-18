@@ -155,8 +155,12 @@
             <input type="number" name="order_count" id="order_count" placeholder="e.g., 3" value="{{ filters.order_count|default:'' }}">
         </div>
         <div>
-            <label for="order_date">Last Order Date</label>
-            <input type="date" name="order_date" id="order_date" value="{{ filters.order_date|default:'' }}">
+            <label for="order_date_from">Last Order From</label>
+            <input type="date" name="order_date_from" id="order_date_from" value="{{ filters.order_date_from|default:'' }}">
+        </div>
+        <div>
+            <label for="order_date_to">Last Order To</label>
+            <input type="date" name="order_date_to" id="order_date_to" value="{{ filters.order_date_to|default:'' }}">
         </div>
         <div>
             <label for="not_ordered_since">Not Ordered Since</label>
@@ -455,7 +459,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <script>
     $(document).ready(function() {
         // Initialize Select2 after the library is loaded
-        $('select[name="tags"]').select2({ theme: 'bootstrap-5' });
+        $('.sidebar select').select2({ theme: 'bootstrap-5' });
     });
 </script>
 {% endblock %}
