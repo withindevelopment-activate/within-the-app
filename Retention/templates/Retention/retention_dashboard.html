@@ -164,8 +164,8 @@
     background: var(--accent);
     opacity: 0.5;
   }
-  .drp-day-range-bg.edge-start { left: 50%; }
-  .drp-day-range-bg.edge-end { right: 50%; }
+  .drp-day-range-bg.edge-start { left: 10%;border-radius: 10px 0 0 10px; }
+  .drp-day-range-bg.edge-end { right: 10%;border-radius: 0 10px 10px 0;}
 
   .drp-day-btn {
     position: relative;
@@ -219,7 +219,6 @@
   .drp-btn-apply:disabled { opacity: 0.4; cursor: not-allowed; }
 </style>
 
-<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 <style>
   :root {
     --bg: #f8fafc;
@@ -674,7 +673,6 @@ document.addEventListener('DOMContentLoaded', function() {
     renderTable(); // First render on page load
 });
 </script>
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
     // Date Range Picker Logic
     (function () {
@@ -942,10 +940,5 @@ document.addEventListener('DOMContentLoaded', function() {
 
       renderTrigger();
     })();
-
-    $(document).ready(function() {
-        // Initialize Select2 after the library is loaded
-        $('.sidebar select[name="not_ordered_since"]').select2({ theme: 'bootstrap-5' });
-    });
 </script>
 {% endblock %}
