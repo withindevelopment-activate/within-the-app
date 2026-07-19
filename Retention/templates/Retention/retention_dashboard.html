@@ -462,6 +462,15 @@
     <!-- Header -->
     <div class="page-header">
       <div>
+        <div class="tabs" style="margin-bottom: 1rem; border-bottom: 1px solid var(--border);">
+            <a href="{% url 'Retention:retention_dashboard' %}" class="tab-link {% if not filters.view_type %}active{% endif %}">All Customers</a>
+            <a href="?view_type=contacted" class="tab-link {% if filters.view_type == 'contacted' %}active{% endif %}">Contacted Customers</a>
+        </div>
+        <style>
+            .tabs { display: flex; gap: 1rem; }
+            .tab-link { padding: 8px 16px; text-decoration: none; color: var(--muted); border-bottom: 2px solid transparent; }
+            .tab-link.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+        </style>
         <div class="page-title">Retention Dashboard</div>
       </div>
       <span class="row-badge">{{ row_count }} Customers Displayed</span>

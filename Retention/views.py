@@ -266,6 +266,7 @@ def retention_dashboard(request):
     action = request.GET.get("action")
     contacted_filter = request.GET.get("contacted")
     tags_filter = request.GET.getlist("tags") # Get list of selected tags
+    view_type = request.GET.get("view_type")
 
     try:
         limit = int(limit)
@@ -292,6 +293,9 @@ def retention_dashboard(request):
 
     if contacted_filter:
         filters["Contacted"] = ("eq", False)
+
+    if view_type == "contacted":
+        filters["Contacted"] = ("eq", True)
 
     # If we have phone numbers from tags, use them to filter.
     if phone_numbers_from_tags:
@@ -471,6 +475,7 @@ def retention_dashboard(request):
             "phone": phone_filter or "",
             "tags": tags_filter,
             "contacted": contacted_filter,
+            "view_type": view_type,
         },
         "all_tags": tag_display_mapping,
         "tag_descriptions": tag_descriptions,
