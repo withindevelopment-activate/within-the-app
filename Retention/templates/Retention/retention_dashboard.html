@@ -75,8 +75,8 @@
   }
   .drp-preset-btn:hover { background: #f1f5f9; }
   .drp-preset-btn.active {
-    background: #fef3c7;
-    color: #92400e;
+    background: #2563eb50;
+    color: var(--surface);
     font-weight: 600;
   }
 
@@ -161,7 +161,8 @@
   .drp-day-range-bg {
     position: absolute;
     top: 0; bottom: 0; left: 0; right: 0;
-    background: #fef3c7;
+    background: var(--accent);
+    opacity: 0.5;
   }
   .drp-day-range-bg.edge-start { left: 50%; }
   .drp-day-range-bg.edge-end { right: 50%; }
@@ -214,7 +215,7 @@
   .drp-btn-cancel { background: none; color: #475569; }
   .drp-btn-cancel:hover { background: #f1f5f9; }
   .drp-btn-apply { background: var(--accent); color: #fff; font-weight: 600; }
-  .drp-btn-apply:hover { background: #ffd012; }
+  .drp-btn-apply:hover { background: var(--accent); }
   .drp-btn-apply:disabled { opacity: 0.4; cursor: not-allowed; }
 </style>
 
@@ -231,7 +232,7 @@
     --warning: #f97316;
     --danger: #dc2626;
     --info: #0ea5e9;
-    --accent: #ffd012;
+    --accent: #2563eb;
     --radius: 12px;
     --radius-sm: 8px;
   }
