@@ -291,7 +291,7 @@ def retention_dashboard(request):
         filters["Customer_Mobile"] = ("eq", phone_filter)
 
     if contacted_filter:
-        filters["Contacted"] = ("eq", True)
+        filters["Contacted"] = ("eq", False)
 
     # If we have phone numbers from tags, use them to filter.
     if phone_numbers_from_tags:
