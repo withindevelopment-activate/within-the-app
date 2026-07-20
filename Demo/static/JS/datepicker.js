@@ -33,8 +33,8 @@
     const initialFrom = "{{ filters.order_date_from|default:'' }}";
     const initialTo = "{{ filters.order_date_to|default:'' }}";
 
-    let appliedStart = initialFrom ? startOfDay(new Date(initialFrom + "T00:00:00")) : null;
-    let appliedEnd = initialTo ? startOfDay(new Date(initialTo + "T00:00:00")) : null;
+    let appliedStart = initialFrom ? new Date(initialFrom + "T00:00:00") : null;
+    let appliedEnd = initialTo ? new Date(initialTo + "T00:00:00") : null;
 
     let draftStart = appliedStart;
     let draftEnd = appliedEnd;
