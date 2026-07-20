@@ -319,6 +319,8 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="{% static 'JS/datepicker.js' %}"></script>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const customersData = {{ customers|safe }};
@@ -463,5 +465,4 @@ document.addEventListener('DOMContentLoaded', function() {
     renderTable(); // First render on page load
 });
 </script>
-<script src="{% static 'JS/datepicker.js' %}"></script>
 {% endblock %}
