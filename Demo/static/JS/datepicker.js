@@ -22,10 +22,10 @@
     const PRESETS = [
     { label: "Today", range: () => [today, today] },
     { label: "Yesterday", range: () => [addDays(today,-1), addDays(today,-1)] },
-    { label: "Last 7 days", range: () => [addDays(today,-6), today] },
-    { label: "Last 14 days", range: () => [addDays(today,-13), today] },
-    { label: "Last 30 days", range: () => [addDays(today,-29), today] },
-    { label: "Last 90 days", range: () => [addDays(today,-89), today] },
+    { label: "Last 7 days", range: () => [addDays(today,-6), addDays(today,-1)] },
+    { label: "Last 14 days", range: () => [addDays(today,-13), addDays(today,-1)] },
+    { label: "Last 30 days", range: () => [addDays(today,-29), addDays(today,-1)] },
+    { label: "Last 90 days", range: () => [addDays(today,-89), addDays(today,-1)] },
     { label: "This month", range: () => [startOfMonth(today), today] },
     { label: "Last month", range: () => { const lm = addMonths(today, -1); return [startOfMonth(lm), endOfMonth(lm)]; } },
     ];
