@@ -319,6 +319,10 @@
 {% endblock %}
 
 {% block extra_js %}
+<script>
+  const initialFrom = "{{ filters.order_date_from|default:'' }}";
+  const initialTo = "{{ filters.order_date_to|default:'' }}";
+</script>
 <script src="{% static 'JS/datepicker.js' %}"></script>
 
 <script>
