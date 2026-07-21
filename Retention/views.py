@@ -1,4 +1,4 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 import json
 from io import BytesIO
 import logging
@@ -6,6 +6,8 @@ from Demo.supporting_files.supabase_functions import get_next_id_from_supabase_c
 from Demo.supporting_files.supporting_functions import get_uae_current_date
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
+from django.contrib import messages
+from postgrest.exceptions import APIError
 
 ## Import the database functions
 from Retention.supporting_pys.database_functions import *
@@ -316,17 +318,40 @@ def retention_dashboard(request):
         except (ValueError, TypeError):
             pass
 
-    # First, get the total count of customers matching the filters without any limit.
-    _, total_customers = fetch_data_from_supabase_specific(
-        table_name="Store_Customers", columns=["Distinct_ID"], filters=filters, count='exact')
-    
-    # If the action is to download, fetch all data, otherwise fetch the paginated view.
-    if action == "download_excel":
-        df, _ = fetch_data_from_supabase_specific(
-            table_name="Store_Customers", filters=filters, order_by="Last_Updated")
-    else:
-        df, _ = fetch_data_from_supabase_specific(
-            table_name="Store_Customers", limit=limit, filters=filters, order_by="Last_Updated")
+    try:
+        # First, get the total count of customers matching the filters without any limit.
+        _, total_customers = fetch_data_from_supabase_specific(
+            table_name="Store_Customers", columns=["Distinct_ID"], filters=filters, count='exact')
+        
+        # If the action is to download, fetch all data, otherwise fetch the paginated view.
+        if action == "download_excel":
+            df, _ = fetch_data_from_supabase_specific(
+                table_name="Store_Customers", filters=filters, order_by="Last_Updated")
+        else:
+            df, _ = fetch_data_from_supabase_specific(
+                table_name="Store_Customers", limit=limit, filters=filters, order_by="Last_Updated")
+
+    except APIError as e:
+        # PostgreSQL statement timeout
+        if isinstance(e.args[0], dict) and e.args[0].get("code") == "57014":
+            messages.error(
+                request,
+                "The request took too long to complete. Please refresh the page and try again."
+            )
+        else:
+            messages.error(
+                request,
+                "An unexpected database error occurred. Please try again."
+            )
+
+        return redirect(request.get_full_path())
+
+    except Exception:
+        messages.error(
+            request,
+            "Something went wrong. Please refresh the page and try again."
+        )
+        return redirect(request.get_full_path())
 
     # --- Data Processing and Cleaning ---
     # This block is now common for both display and download
@@ -334,6 +359,8 @@ def retention_dashboard(request):
         "Order_Count", "Customer_Lifetime_Value", "Orders", 
         "Last_Visit", "Customer_Name", "Customer_Mobile", "Customer_ID"
     ]
+    if df.empty:
+        df = pd.DataFrame(columns=required_cols)
     for col in required_cols:
         if col not in df.columns:
             df[col] = None
