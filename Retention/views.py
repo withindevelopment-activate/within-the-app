@@ -318,11 +318,13 @@ def retention_dashboard(request):
         except (ValueError, TypeError):
             pass
 
+    df = pd.DataFrame()
+    total_customers = 0
     try:
         # First, get the total count of customers matching the filters without any limit.
         _, total_customers = fetch_data_from_supabase_specific(
             table_name="Store_Customers", columns=["Distinct_ID"], filters=filters, count='exact')
-        
+
         # If the action is to download, fetch all data, otherwise fetch the paginated view.
         if action == "download_excel":
             df, _ = fetch_data_from_supabase_specific(
@@ -332,26 +334,13 @@ def retention_dashboard(request):
                 table_name="Store_Customers", limit=limit, filters=filters, order_by="Last_Updated")
 
     except APIError as e:
-        # PostgreSQL statement timeout
         if isinstance(e.args[0], dict) and e.args[0].get("code") == "57014":
-            messages.error(
-                request,
-                "The request took too long to complete. Please refresh the page and try again."
-            )
+            messages.error(request, "The request took too long to complete. Please try again with simpler filters.")
         else:
-            messages.error(
-                request,
-                "An unexpected database error occurred. Please try again."
-            )
-
-        return redirect(request.get_full_path())
+            messages.error(request, "An unexpected database error occurred. Please try again.")
 
     except Exception:
-        messages.error(
-            request,
-            "Something went wrong. Please refresh the page and try again."
-        )
-        return redirect(request.get_full_path())
+        messages.error(request, "Something went wrong. Please refresh the page and try again.")
 
     # --- Data Processing and Cleaning ---
     # This block is now common for both display and download
