@@ -233,6 +233,9 @@ def adding_order_to_db(payload):
     rows_df["ip_region"] = None
     rows_df["ip_timezone"] = None
 
+    ## Contacted Customer or not
+    rows_df['Contacted'] = False
+
     ## Markings
     rows_df['order_source'] = 'Webhook'
     rows_df['last_updated'] = get_uae_current_date()
