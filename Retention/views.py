@@ -369,10 +369,10 @@ def retention_dashboard(request):
         print(f"[DEBUG Retention] Fetched {len(df)} rows from Supabase.")
 
     except APIError as e:
-        if isinstance(e.args[0], dict) and e.args[0].get("code") == "57014":
-            messages.error(request, "The request took too long to complete. Please try again with simpler filters.")
-        else:
-            messages.error(request, "An unexpected database error occurred. Please try again.")
+        print("========== SUPABASE ERROR ==========")
+        print(e)
+        print(e.args)
+        raise
 
     except Exception:
         messages.error(request, "Something went wrong. Please refresh the page and try again.")
