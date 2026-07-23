@@ -273,6 +273,10 @@ def retention_dashboard(request):
     tags_filter = request.GET.getlist("tags") # Get list of selected tags
     view_type = request.GET.get("view_type")
 
+    print("--- [DEBUG Retention] Retention Dashboard ---")
+    print(f"[DEBUG Retention] Date From: {order_date_from} (type: {type(order_date_from)})")
+    print(f"[DEBUG Retention] Date To: {order_date_to} (type: {type(order_date_to)})")
+
 
     try:
         limit = int(limit)
@@ -314,24 +318,27 @@ def retention_dashboard(request):
             pass # Ignore if not a valid integer
 
     if not_ordered_since_months:
+        select_query = "*, All_ZID_Orders!inner(*)"
         try:
             months = int(not_ordered_since_months)
             if months > 0:
                 cutoff_date = datetime.now() - timedelta(days=months * 30)
-                filters["Last_Updated"] = ("lt", cutoff_date.isoformat())
+                filters["All_ZID_Orders.added_at (Asia/Dubai)"] = ("lt", cutoff_date.isoformat())
         except (ValueError, TypeError):
             pass
 
     # If date filters are applied, we need to join with All_ZID_Orders
     if order_date_from or order_date_to:
+        print("[DEBUG Retention] Date filters are present. Preparing join query.")
         select_query = "*, All_ZID_Orders!inner(*)"
         if order_date_from and order_date_to:
-            filters["All_ZID_Orders.last_updated"] = ('between', order_date_from, order_date_to)
+            filters["All_ZID_Orders.added_at (Asia/Dubai)"] = ('between', order_date_from, order_date_to)
         elif order_date_from:
-            filters["All_ZID_Orders.last_updated"] = ('gte', order_date_from)
+            filters["All_ZID_Orders.added_at (Asia/Dubai)"] = ('gte', order_date_from)
         elif order_date_to:
-            filters["All_ZID_Orders.last_updated"] = ('lte', order_date_to)
+            filters["All_ZID_Orders.added_at (Asia/Dubai)"] = ('lte', order_date_to)
     else:
+        print("[DEBUG Retention] No date filters. Using standard select query.")
         select_query = "*"
 
     df = pd.DataFrame()
@@ -339,8 +346,10 @@ def retention_dashboard(request):
     try:
         # First, get the total count of customers matching the filters without any limit.
         _, total_customers = fetch_data_from_supabase_specific(
-                    table_name="Store_Customers", columns=["Distinct_ID"], filters=filters, count='exact')
+                    table_name="Store_Customers", columns=["Distinct_ID"], count='exact')
 
+        print(f"[DEBUG Retention] Supabase filters being sent: {filters}")
+        print(f"[DEBUG Retention] Select query: {select_query}")
         # If the action is to download, fetch all data, otherwise fetch the paginated view.
         if action == "download_excel":
             df, _ = fetch_retention_data(
@@ -357,6 +366,7 @@ def retention_dashboard(request):
                 filters=filters, 
                 order_by="Last_Updated"
             )
+        print(f"[DEBUG Retention] Fetched {len(df)} rows from Supabase.")
 
     except APIError as e:
         if isinstance(e.args[0], dict) and e.args[0].get("code") == "57014":
@@ -394,15 +404,6 @@ def retention_dashboard(request):
 
     # Ensure 'Last_Visit' is a datetime column before using .dt accessor
     df['Last_Visit'] = pd.to_datetime(df['Last_Visit'], errors='coerce')
-
-    # Apply date range filter
-    # if order_date_from:
-    #     from_date = pd.to_datetime(order_date_from).date()
-    #     df = df[df['Last_Visit'].notna() & (df['Last_Visit'].dt.date >= from_date)]
-
-    # if order_date_to:
-    #     to_date = pd.to_datetime(order_date_to).date()
-    #     df = df[df['Last_Visit'].notna() & (df['Last_Visit'].dt.date <= to_date)]
 
     is_filtered = any([order_count_filter, order_date_from, order_date_to, not_ordered_since_months, phone_filter, tags_filter, contacted_filter])
 

@@ -217,6 +217,11 @@ def fetch_retention_data(table_name, select_query="*", columns=None, filters=Non
     A specialized fetch function for the retention dashboard that handles complex queries,
     including joins and dotted notation for filters.
     """
+    print("\n--- [DEBUG Retention] fetch_retention_data ---")
+    print(f"[DEBUG Retention] table_name: {table_name}")
+    print(f"[DEBUG Retention] select_query: {select_query}")
+    print(f"[DEBUG Retention] filters: {filters}")
+    print(f"[DEBUG Retention] limit: {limit}, count: {count}")
     # If a specific select_query (like one with a join) is provided, use it.
     # Otherwise, construct one from the columns list.
     if select_query == "*" and columns:
@@ -226,11 +231,13 @@ def fetch_retention_data(table_name, select_query="*", columns=None, filters=Non
     else:
         final_select = select_query
 
+    print(f"[DEBUG Retention] Final select statement: {final_select}")
     query = supabase.table(table_name).select(final_select, count=count)
 
     # Apply filters if specified
     if filters:
         for column, condition in filters.items():
+            print(f"[DEBUG Retention] Applying filter: {column} {condition}")
             if isinstance(condition, tuple) and len(condition) == 2:
                 op, value = condition
                 # Dynamically call the filter method on the query object
@@ -252,8 +259,9 @@ def fetch_retention_data(table_name, select_query="*", columns=None, filters=Non
     if limit:
         query = query.limit(limit)
 
+    print("[DEBUG Retention] Executing Supabase query...")
     response = query.execute()
     df = pd.DataFrame(response.data) if response.data else pd.DataFrame()
     total_count = response.count if hasattr(response, 'count') else len(df)
+    print(f"[DEBUG Retention] Query returned {len(df)} rows. Total count from Supabase: {total_count}")
     return df, total_count
-
