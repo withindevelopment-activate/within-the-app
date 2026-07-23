@@ -441,6 +441,9 @@ def retention_dashboard(request):
     total_ltv = df["Customer_Lifetime_Value"].sum()
     avg_ltv = total_ltv / total_customers_filtered if total_customers_filtered > 0 else 0
 
+    ## Getting the repurchase rate --
+    repurchase_rate = lifetime_repurchase_rate()
+
     # Calculate the number of contacted customers from the filtered dataframe
     contacted_count = 0
     if 'Contacted' in df.columns:
@@ -518,7 +521,7 @@ def retention_dashboard(request):
             "total_customers": f"{total_customers:,.0f}",
             "avg_ltv": f"{avg_ltv:,.2f}",
             "contacted_count": f"{contacted_count:,.0f}",
-            "total_ltv": f"{total_ltv:,.2f}",
+            "repurchase_rate": f"{repurchase_rate:,.2f}",
         },
     }
 

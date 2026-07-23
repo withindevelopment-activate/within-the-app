@@ -187,6 +187,8 @@ def upsert_partial(df, table_name, pk):
     supabase.table(table_name) \
             .upsert(payload, on_conflict=pk) \
             .execute()
+
+
     
 def delete_row_from_supabase(df, table_name, pk):
     """

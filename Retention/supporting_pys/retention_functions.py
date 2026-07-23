@@ -161,6 +161,8 @@ def update_customers_db(customer_id, customer_name, customer_mobile,
         customer_df.at[customer_df.index[0], "LTV_Averaged"] = ltv_averaged
 
         customer_df.at[customer_df.index[0], "Products"] = products
+
+        customer_df.at[customer_df.index[0], "Last_Order_Date"] = added_at
         
         customer_df.at[customer_df.index[0], "Orders"] = orders
 
@@ -209,21 +211,17 @@ def update_customers_db(customer_id, customer_name, customer_mobile,
         row = pd.DataFrame([{
 
             "Distinct_ID": distinct_id,
-
             "Customer_ID": customer_id,
             "Customer_Name": customer_name,
             "Customer_Mobile": customer_mobile,
-
             "Order_Count": 1,
-
             "Customer_Lifetime_Value": float(order_total or 0),
-
             "Products": products,
             "Orders": orders,
-
             "LTV_Averaged": float(order_total or 0),
             "Hook_Source": utm_source,            
-            "Last_Updated": get_uae_current_date()
+            "Last_Updated": get_uae_current_date(),
+            "Last_Order_Date": added_at
 
         }])
 
@@ -232,8 +230,8 @@ def update_customers_db(customer_id, customer_name, customer_mobile,
             "Store_Customers"
         )
 
-        ## Syncing to the customer tags
-        sync_customer_tags(customer_mobile=customer_mobile, order_count=order_count, ltv=new_ltv, ltv_averaged=ltv_averaged, orders_dict=orders)
+        ## Syncing to the customer tags -- whilst being mindful of values for new customers -- 
+        sync_customer_tags(customer_mobile=customer_mobile, order_count=1, ltv=float(order_total or 0), ltv_averaged=float(order_total or 0), orders_dict=orders)
 
         return True
     
