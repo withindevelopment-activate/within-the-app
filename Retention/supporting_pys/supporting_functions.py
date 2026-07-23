@@ -94,5 +94,3 @@ def lifetime_repurchase_rate():
         "repeat_customers": repeat_customers,
         "repurchase_rate": repurchase_rate
     }
-
-    return
