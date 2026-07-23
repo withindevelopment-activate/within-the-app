@@ -211,4 +211,49 @@ def delete_row_from_supabase(df, table_name, pk):
         .delete() \
         .in_(pk, ids) \
         .execute()
-    
+
+def fetch_retention_data(table_name, select_query="*", columns=None, filters=None, order_by=None, limit=None, count=None):
+    """
+    A specialized fetch function for the retention dashboard that handles complex queries,
+    including joins and dotted notation for filters.
+    """
+    # If a specific select_query (like one with a join) is provided, use it.
+    # Otherwise, construct one from the columns list.
+    if select_query == "*" and columns:
+        # Wrap problematic column names with double quotes
+        columns = [f'"{col}"' if " " in col or "(" in col else col for col in columns]
+        final_select = ",".join(columns)
+    else:
+        final_select = select_query
+
+    query = supabase.table(table_name).select(final_select, count=count)
+
+    # Apply filters if specified
+    if filters:
+        for column, condition in filters.items():
+            if isinstance(condition, tuple) and len(condition) == 2:
+                op, value = condition
+                # Dynamically call the filter method on the query object
+                # e.g., query.eq(column, value) or query.in_(column, value)
+                method_name = op if op != 'in' else 'in_'
+                if hasattr(query, method_name):
+                    method = getattr(query, method_name)
+                    query = method(column, value)
+            elif isinstance(condition, tuple) and len(condition) == 3 and condition[0] == 'between':
+                # Handle 'between' which is not a direct method
+                _, start, end = condition
+                query = query.gte(column, start).lte(column, end)
+            else:
+                query = query.eq(column, condition)
+
+    if order_by:
+        query = query.order(order_by, desc=True)
+
+    if limit:
+        query = query.limit(limit)
+
+    response = query.execute()
+    df = pd.DataFrame(response.data) if response.data else pd.DataFrame()
+    total_count = response.count if hasattr(response, 'count') else len(df)
+    return df, total_count
+

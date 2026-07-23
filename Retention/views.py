@@ -273,6 +273,7 @@ def retention_dashboard(request):
     tags_filter = request.GET.getlist("tags") # Get list of selected tags
     view_type = request.GET.get("view_type")
 
+
     try:
         limit = int(limit)
     except (ValueError, TypeError):
@@ -321,20 +322,41 @@ def retention_dashboard(request):
         except (ValueError, TypeError):
             pass
 
+    # If date filters are applied, we need to join with All_ZID_Orders
+    if order_date_from or order_date_to:
+        select_query = "*, All_ZID_Orders!inner(*)"
+        if order_date_from and order_date_to:
+            filters["All_ZID_Orders.added_at (Asia/Dubai)"] = ('between', order_date_from, order_date_to)
+        elif order_date_from:
+            filters["All_ZID_Orders.added_at (Asia/Dubai)"] = ('gte', order_date_from)
+        elif order_date_to:
+            filters["All_ZID_Orders.added_at (Asia/Dubai)"] = ('lte', order_date_to)
+    else:
+        select_query = "*"
+
     df = pd.DataFrame()
     total_customers = 0
     try:
         # First, get the total count of customers matching the filters without any limit.
         _, total_customers = fetch_data_from_supabase_specific(
-            table_name="Store_Customers", columns=["Distinct_ID"], filters=filters, count='exact')
+                    table_name="Store_Customers", columns=["Distinct_ID"], filters=filters, count='exact')
 
         # If the action is to download, fetch all data, otherwise fetch the paginated view.
         if action == "download_excel":
-            df, _ = fetch_data_from_supabase_specific(
-                table_name="Store_Customers", filters=filters, order_by="Last_Updated")
+            df, _ = fetch_retention_data(
+                table_name="Store_Customers", 
+                select_query=select_query,
+                filters=filters, 
+                order_by="Last_Updated"
+            )
         else:
-            df, _ = fetch_data_from_supabase_specific(
-                table_name="Store_Customers", limit=limit, filters=filters, order_by="Last_Updated")
+            df, _ = fetch_retention_data(
+                table_name="Store_Customers", 
+                select_query=select_query,
+                limit=limit, 
+                filters=filters, 
+                order_by="Last_Updated"
+            )
 
     except APIError as e:
         if isinstance(e.args[0], dict) and e.args[0].get("code") == "57014":
@@ -369,16 +391,6 @@ def retention_dashboard(request):
             return max(d for d in dates if pd.notna(d)) if dates else pd.NaT
         except (json.JSONDecodeError, TypeError): return pd.NaT
     df['Last_Visit'] = df['Orders'].apply(get_last_visit)
-
-    # --- Data Processing and Cleaning ---
-    # Ensure required columns exist, even if df is empty, to prevent KeyErrors
-    required_cols = [
-        "Order_Count", "Customer_Lifetime_Value", 
-        "Orders", "Last_Visit", "Customer_Name", "Customer_Mobile"
-    ]
-    for col in required_cols:
-        if col not in df.columns:
-            df[col] = None
 
     # Apply date range filter
     if order_date_from:
