@@ -273,11 +273,6 @@ def retention_dashboard(request):
     tags_filter = request.GET.getlist("tags") # Get list of selected tags
     view_type = request.GET.get("view_type")
 
-    print("--- [DEBUG Retention] Retention Dashboard ---")
-    print(f"[DEBUG Retention] Date From: {order_date_from} (type: {type(order_date_from)})")
-    print(f"[DEBUG Retention] Date To: {order_date_to} (type: {type(order_date_to)})")
-
-
     try:
         limit = int(limit)
     except (ValueError, TypeError):
@@ -318,61 +313,34 @@ def retention_dashboard(request):
             pass # Ignore if not a valid integer
 
     if not_ordered_since_months:
-        select_query = "*, All_ZID_Orders!inner(*)"
         try:
             months = int(not_ordered_since_months)
             if months > 0:
                 cutoff_date = datetime.now() - timedelta(days=months * 30)
-                filters["All_ZID_Orders.last_updated"] = ("lt", cutoff_date.isoformat())
+                filters["Last_Updated"] = ("lt", cutoff_date.isoformat())
         except (ValueError, TypeError):
             pass
-
-    # If date filters are applied, we need to join with All_ZID_Orders
-    if order_date_from or order_date_to:
-        print("[DEBUG Retention] Date filters are present. Preparing join query.")
-        select_query = "*, All_ZID_Orders!inner(*)"
-        if order_date_from and order_date_to:
-            filters["All_ZID_Orders.last_updated"] = ('between', order_date_from, order_date_to)
-        elif order_date_from:
-            filters["All_ZID_Orders.last_updated"] = ('gte', order_date_from)
-        elif order_date_to:
-            filters["All_ZID_Orders.last_updated"] = ('lte', order_date_to)
-    else:
-        print("[DEBUG Retention] No date filters. Using standard select query.")
-        select_query = "*"
 
     df = pd.DataFrame()
     total_customers = 0
     try:
         # First, get the total count of customers matching the filters without any limit.
         _, total_customers = fetch_data_from_supabase_specific(
-                    table_name="Store_Customers", columns=["Distinct_ID"], count='exact')
+            table_name="Store_Customers", columns=["Distinct_ID"], filters=filters, count='exact')
 
-        print(f"[DEBUG Retention] Supabase filters being sent: {filters}")
-        print(f"[DEBUG Retention] Select query: {select_query}")
         # If the action is to download, fetch all data, otherwise fetch the paginated view.
         if action == "download_excel":
-            df, _ = fetch_retention_data(
-                table_name="Store_Customers", 
-                select_query=select_query,
-                filters=filters, 
-                order_by="Last_Updated"
-            )
+            df, _ = fetch_data_from_supabase_specific(
+                table_name="Store_Customers", filters=filters, order_by="Last_Updated")
         else:
-            df, _ = fetch_retention_data(
-                table_name="Store_Customers", 
-                select_query=select_query,
-                limit=limit, 
-                filters=filters, 
-                order_by="Last_Updated"
-            )
-        print(f"[DEBUG Retention] Fetched {len(df)} rows from Supabase.")
+            df, _ = fetch_data_from_supabase_specific(
+                table_name="Store_Customers", limit=limit, filters=filters, order_by="Last_Updated")
 
     except APIError as e:
-        print("========== SUPABASE ERROR ==========")
-        print(e)
-        print(e.args)
-        raise
+        if isinstance(e.args[0], dict) and e.args[0].get("code") == "57014":
+            messages.error(request, "The request took too long to complete. Please try again with simpler filters.")
+        else:
+            messages.error(request, "An unexpected database error occurred. Please try again.")
 
     except Exception:
         messages.error(request, "Something went wrong. Please refresh the page and try again.")
@@ -402,8 +370,24 @@ def retention_dashboard(request):
         except (json.JSONDecodeError, TypeError): return pd.NaT
     df['Last_Visit'] = df['Orders'].apply(get_last_visit)
 
-    # Ensure 'Last_Visit' is a datetime column before using .dt accessor
-    df['Last_Visit'] = pd.to_datetime(df['Last_Visit'], errors='coerce')
+    # --- Data Processing and Cleaning ---
+    # Ensure required columns exist, even if df is empty, to prevent KeyErrors
+    required_cols = [
+        "Order_Count", "Customer_Lifetime_Value", 
+        "Orders", "Last_Visit", "Customer_Name", "Customer_Mobile"
+    ]
+    for col in required_cols:
+        if col not in df.columns:
+            df[col] = None
+
+    # Apply date range filter
+    if order_date_from:
+        from_date = pd.to_datetime(order_date_from).date()
+        df = df[df['Last_Visit'].notna() & (df['Last_Visit'].dt.date >= from_date)]
+
+    if order_date_to:
+        to_date = pd.to_datetime(order_date_to).date()
+        df = df[df['Last_Visit'].notna() & (df['Last_Visit'].dt.date <= to_date)]
 
     is_filtered = any([order_count_filter, order_date_from, order_date_to, not_ordered_since_months, phone_filter, tags_filter, contacted_filter])
 
@@ -440,8 +424,6 @@ def retention_dashboard(request):
     total_customers_filtered = len(df)
     total_ltv = df["Customer_Lifetime_Value"].sum()
     avg_ltv = total_ltv / total_customers_filtered if total_customers_filtered > 0 else 0
-
-    ## Getting the repurchase rate --
     repurchase_rate = lifetime_repurchase_rate()
 
     # Calculate the number of contacted customers from the filtered dataframe
