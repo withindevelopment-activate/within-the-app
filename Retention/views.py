@@ -392,6 +392,9 @@ def retention_dashboard(request):
         except (json.JSONDecodeError, TypeError): return pd.NaT
     df['Last_Visit'] = df['Orders'].apply(get_last_visit)
 
+    # Ensure 'Last_Visit' is a datetime column before using .dt accessor
+    df['Last_Visit'] = pd.to_datetime(df['Last_Visit'], errors='coerce')
+
     # Apply date range filter
     if order_date_from:
         from_date = pd.to_datetime(order_date_from).date()
