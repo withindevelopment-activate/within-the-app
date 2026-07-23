@@ -71,7 +71,7 @@ def get_customer_tags(order_count, ltv, ltv_averaged, orders_dict):
     elif ltv_averaged > 2000:
         tags.append('aov_2000_plus')
 
-    return list(tags)
+    return set(tags)
 
 ## Next is the funciton to call whenever an order is coming in to update the customers database as well -- Match on the phone number if it exists update the orders + the order count and other relevant fields
 ## If the customer doesnt exist, create an entry --- 
