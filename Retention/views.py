@@ -323,7 +323,7 @@ def retention_dashboard(request):
             months = int(not_ordered_since_months)
             if months > 0:
                 cutoff_date = datetime.now() - timedelta(days=months * 30)
-                filters["All_ZID_Orders.added_at (Asia/Dubai)"] = ("lt", cutoff_date.isoformat())
+                filters["All_ZID_Orders.last_updated"] = ("lt", cutoff_date.isoformat())
         except (ValueError, TypeError):
             pass
 
@@ -332,11 +332,11 @@ def retention_dashboard(request):
         print("[DEBUG Retention] Date filters are present. Preparing join query.")
         select_query = "*, All_ZID_Orders!inner(*)"
         if order_date_from and order_date_to:
-            filters["All_ZID_Orders.added_at (Asia/Dubai)"] = ('between', order_date_from, order_date_to)
+            filters["All_ZID_Orders.last_updated"] = ('between', order_date_from, order_date_to)
         elif order_date_from:
-            filters["All_ZID_Orders.added_at (Asia/Dubai)"] = ('gte', order_date_from)
+            filters["All_ZID_Orders.last_updated"] = ('gte', order_date_from)
         elif order_date_to:
-            filters["All_ZID_Orders.added_at (Asia/Dubai)"] = ('lte', order_date_to)
+            filters["All_ZID_Orders.last_updated"] = ('lte', order_date_to)
     else:
         print("[DEBUG Retention] No date filters. Using standard select query.")
         select_query = "*"
