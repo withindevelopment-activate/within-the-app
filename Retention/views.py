@@ -482,9 +482,9 @@ def retention_dashboard(request):
     }
 
     context = {
-        "customers": customers,
+        "customers": json.dumps(customers),
         "row_count": len(customers),
-        "is_filtered": json.dumps(is_filtered),
+        "is_filtered": is_filtered,
         "filters": {
             "limit": limit or "20",
             "order_count": order_count_filter or "",

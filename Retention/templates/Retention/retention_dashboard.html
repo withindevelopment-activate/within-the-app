@@ -327,7 +327,7 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const customersData = {{ customers|safe }};
+    const customersData = JSON.parse('{{ customers|safe }}');
     const tableBody = document.getElementById('tableBody');
     const paginationContainer = document.getElementById('pagination');
     const rowsPerPageSelect = document.getElementById('rowsPerPage');
