@@ -326,11 +326,11 @@ def retention_dashboard(request):
     if order_date_from or order_date_to:
         select_query = "*, All_ZID_Orders!inner(*)"
         if order_date_from and order_date_to:
-            filters["All_ZID_Orders.added_at (Asia/Dubai)"] = ('between', order_date_from, order_date_to)
+            filters["All_ZID_Orders.last_updated"] = ('between', order_date_from, order_date_to)
         elif order_date_from:
-            filters["All_ZID_Orders.added_at (Asia/Dubai)"] = ('gte', order_date_from)
+            filters["All_ZID_Orders.last_updated"] = ('gte', order_date_from)
         elif order_date_to:
-            filters["All_ZID_Orders.added_at (Asia/Dubai)"] = ('lte', order_date_to)
+            filters["All_ZID_Orders.last_updated"] = ('lte', order_date_to)
     else:
         select_query = "*"
 
@@ -396,13 +396,13 @@ def retention_dashboard(request):
     df['Last_Visit'] = pd.to_datetime(df['Last_Visit'], errors='coerce')
 
     # Apply date range filter
-    if order_date_from:
-        from_date = pd.to_datetime(order_date_from).date()
-        df = df[df['Last_Visit'].notna() & (df['Last_Visit'].dt.date >= from_date)]
+    # if order_date_from:
+    #     from_date = pd.to_datetime(order_date_from).date()
+    #     df = df[df['Last_Visit'].notna() & (df['Last_Visit'].dt.date >= from_date)]
 
-    if order_date_to:
-        to_date = pd.to_datetime(order_date_to).date()
-        df = df[df['Last_Visit'].notna() & (df['Last_Visit'].dt.date <= to_date)]
+    # if order_date_to:
+    #     to_date = pd.to_datetime(order_date_to).date()
+    #     df = df[df['Last_Visit'].notna() & (df['Last_Visit'].dt.date <= to_date)]
 
     is_filtered = any([order_count_filter, order_date_from, order_date_to, not_ordered_since_months, phone_filter, tags_filter, contacted_filter])
 
