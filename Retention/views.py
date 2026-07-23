@@ -317,7 +317,7 @@ def retention_dashboard(request):
             months = int(not_ordered_since_months)
             if months > 0:
                 cutoff_date = datetime.now() - timedelta(days=months * 30)
-                filters["Last_Updated"] = ("lt", cutoff_date.isoformat())
+                filters["Last_Order_Date"] = ("lt", cutoff_date.isoformat())
         except (ValueError, TypeError):
             pass
 
@@ -331,10 +331,10 @@ def retention_dashboard(request):
         # If the action is to download, fetch all data, otherwise fetch the paginated view.
         if action == "download_excel":
             df, _ = fetch_data_from_supabase_specific(
-                table_name="Store_Customers", filters=filters, order_by="Last_Updated")
+                table_name="Store_Customers", filters=filters, order_by="Last_Order_Date")
         else:
             df, _ = fetch_data_from_supabase_specific(
-                table_name="Store_Customers", limit=limit, filters=filters, order_by="Last_Updated")
+                table_name="Store_Customers", limit=limit, filters=filters, order_by="Last_Order_Date")
 
     except APIError as e:
         if isinstance(e.args[0], dict) and e.args[0].get("code") == "57014":
@@ -349,7 +349,7 @@ def retention_dashboard(request):
     # This block is now common for both display and download
     required_cols = [
         "Order_Count", "Customer_Lifetime_Value", "Orders", 
-        "Last_Visit", "Customer_Name", "Customer_Mobile", "Customer_ID"
+        "Last_Order_Date", "Customer_Name", "Customer_Mobile", "Customer_ID"
     ]
     if df.empty:
         df = pd.DataFrame(columns=required_cols)
@@ -368,13 +368,13 @@ def retention_dashboard(request):
             dates = [pd.to_datetime(order.get("added_at"), errors='coerce') for order in order_json.values() if order.get("added_at")]
             return max(d for d in dates if pd.notna(d)) if dates else pd.NaT
         except (json.JSONDecodeError, TypeError): return pd.NaT
-    df['Last_Visit'] = df['Orders'].apply(get_last_visit)
+    df['Last_Order_Date'] = df['Orders'].apply(get_last_visit)
 
     # --- Data Processing and Cleaning ---
     # Ensure required columns exist, even if df is empty, to prevent KeyErrors
     required_cols = [
         "Order_Count", "Customer_Lifetime_Value", 
-        "Orders", "Last_Visit", "Customer_Name", "Customer_Mobile"
+        "Orders", "Last_Order_Date", "Customer_Name", "Customer_Mobile"
     ]
     for col in required_cols:
         if col not in df.columns:
@@ -383,11 +383,11 @@ def retention_dashboard(request):
     # Apply date range filter
     if order_date_from:
         from_date = pd.to_datetime(order_date_from).date()
-        df = df[df['Last_Visit'].notna() & (df['Last_Visit'].dt.date >= from_date)]
+        df = df[df['Last_Order_Date'].notna() & (df['Last_Order_Date'].dt.date >= from_date)]
 
     if order_date_to:
         to_date = pd.to_datetime(order_date_to).date()
-        df = df[df['Last_Visit'].notna() & (df['Last_Visit'].dt.date <= to_date)]
+        df = df[df['Last_Order_Date'].notna() & (df['Last_Order_Date'].dt.date <= to_date)]
 
     is_filtered = any([order_count_filter, order_date_from, order_date_to, not_ordered_since_months, phone_filter, tags_filter, contacted_filter])
 
@@ -406,11 +406,11 @@ def retention_dashboard(request):
             # Prepare data for export
             df_export = df[[
                 "Customer_ID", "Customer_Name", "Customer_Mobile",
-                "Order_Count", "Last_Visit", "Customer_Lifetime_Value"
+                "Order_Count", "Last_Order_Date", "Customer_Lifetime_Value"
             ]].copy()
             df_export.rename(columns={
                 "Customer_ID": "Customer ID", "Customer_Name": "Name", "Customer_Mobile": "Mobile",
-                "Order_Count": "Orders", "Last_Visit": "Last Order", "Customer_Lifetime_Value": "Total Spent (AED)"
+                "Order_Count": "Orders", "Last_Order_Date": "Last Order", "Customer_Lifetime_Value": "Total Spent (AED)"
             }, inplace=True)
             df_export['Last Order'] = pd.to_datetime(df_export['Last Order']).dt.strftime('%Y-%m-%d %H:%M')
             df_export.to_excel(writer, index=False, sheet_name='Customers')
@@ -438,10 +438,10 @@ def retention_dashboard(request):
         customer['Customer_Name'] = customer.get('Customer_Name') or 'N/A'
         customer['Customer_Mobile'] = customer.get('Customer_Mobile') or ''
 
-        if pd.isna(customer.get('Last_Visit')):
-            customer['Last_Visit'] = None
+        if pd.isna(customer.get('Last_Order_Date')):
+            customer['Last_Order_Date'] = None
         else:
-            customer['Last_Visit'] = customer['Last_Visit'].strftime('%Y-%m-%d')
+            customer['Last_Order_Date'] = customer['Last_Order_Date'].strftime('%Y-%m-%d')
 
     # Mapping from English tag values (database) to Arabic display names (UI)
     tag_display_mapping = {

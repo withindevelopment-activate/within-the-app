@@ -295,7 +295,7 @@
                 <th data-sort="Customer_Name">Name<span class="sort-indicator"></span></th>
                 <th data-sort="Customer_Mobile">Mobile<span class="sort-indicator"></span></th>
                 <th data-sort="Order_Count">Orders<span class="sort-indicator"></span></th>
-                <th data-sort="Last_Visit">Last Order<span class="sort-indicator"></span></th>
+                <th data-sort="Last_Order_Date">Last Order<span class="sort-indicator"></span></th>
                 <th data-sort="Customer_Lifetime_Value">Total Spent<span class="sort-indicator"></span></th>
             </tr>
           </thead>
@@ -335,7 +335,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     let currentPage = 1;
     let rowsPerPage = parseInt(rowsPerPageSelect.value, 10);
-    let sortColumn = 'Last_Visit';
+    let sortColumn = 'Last_Order_Date';
     let sortDirection = 'desc';
 
     function renderTable() {
@@ -374,7 +374,7 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             paginatedData.forEach(customer => {
                 const row = document.createElement('tr');
-                const lastVisit = customer.Last_Visit ? new Date(customer.Last_Visit).toLocaleString('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).replace(',', '') : '-';
+                const lastVisit = customer.Last_Order_Date ? new Date(customer.Last_Order_Date).toLocaleString('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).replace(',', '') : '-';
                 
                 row.innerHTML = `
                     <td>${customer.Customer_ID}</td>
