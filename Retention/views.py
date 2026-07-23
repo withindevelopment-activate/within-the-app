@@ -360,15 +360,15 @@ def retention_dashboard(request):
     df["Order_Count"] = pd.to_numeric(df["Order_Count"], errors='coerce').fillna(0).astype(int)
     df["Customer_Lifetime_Value"] = pd.to_numeric(df["Customer_Lifetime_Value"], errors='coerce').fillna(0)
 
-    def get_last_visit(order_json):
-        if pd.isna(order_json): return pd.NaT
-        try:
-            if isinstance(order_json, str): order_json = json.loads(order_json)
-            if not isinstance(order_json, dict): return pd.NaT
-            dates = [pd.to_datetime(order.get("added_at"), errors='coerce') for order in order_json.values() if order.get("added_at")]
-            return max(d for d in dates if pd.notna(d)) if dates else pd.NaT
-        except (json.JSONDecodeError, TypeError): return pd.NaT
-    df['Last_Order_Date'] = df['Orders'].apply(get_last_visit)
+    # def get_last_visit(order_json):
+    #     if pd.isna(order_json): return pd.NaT
+    #     try:
+    #         if isinstance(order_json, str): order_json = json.loads(order_json)
+    #         if not isinstance(order_json, dict): return pd.NaT
+    #         dates = [pd.to_datetime(order.get("added_at"), errors='coerce') for order in order_json.values() if order.get("added_at")]
+    #         return max(d for d in dates if pd.notna(d)) if dates else pd.NaT
+    #     except (json.JSONDecodeError, TypeError): return pd.NaT
+    # df['Last_Order_Date'] = df['Orders'].apply(get_last_visit)
 
     # --- Data Processing and Cleaning ---
     # Ensure required columns exist, even if df is empty, to prevent KeyErrors
