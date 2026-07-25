@@ -8,6 +8,25 @@ key: str = os.environ.get('SUPABASE_KEY')
 
 supabase: Client = create_client(url, key)
 
+def fetch_data_from_supabase(table_name):
+    response = supabase.table(table_name).select("*").execute()
+    
+    if response.data is not None:
+        df = pd.DataFrame(response.data)
+        if df.empty:
+            raise Exception(f"No data found in '{table_name}' table.")
+        
+        # Replace NaNs with 0 in the 'Quantity' column if the table is 'Inventory' - lolz got the inven code on here
+        if table_name == "Inventory":
+            if 'Quantity' in df.columns:
+                df['Quantity'].fillna(0, inplace=True)
+
+        return df
+    else:
+        raise Exception("Error fetching data: " + response.error_message)
+
+    
+
 def fetch_data_from_supabase_specific(table_name, columns=None, filters=None, order_by=None, limit=None, count=None):
     # Construct the select query with specified columns or all columns
     if columns:
