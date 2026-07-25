@@ -2,6 +2,7 @@ from django.shortcuts import render, redirect
 import json
 from io import BytesIO
 import logging
+from django.http import JsonResponse
 from Demo.supporting_files.supabase_functions import get_next_id_from_supabase_compatible_all
 from Demo.supporting_files.supporting_functions import get_uae_current_date
 from django.views.decorators.csrf import csrf_exempt
@@ -516,6 +517,62 @@ def retention_dashboard(request):
 
     return render(request, "Retention/retention_dashboard.html", context)
 
+######### The function to update customers to contacted or not
+@require_POST
+def update_customer_contact_status(request):
+    try:
+        # Get the request data
+        data = json.loads(request.body)
+
+        # Extract the info -- 
+        distinct_ids = data.get('distinct_ids')
+        contacted = data.get('contacted')
+
+        # Make sure we've got the IDs
+        if not distinct_ids:
+            return JsonResponse({
+                'status': 'error',
+                'error': 'No customers selected.'
+            }, status=400)
+
+        # Get'em customers -- 
+        customers = fetch_data_from_supabase_specific(
+            "Store_Customers",
+            filters={
+                'Distinct_ID': ('in', distinct_ids)
+            }
+        )
+
+        # Make sure we found them -- 
+        if customers.empty:
+            return JsonResponse({
+                'status': 'error',
+                'error': 'No matching customers found.'
+            }, status=404)
+
+        # Update the data -- 
+        customers['Contacted'] = contacted
+        customers['Last_Updated'] = get_uae_current_date()
+
+        # Upsert the updates
+        upsert_partial(
+            customers,
+            "Store_Customers",
+            "Distinct_ID"
+        )
+
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Customers updated successfully.'
+        })
+
+    except Exception as e:
+        print(f"Error updating customers: {e}")
+
+        return JsonResponse({
+            'status': 'error',
+            'error': str(e)
+        }, status=500)
 
 '''@csrf_exempt
 @require_POST

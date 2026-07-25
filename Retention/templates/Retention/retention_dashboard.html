@@ -278,11 +278,39 @@
 
 
     <!-- Table Controls -->
-    <div class="table-controls">
-      <div>
-        <label for="rowsPerPage">Rows per page</label>
-        <input type="number" id="rowsPerPage" value="50" min="1">
-      </div>
+    <div class="table-controls d-flex justify-content-between align-items-center">
+        <div class="dropdown d-none" id="bulk-actions-dropdown">
+            <button class="btn btn-primary dropdown-toggle"
+                    data-bs-toggle="dropdown">
+                الإجراءات 
+            </button>
+
+            <ul class="dropdown-menu">
+                <li>
+                    <a class="dropdown-item bulk-contact"
+                      data-value="true"
+                      href="#">
+                        تم التواصل
+                    </a>
+                </li>
+
+                <li>
+                    <a class="dropdown-item bulk-contact"
+                      data-value="false"
+                      href="#">
+                        لم يتم التواصل   
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        <div>
+            <label for="rowsPerPage">Rows per page</label>
+            <input type="number"
+                  id="rowsPerPage"
+                  value="50"
+                  min="1">
+        </div>
     </div>
 
     <!-- Table -->
@@ -291,6 +319,9 @@
         <table id="dataTable">
           <thead>
             <tr id="tableHeaders">
+                <th>
+                    <input type="checkbox" id="select-all">
+                </th>
                 <th data-sort="Customer_ID">Customer ID<span class="sort-indicator"></span></th>
                 <th data-sort="Customer_Name">Name<span class="sort-indicator"></span></th>
                 <th data-sort="Customer_Mobile">Mobile<span class="sort-indicator"></span></th>
@@ -338,6 +369,100 @@ document.addEventListener('DOMContentLoaded', function() {
     let sortColumn = 'Last_Order_Date';
     let sortDirection = 'desc';
 
+    // The Bulk Updates
+    const bulkDropdown = document.getElementById('bulk-actions-dropdown');
+
+    function toggleBulkDropdown(){
+
+        const selected =
+            document.querySelectorAll('.row-select:checked').length;
+
+        bulkDropdown.classList.toggle(
+            'd-none',
+            selected === 0
+        );
+
+    }
+
+    document.addEventListener('change', function(e){
+
+        if(e.target.id === 'select-all'){
+
+            document.querySelectorAll('.row-select')
+                .forEach(cb => cb.checked = e.target.checked);
+
+            toggleBulkDropdown();
+        }
+
+        if(e.target.classList.contains('row-select')){
+
+            const total =
+                document.querySelectorAll('.row-select').length;
+
+            const checked =
+                document.querySelectorAll('.row-select:checked').length;
+
+            document.getElementById('select-all').checked =
+                total === checked;
+
+            toggleBulkDropdown();
+
+        }
+
+    });
+
+    document.addEventListener('click', function(e){
+        if(!e.target.classList.contains('bulk-contact'))
+            return;
+
+        e.preventDefault();
+
+        const contacted =
+            e.target.dataset.value === "true";
+
+        const distinctIds = [];
+
+        document.querySelectorAll('.row-select:checked')
+            .forEach(cb => {
+
+                distinctIds.push(
+                    cb.closest('tr').dataset.distinct
+                );
+
+            });
+
+        if(!distinctIds.length){
+
+            alert("Select at least one customer.");
+            return;
+
+        }
+
+        fetch("{% url 'Retention:update_customer_contact_status' %}", {
+            method: "POST",
+            headers:{
+                "Content-Type":"application/json",
+                "X-CSRFToken":"{{ csrf_token }}"
+            },
+            body:JSON.stringify({
+                distinct_ids: distinctIds,
+                contacted: contacted
+            })
+        })
+        .then(r=>r.json())
+        .then(data=>{
+
+            if(data.status==="success"){
+                location.reload();
+            }else{
+                alert(data.error);
+            }
+        });
+    });
+
+
+    // The rest of the logic ------------------------
+
     function renderTable() {
         // 1. Sort the data
         const sortedData = [...customersData].sort((a, b) => {
@@ -375,8 +500,14 @@ document.addEventListener('DOMContentLoaded', function() {
             paginatedData.forEach(customer => {
                 const row = document.createElement('tr');
                 const lastVisit = customer.Last_Order_Date ? new Date(customer.Last_Order_Date).toLocaleString('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).replace(',', '') : '-';
-                
+                // Define the distinct id for us to send it later on -- 
+                row.dataset.distinct = customer.Distinct_ID;
+
                 row.innerHTML = `
+                    <td>
+                        <input type="checkbox"
+                              class="row-select">
+                    </td>
                     <td>${customer.Customer_ID}</td>
                     <td class="name-col">${customer.Customer_Name || 'N/A'}</td>
                     <td>${customer.Customer_Mobile || '-'}</td>
