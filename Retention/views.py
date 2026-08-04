@@ -449,7 +449,10 @@ def retention_dashboard(request):
         if pd.isna(customer.get('Last_Order_Date')):
             customer['Last_Order_Date'] = None
         else:
-            customer['Last_Order_Date'] = customer['Last_Order_Date'].strftime('%Y-%m-%d')
+            # Ensure the date is a datetime object before formatting
+            last_order_date = pd.to_datetime(customer['Last_Order_Date'], errors='coerce')
+            if pd.notna(last_order_date):
+                customer['Last_Order_Date'] = last_order_date.strftime('%Y-%m-%d')
 
     # Mapping from English tag values (database) to Arabic display names (UI)
     tag_display_mapping = {
