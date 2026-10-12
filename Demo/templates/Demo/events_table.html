@@ -213,52 +213,81 @@
     </main>
   </div>
 </form>
+
 <script>
-  // Chart initialization with your colors
   const modernColors = ['#6366F1','#10B981','#F59E0B','#EF4444','#3B82F6','#8B5CF6','#EC4899'];
   const pieOptions = {
     responsive: true, maintainAspectRatio: false,
     plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } }
   };
 
-  const utmSourceData = {
-        labels: {{ utm_source_labels|safe }},
-        datasets: [{
-            data: {{ utm_source_values|safe }},
-            backgroundColor: modernColors,
-            hoverOffset: 20,
-            borderWidth: 0,
-            borderRadius: 10,
-            spacing: 0,
-            radius: '80%',
-        }]
-    };
+  let sourceChartInstance = null;
+  let campaignChartInstance = null;
 
-    const utmCampaignData = {
-        labels: {{ utm_campaign_labels|safe }},
-        datasets: [{
-            data: {{ utm_campaign_values|safe }},
-            backgroundColor: modernColors,
-            hoverOffset: 20,
-            borderWidth: 0,
-            borderRadius: 10,
-            spacing: 0,
-            radius: '80%',
-        }]
-    };
+  function renderBackendCharts() {
+    const sourceValues = {{ utm_source_values|safe }};
+    const campaignValues = {{ utm_campaign_values|safe }};
 
-  if ({{ utm_source_values|safe }}.length) {
-    new Chart(document.getElementById('utmSourceChart'), {
-      type: 'pie',
-      data: utmSourceData,
-      options: pieOptions
-    });
+    if (sourceValues.length) {
+      sourceChartInstance = new Chart(document.getElementById('utmSourceChart'), {
+        type: 'pie',
+        data: {
+          labels: {{ utm_source_labels|safe }},
+          datasets: [{ data: sourceValues, backgroundColor: modernColors, hoverOffset: 20, borderWidth: 0, borderRadius: 10, spacing: 0, radius: '80%' }]
+        },
+        options: pieOptions
+      });
+    }
+
+    if (campaignValues.length) {
+      campaignChartInstance = new Chart(document.getElementById('utmCampaignChart'), {
+        type: 'pie',
+        data: {
+          labels: {{ utm_campaign_labels|safe }},
+          datasets: [{ data: campaignValues, backgroundColor: modernColors, hoverOffset: 20, borderWidth: 0, borderRadius: 10, spacing: 0, radius: '80%' }]
+        },
+        options: pieOptions
+      });
+    }
   }
 
-  if ({{ utm_campaign_values|safe }}.length) {
-    new Chart(document.getElementById('utmCampaignChart'), {
+  function renderFilteredCharts() {
+    const sourceCounts = {};
+    const campaignCounts = {};
+
+    table_big.rows({ search: 'applied' }).nodes().each(function(rowNode) {
+      $(rowNode).find('td').each(function() {
+        const colName = $(this).attr('data-col') || '';
+        const val = $(this).text().trim();
+        if (!val || val === '—') return;
+
+        if (colName.includes('source') || colName.includes('utm_source')) {
+          sourceCounts[val] = (sourceCounts[val] || 0) + 1;
+        }
+        if (colName.includes('campaign') || colName.includes('utm_campaign')) {
+          campaignCounts[val] = (campaignCounts[val] || 0) + 1;
+        }
+      });
+    });
+
+    if (sourceChartInstance) sourceChartInstance.destroy();
+    if (campaignChartInstance) campaignChartInstance.destroy();
+
+    sourceChartInstance = new Chart(document.getElementById('utmSourceChart'), {
       type: 'pie',
-      data: utmCampaignData,
+      data: {
+        labels: Object.keys(sourceCounts),
+        datasets: [{ data: Object.values(sourceCounts), backgroundColor: modernColors, hoverOffset: 20, borderWidth: 0, borderRadius: 10, spacing: 0, radius: '80%' }]
+      },
+      options: pieOptions
+    });
+
+    campaignChartInstance = new Chart(document.getElementById('utmCampaignChart'), {
+      type: 'pie',
+      data: {
+        labels: Object.keys(campaignCounts),
+        datasets: [{ data: Object.values(campaignCounts), backgroundColor: modernColors, hoverOffset: 20, borderWidth: 0, borderRadius: 10, spacing: 0, radius: '80%' }]
+      },
       options: pieOptions
     });
   }
@@ -268,13 +297,11 @@
   $(document).ready(function () {
     const urlParams = new URLSearchParams(window.location.search);
     const isLast30Active = urlParams.get('last_30_min') === '1';
-    console.log("[DEBUG] URL Param last_30_min:", isLast30Active);
     
     if (isLast30Active) {
       $('#last30Toggle').prop('checked', true);
     }
 
-    // Helper to find the index of the 'Visited_at' column dynamically
     function getVisitedAtIndex() {
       let colIdx = -1;
       $('.data-table th').each(function(index) {
@@ -286,7 +313,6 @@
       return colIdx;
     }
 
-    // Custom DataTables filtering extension based on max Visited_at minus 30 mins
     $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
       const isChecked = $('#last30Toggle').is(':checked');
       if (!isChecked) return true;
@@ -299,7 +325,6 @@
       if (colIdx !== -1) {
         visitedAtStr = $(rowNode).find('td').eq(colIdx).text().trim();
       } else {
-        // Fallback search across cells if header index not found
         $(rowNode).find('td').each(function() {
           const text = $(this).text().trim();
           if (text.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) {
@@ -308,24 +333,16 @@
         });
       }
 
-      if (!visitedAtStr || visitedAtStr === '—') {
-        console.log(`[DEBUG Row ${dataIndex}] No valid Visited_at found, keeping row.`);
-        return true;
-      }
+      if (!visitedAtStr || visitedAtStr === '—') return true;
 
-      // Ensure UTC parsing by appending 'Z' if missing timezone indicator
       let parseableStr = visitedAtStr;
       if (!parseableStr.endsWith('Z') && !parseableStr.includes('+') && !parseableStr.includes('-', 10)) {
         parseableStr += 'Z';
       }
 
       const eventTime = new Date(parseableStr).getTime();
-      if (isNaN(eventTime)) {
-        console.warn(`[DEBUG Row ${dataIndex}] Invalid date format: "${visitedAtStr}"`);
-        return true;
-      }
+      if (isNaN(eventTime)) return true;
 
-      // Find maximum Visited_at across all current table data rows to establish the baseline
       let maxTime = 0;
       table_big.rows().nodes().each(function(node) {
         let rowTimeStr = '';
@@ -349,12 +366,7 @@
       });
 
       const thirtyMinutesAgoFromLatest = maxTime - (30 * 60 * 1000);
-
-      console.log(`[DEBUG Row ${dataIndex}] Visited_at: ${visitedAtStr} | Event Time: ${eventTime} | Max Dataset Time: ${maxTime} | Cutoff (Max - 30m): ${thirtyMinutesAgoFromLatest}`);
-
-      const keep = eventTime >= thirtyMinutesAgoFromLatest;
-      console.log(`[DEBUG Row ${dataIndex}] Keep row?`, keep);
-      return keep;
+      return eventTime >= thirtyMinutesAgoFromLatest;
     });
 
     table_big = $('.data-table').DataTable({
@@ -367,7 +379,7 @@
       dom: 't',
     });
 
-    function updateUniqueUsersCount() {
+    function updateMetricsAndCharts() {
       const uniqueUsers = new Set();
       table_big.rows({ search: 'applied' }).nodes().each(function(rowNode) {
         let userId = $(rowNode).attr('data-user-id');
@@ -385,29 +397,42 @@
           uniqueUsers.add(userId);
         }
       });
-      console.log("[DEBUG] Unique users in filtered view:", uniqueUsers.size);
       $('#unique-users-count').text(uniqueUsers.size);
       $('#total-rows-count').text(table_big.rows({ search: 'applied' }).count());
+
+      // Update charts based on active state
+      if ($('#last30Toggle').is(':checked')) {
+        renderFilteredCharts();
+      } else {
+        if (!sourceChartInstance && !campaignChartInstance) {
+          renderBackendCharts();
+        }
+      }
     }
 
     $('#last30Toggle').on('change', function() {
       const checked = $(this).is(':checked');
-      console.log("[DEBUG] Toggle changed. Checked:", checked);
       const url = new URL(window.location.href);
       if (checked) {
         url.searchParams.set('last_30_min', '1');
+        renderFilteredCharts();
       } else {
         url.searchParams.delete('last_30_min');
+        if (sourceChartInstance) sourceChartInstance.destroy();
+        if (campaignChartInstance) campaignChartInstance.destroy();
+        sourceChartInstance = null;
+        campaignChartInstance = null;
+        renderBackendCharts();
       }
       window.history.replaceState({}, '', url);
       table_big.draw();
       syncPagination();
-      updateUniqueUsersCount();
+      updateMetricsAndCharts();
     });
 
     $('#table-search').on('keyup', function () {
       table_big.search(this.value).draw();
-      updateUniqueUsersCount();
+      updateMetricsAndCharts();
     });
 
     function syncPagination() {
@@ -419,7 +444,7 @@
 
     table_big.on('draw', function() {
       syncPagination();
-      updateUniqueUsersCount();
+      updateMetricsAndCharts();
     });
 
     $('#next-btn').on('click', (e) => { e.preventDefault(); table_big.page('next').draw('page'); });
@@ -427,10 +452,10 @@
     
     syncPagination();
     if (isLast30Active) {
-      console.log("[DEBUG] Triggering initial table draw for Last 30 min filter.");
       table_big.draw();
     } else {
-      updateUniqueUsersCount();
+      renderBackendCharts();
+      updateMetricsAndCharts();
     }
   });
 </script>
