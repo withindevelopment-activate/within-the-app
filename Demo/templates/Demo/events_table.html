@@ -247,7 +247,6 @@
         }]
     };
 
-
   if ({{ utm_source_values|safe }}.length) {
     new Chart(document.getElementById('utmSourceChart'), {
       type: 'pie',
@@ -269,45 +268,93 @@
   $(document).ready(function () {
     const urlParams = new URLSearchParams(window.location.search);
     const isLast30Active = urlParams.get('last_30_min') === '1';
+    console.log("[DEBUG] URL Param last_30_min:", isLast30Active);
     
     if (isLast30Active) {
       $('#last30Toggle').prop('checked', true);
     }
 
-    // Custom DataTables filtering extension
+    // Helper to find the index of the 'Visited_at' column dynamically
+    function getVisitedAtIndex() {
+      let colIdx = -1;
+      $('.data-table th').each(function(index) {
+        const headerText = $(this).text().trim().toLowerCase();
+        if (headerText.includes('visited_at') || headerText.includes('visited at')) {
+          colIdx = index;
+        }
+      });
+      return colIdx;
+    }
+
+    // Custom DataTables filtering extension based on max Visited_at minus 30 mins
     $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
       const isChecked = $('#last30Toggle').is(':checked');
       if (!isChecked) return true;
       if (!table_big) return true;
-      
+
       const rowNode = table_big.row(dataIndex).node();
-      let timestampStr = $(rowNode).attr('data-timestamp');
+      const colIdx = getVisitedAtIndex();
       
-      // Fallback: search cells explicitly if attribute missed
-      if (!timestampStr) {
+      let visitedAtStr = '';
+      if (colIdx !== -1) {
+        visitedAtStr = $(rowNode).find('td').eq(colIdx).text().trim();
+      } else {
+        // Fallback search across cells if header index not found
         $(rowNode).find('td').each(function() {
-          const colName = $(this).attr('data-col') || '';
-          if (colName.includes('time') || colName.includes('date')) {
-            timestampStr = $(this).text().trim();
+          const text = $(this).text().trim();
+          if (text.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) {
+            visitedAtStr = text;
           }
         });
       }
 
-      if (!timestampStr || timestampStr === '—') return true; 
+      if (!visitedAtStr || visitedAtStr === '—') {
+        console.log(`[DEBUG Row ${dataIndex}] No valid Visited_at found, keeping row.`);
+        return true;
+      }
 
-      // Ensure UTC or parseable format
-      let parseableStr = timestampStr;
+      // Ensure UTC parsing by appending 'Z' if missing timezone indicator
+      let parseableStr = visitedAtStr;
       if (!parseableStr.endsWith('Z') && !parseableStr.includes('+') && !parseableStr.includes('-', 10)) {
         parseableStr += 'Z';
       }
 
       const eventTime = new Date(parseableStr).getTime();
-      const now = Date.now();
-      const thirtyMinutesAgo = now - (30 * 60 * 1000);
+      if (isNaN(eventTime)) {
+        console.warn(`[DEBUG Row ${dataIndex}] Invalid date format: "${visitedAtStr}"`);
+        return true;
+      }
 
-      if (isNaN(eventTime)) return true;
+      // Find maximum Visited_at across all current table data rows to establish the baseline
+      let maxTime = 0;
+      table_big.rows().nodes().each(function(node) {
+        let rowTimeStr = '';
+        if (colIdx !== -1) {
+          rowTimeStr = $(node).find('td').eq(colIdx).text().trim();
+        } else {
+          $(node).find('td').each(function() {
+            const t = $(this).text().trim();
+            if (t.match(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/)) rowTimeStr = t;
+          });
+        }
+        if (rowTimeStr && rowTimeStr !== '—') {
+          if (!rowTimeStr.endsWith('Z') && !rowTimeStr.includes('+') && !rowTimeStr.includes('-', 10)) {
+            rowTimeStr += 'Z';
+          }
+          const tVal = new Date(rowTimeStr).getTime();
+          if (!isNaN(tVal) && tVal > maxTime) {
+            maxTime = tVal;
+          }
+        }
+      });
 
-      return eventTime >= thirtyMinutesAgo;
+      const thirtyMinutesAgoFromLatest = maxTime - (30 * 60 * 1000);
+
+      console.log(`[DEBUG Row ${dataIndex}] Visited_at: ${visitedAtStr} | Event Time: ${eventTime} | Max Dataset Time: ${maxTime} | Cutoff (Max - 30m): ${thirtyMinutesAgoFromLatest}`);
+
+      const keep = eventTime >= thirtyMinutesAgoFromLatest;
+      console.log(`[DEBUG Row ${dataIndex}] Keep row?`, keep);
+      return keep;
     });
 
     table_big = $('.data-table').DataTable({
@@ -338,12 +385,14 @@
           uniqueUsers.add(userId);
         }
       });
+      console.log("[DEBUG] Unique users in filtered view:", uniqueUsers.size);
       $('#unique-users-count').text(uniqueUsers.size);
       $('#total-rows-count').text(table_big.rows({ search: 'applied' }).count());
     }
 
     $('#last30Toggle').on('change', function() {
       const checked = $(this).is(':checked');
+      console.log("[DEBUG] Toggle changed. Checked:", checked);
       const url = new URL(window.location.href);
       if (checked) {
         url.searchParams.set('last_30_min', '1');
@@ -378,6 +427,7 @@
     
     syncPagination();
     if (isLast30Active) {
+      console.log("[DEBUG] Triggering initial table draw for Last 30 min filter.");
       table_big.draw();
     } else {
       updateUniqueUsersCount();
