@@ -213,6 +213,7 @@
     </main>
   </div>
 </form>
+
 <script>
   // Chart initialization with your colors
   const modernColors = ['#6366F1','#10B981','#F59E0B','#EF4444','#3B82F6','#8B5CF6','#EC4899'];
@@ -264,9 +265,10 @@
     });
   }
 
-  // DataTable Logic & Front-End 30-min filter + Unique Users Counter
-  let table_big; // Declare beforehand to avoid hoisting/initialization reference errors
+  // Declare table_big globally inside script scope before document.ready
+  let table_big;
 
+  // DataTable Logic & Front-End 30-min filter + Unique Users Counter
   $(document).ready(function () {
     // Read and apply URL parameter state for Last 30 Mins toggle on load
     const urlParams = new URLSearchParams(window.location.search);
@@ -282,7 +284,7 @@
       
       const rowNode = table_big.row(dataIndex).node();
       const timestampStr = $(rowNode).attr('data-timestamp');
-      if (!timestampStr) return true; // Keep row if no timestamp is present
+      if (!timestampStr) return true; // Keep row if no timestamp is present to avoid hiding valid non-date rows
 
       const eventTime = new Date(timestampStr).getTime();
       if (isNaN(eventTime)) return true;
@@ -304,10 +306,13 @@
     // Function to calculate and update unique users counter based on current rows
     function updateUniqueUsersCount() {
       const uniqueUsers = new Set();
+      // Inspect visible or all filtered rows
       table_big.rows({ search: 'applied' }).nodes().each(function(rowNode) {
         let userId = $(rowNode).attr('data-user-id');
         if (!userId) {
+          // Fallback: search cells if data attributes are missing
           $(rowNode).find('td').each(function() {
+            // Check if column header matches visitor or sleecid
             const colIdx = $(this).index();
             const colHeader = $('.data-table th').eq(colIdx).text().toLowerCase();
             if (colHeader.includes('visitor') || colHeader.includes('sleec') || colHeader.includes('user')) {
