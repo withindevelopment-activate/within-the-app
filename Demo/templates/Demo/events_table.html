@@ -283,13 +283,18 @@
       if (!table_big) return true;
       
       const rowNode = table_big.row(dataIndex).node();
-      const timestampStr = $(rowNode).attr('data-timestamp');
-      if (!timestampStr) return true; // Keep row if no timestamp is present to avoid hiding valid non-date rows
+      let timestampStr = $(rowNode).attr('data-timestamp');
+      if (!timestampStr) return true; // Keep row if no timestamp is present
+
+      // Ensure UTC evaluation by appending 'Z' if missing a timezone indicator
+      if (!timestampStr.endsWith('Z') && !timestampStr.includes('+') && !timestampStr.includes('-', 10)) {
+        timestampStr += 'Z';
+      }
 
       const eventTime = new Date(timestampStr).getTime();
       if (isNaN(eventTime)) return true;
 
-      const thirtyMinutesAgo = new Date().getTime() - (30 * 60 * 1000);
+      const thirtyMinutesAgo = Date.now() - (30 * 60 * 1000);
       return eventTime >= thirtyMinutesAgo;
     });
 
@@ -306,13 +311,10 @@
     // Function to calculate and update unique users counter based on current rows
     function updateUniqueUsersCount() {
       const uniqueUsers = new Set();
-      // Inspect visible or all filtered rows
       table_big.rows({ search: 'applied' }).nodes().each(function(rowNode) {
         let userId = $(rowNode).attr('data-user-id');
         if (!userId) {
-          // Fallback: search cells if data attributes are missing
           $(rowNode).find('td').each(function() {
-            // Check if column header matches visitor or sleecid
             const colIdx = $(this).index();
             const colHeader = $('.data-table th').eq(colIdx).text().toLowerCase();
             if (colHeader.includes('visitor') || colHeader.includes('sleec') || colHeader.includes('user')) {
@@ -378,4 +380,5 @@
     location.reload();
 }, 60000);
 </script>
+
 {% endblock %}
