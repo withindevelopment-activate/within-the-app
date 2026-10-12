@@ -213,7 +213,6 @@
     </main>
   </div>
 </form>
-
 <script>
   // Chart initialization with your colors
   const modernColors = ['#6366F1','#10B981','#F59E0B','#EF4444','#3B82F6','#8B5CF6','#EC4899'];
@@ -265,37 +264,53 @@
     });
   }
 
-  // Declare table_big globally inside script scope before document.ready
   let table_big;
 
-  // DataTable Logic & Front-End 30-min filter + Unique Users Counter
   $(document).ready(function () {
-    // Read and apply URL parameter state for Last 30 Mins toggle on load
     const urlParams = new URLSearchParams(window.location.search);
     const isLast30Active = urlParams.get('last_30_min') === '1';
+    console.log("[DEBUG] URL Param last_30_min:", isLast30Active);
+    
     if (isLast30Active) {
       $('#last30Toggle').prop('checked', true);
     }
 
-    // Custom DataTables filtering extension for Last 30 min front-end filter
+    // Custom DataTables filtering extension with debug logs
     $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
-      if (!$('#last30Toggle').is(':checked')) return true;
+      const isChecked = $('#last30Toggle').is(':checked');
+      if (!isChecked) return true;
       if (!table_big) return true;
       
       const rowNode = table_big.row(dataIndex).node();
       let timestampStr = $(rowNode).attr('data-timestamp');
-      if (!timestampStr) return true; // Keep row if no timestamp is present
+      
+      console.log(`[DEBUG Row ${dataIndex}] Raw timestamp attribute:`, timestampStr);
 
-      // Ensure UTC evaluation by appending 'Z' if missing a timezone indicator
-      if (!timestampStr.endsWith('Z') && !timestampStr.includes('+') && !timestampStr.includes('-', 10)) {
-        timestampStr += 'Z';
+      if (!timestampStr) {
+        console.warn(`[DEBUG Row ${dataIndex}] Missing 'data-timestamp' attribute on TR node!`);
+        return true; 
       }
 
-      const eventTime = new Date(timestampStr).getTime();
-      if (isNaN(eventTime)) return true;
+      // Ensure UTC or parseable format
+      let parseableStr = timestampStr;
+      if (!parseableStr.endsWith('Z') && !parseableStr.includes('+') && !parseableStr.includes('-', 10)) {
+        parseableStr += 'Z';
+      }
 
-      const thirtyMinutesAgo = Date.now() - (30 * 60 * 1000);
-      return eventTime >= thirtyMinutesAgo;
+      const eventTime = new Date(parseableStr).getTime();
+      const now = Date.now();
+      const thirtyMinutesAgo = now - (30 * 60 * 1000);
+
+      console.log(`[DEBUG Row ${dataIndex}] Event Time:`, new Date(eventTime).toISOString(), "| 30 Mins Ago:", new Date(thirtyMinutesAgo).toISOString());
+
+      if (isNaN(eventTime)) {
+        console.error(`[DEBUG Row ${dataIndex}] Failed to parse timestamp: "${timestampStr}"`);
+        return true;
+      }
+
+      const keep = eventTime >= thirtyMinutesAgo;
+      console.log(`[DEBUG Row ${dataIndex}] Keep row?`, keep);
+      return keep;
     });
 
     table_big = $('.data-table').DataTable({
@@ -308,7 +323,6 @@
       dom: 't',
     });
 
-    // Function to calculate and update unique users counter based on current rows
     function updateUniqueUsersCount() {
       const uniqueUsers = new Set();
       table_big.rows({ search: 'applied' }).nodes().each(function(rowNode) {
@@ -327,13 +341,14 @@
           uniqueUsers.add(userId);
         }
       });
+      console.log("[DEBUG] Unique users found in current view:", uniqueUsers.size);
       $('#unique-users-count').text(uniqueUsers.size);
       $('#total-rows-count').text(table_big.rows({ search: 'applied' }).count());
     }
 
-    // Toggle switch change handler: update URL parameters and redraw table instantly
     $('#last30Toggle').on('change', function() {
       const checked = $(this).is(':checked');
+      console.log("[DEBUG] Toggle changed. Checked:", checked);
       const url = new URL(window.location.href);
       if (checked) {
         url.searchParams.set('last_30_min', '1');
@@ -366,9 +381,9 @@
     $('#next-btn').on('click', (e) => { e.preventDefault(); table_big.page('next').draw('page'); });
     $('#prev-btn').on('click', (e) => { e.preventDefault(); table_big.page('previous').draw('page'); });
     
-    // Initial calls
     syncPagination();
     if (isLast30Active) {
+      console.log("[DEBUG] Triggering initial table draw for Last 30 min filter.");
       table_big.draw();
     } else {
       updateUniqueUsersCount();
@@ -380,5 +395,4 @@
     location.reload();
 }, 60000);
 </script>
-
 {% endblock %}
