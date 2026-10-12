@@ -190,8 +190,8 @@
             <tbody>
               {% for row in data %}
                 <tr {% for key, val in row.items %}{% if "time" in key|lower or "date" in key|lower %}data-timestamp="{{ val }}" {% endif %}{% if "visitor_id" in key|lower or "sleecid" in key|lower %}data-user-id="{{ val }}" {% endif %}{% endfor %}>
-                  {% for val in row.values %}
-                    <td>{{ val|default:"—" }}</td>
+                  {% for key, val in row.items %}
+                    <td data-col="{{ key|lower }}">{{ val|default:"—" }}</td>
                   {% endfor %}
                 </tr>
               {% empty %}
@@ -269,13 +269,12 @@
   $(document).ready(function () {
     const urlParams = new URLSearchParams(window.location.search);
     const isLast30Active = urlParams.get('last_30_min') === '1';
-    console.log("[DEBUG] URL Param last_30_min:", isLast30Active);
     
     if (isLast30Active) {
       $('#last30Toggle').prop('checked', true);
     }
 
-    // Custom DataTables filtering extension with debug logs
+    // Custom DataTables filtering extension
     $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
       const isChecked = $('#last30Toggle').is(':checked');
       if (!isChecked) return true;
@@ -284,12 +283,17 @@
       const rowNode = table_big.row(dataIndex).node();
       let timestampStr = $(rowNode).attr('data-timestamp');
       
-      console.log(`[DEBUG Row ${dataIndex}] Raw timestamp attribute:`, timestampStr);
-
+      // Fallback: search cells explicitly if attribute missed
       if (!timestampStr) {
-        console.warn(`[DEBUG Row ${dataIndex}] Missing 'data-timestamp' attribute on TR node!`);
-        return true; 
+        $(rowNode).find('td').each(function() {
+          const colName = $(this).attr('data-col') || '';
+          if (colName.includes('time') || colName.includes('date')) {
+            timestampStr = $(this).text().trim();
+          }
+        });
       }
+
+      if (!timestampStr || timestampStr === '—') return true; 
 
       // Ensure UTC or parseable format
       let parseableStr = timestampStr;
@@ -301,16 +305,9 @@
       const now = Date.now();
       const thirtyMinutesAgo = now - (30 * 60 * 1000);
 
-      console.log(`[DEBUG Row ${dataIndex}] Event Time:`, new Date(eventTime).toISOString(), "| 30 Mins Ago:", new Date(thirtyMinutesAgo).toISOString());
+      if (isNaN(eventTime)) return true;
 
-      if (isNaN(eventTime)) {
-        console.error(`[DEBUG Row ${dataIndex}] Failed to parse timestamp: "${timestampStr}"`);
-        return true;
-      }
-
-      const keep = eventTime >= thirtyMinutesAgo;
-      console.log(`[DEBUG Row ${dataIndex}] Keep row?`, keep);
-      return keep;
+      return eventTime >= thirtyMinutesAgo;
     });
 
     table_big = $('.data-table').DataTable({
@@ -341,14 +338,12 @@
           uniqueUsers.add(userId);
         }
       });
-      console.log("[DEBUG] Unique users found in current view:", uniqueUsers.size);
       $('#unique-users-count').text(uniqueUsers.size);
       $('#total-rows-count').text(table_big.rows({ search: 'applied' }).count());
     }
 
     $('#last30Toggle').on('change', function() {
       const checked = $(this).is(':checked');
-      console.log("[DEBUG] Toggle changed. Checked:", checked);
       const url = new URL(window.location.href);
       if (checked) {
         url.searchParams.set('last_30_min', '1');
@@ -383,7 +378,6 @@
     
     syncPagination();
     if (isLast30Active) {
-      console.log("[DEBUG] Triggering initial table draw for Last 30 min filter.");
       table_big.draw();
     } else {
       updateUniqueUsersCount();
