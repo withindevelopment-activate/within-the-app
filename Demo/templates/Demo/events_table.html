@@ -42,6 +42,16 @@
   }
   .form-control-custom:focus { border-color: var(--accent); }
 
+  /* Toggle Switch Styles */
+  .toggle-wrapper { display: flex; align-items: center; justify-content: space-between; background: var(--surface2); padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border2); }
+  .toggle-label { font-size: 13px; font-weight: 500; color: var(--text); }
+  .switch { position: relative; display: inline-block; width: 40px; height: 22px; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--border2); transition: .3s; border-radius: 22px; }
+  .slider:before { position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; }
+  input:checked + .slider { background-color: var(--accent); }
+  input:checked + .slider:before { transform: translateX(18px); }
+
   .btn-custom { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; cursor: pointer; border: none; transition: all 0.2s; text-decoration: none; width: 100%; }
   .btn-primary-custom { background: var(--accent); color: #fff; }
   .btn-export-custom { background: rgba(16, 185, 129, 0.1); color: var(--accent2); border: 1px solid rgba(16, 185, 129, 0.2); }
@@ -70,6 +80,18 @@
       <div class="logo">
         <span class="logo-dot"></span>
         Events Viewer
+      </div>
+
+      <!-- Quick Filter Toggle Section -->
+      <div class="sidebar-section">
+        <div class="sidebar-label">Quick Filter</div>
+        <div class="toggle-wrapper">
+          <span class="toggle-label">Last 30 Minutes</span>
+          <label class="switch">
+            <input type="checkbox" id="last30Toggle" name="last_30_min" value="1">
+            <span class="slider"></span>
+          </label>
+        </div>
       </div>
 
       <div class="sidebar-section">
@@ -127,8 +149,13 @@
           <h2 style="font-family: 'Syne', sans-serif; font-weight: 700;">Tracking Dashboard</h2>
           <p style="color: var(--muted);">Real-time server-side event stream</p>
         </div>
-        <div style="background: var(--surface2); padding: 5px 15px; border-radius: 20px; font-family: 'DM Mono'; font-size: 12px; color: var(--muted);">
-          Total: {{ row_count }} rows
+        <div style="display: flex; gap: 10px;">
+          <div style="background: var(--surface2); padding: 5px 15px; border-radius: 20px; font-family: 'DM Mono'; font-size: 12px; color: var(--muted);">
+            Unique Users: <span id="unique-users-count" style="font-weight: 600; color: var(--text);">0</span>
+          </div>
+          <div style="background: var(--surface2); padding: 5px 15px; border-radius: 20px; font-family: 'DM Mono'; font-size: 12px; color: var(--muted);">
+            Total: <span id="total-rows-count">{{ row_count }}</span> rows
+          </div>
         </div>
       </div>
 
@@ -155,14 +182,14 @@
               <tr>
                 {% if data %}
                   {% for col in data.0.keys %}
-                    <th>{{ col }}</th>
+                    <th data-column-name="{{ col|lower }}">{{ col }}</th>
                   {% endfor %}
                 {% endif %}
               </tr>
             </thead>
             <tbody>
               {% for row in data %}
-                <tr>
+                <tr {% for key, val in row.items %}{% if "time" in key|lower or "date" in key|lower %}data-timestamp="{{ val }}" {% endif %}{% if "visitor_id" in key|lower or "sleecid" in key|lower %}data-user-id="{{ val }}" {% endif %}{% endfor %}>
                   {% for val in row.values %}
                     <td>{{ val|default:"—" }}</td>
                   {% endfor %}
@@ -238,8 +265,30 @@
     });
   }
 
-  // DataTable Logic (Keeping your specific pagination/search logic)
+  // DataTable Logic & Front-End 30-min filter + Unique Users Counter
   $(document).ready(function () {
+    // Read and apply URL parameter state for Last 30 Mins toggle on load
+    const urlParams = new URLSearchParams(window.location.search);
+    const isLast30Active = urlParams.get('last_30_min') === '1';
+    if (isLast30Active) {
+      $('#last30Toggle').prop('checked', true);
+    }
+
+    // Custom DataTables filtering extension for Last 30 min front-end filter
+    $.fn.dataTable.ext.search.push(function(settings, data, dataIndex) {
+      if (!$('#last30Toggle').is(':checked')) return true;
+      
+      const rowNode = table_big.row(dataIndex).node();
+      const timestampStr = $(rowNode).attr('data-timestamp');
+      if (!timestampStr) return true; // Keep row if no timestamp is present to avoid hiding valid non-date rows
+
+      const eventTime = new Date(timestampStr).getTime();
+      if (isNaN(eventTime)) return true;
+
+      const thirtyMinutesAgo = new Date().getTime() - (30 * 60 * 1000);
+      return eventTime >= thirtyMinutesAgo;
+    });
+
     const table_big = $('.data-table').DataTable({
       paging: true,
       ordering: !$('.data-table').hasClass('no-order'),
@@ -250,8 +299,50 @@
       dom: 't',
     });
 
+    // Function to calculate and update unique users counter based on current rows
+    function updateUniqueUsersCount() {
+      const uniqueUsers = new Set();
+      // Inspect visible or all filtered rows
+      table_big.rows({ search: 'applied' }).nodes().each(function(rowNode) {
+        let userId = $(rowNode).attr('data-user-id');
+        if (!userId) {
+          // Fallback: search cells if data attributes are missing
+          $(rowNode).find('td').each(function() {
+            // Check if column header matches visitor or sleecid
+            const colIdx = $(this).index();
+            const colHeader = $('.data-table th').eq(colIdx).text().toLowerCase();
+            if (colHeader.includes('visitor') || colHeader.includes('sleec') || colHeader.includes('user')) {
+              let val = $(this).text().trim();
+              if (val && val !== '—') userId = val;
+            }
+          });
+        }
+        if (userId && userId !== '—') {
+          uniqueUsers.add(userId);
+        }
+      });
+      $('#unique-users-count').text(uniqueUsers.size);
+      $('#total-rows-count').text(table_big.rows({ search: 'applied' }).count());
+    }
+
+    // Toggle switch change handler: update URL parameters and redraw table instantly
+    $('#last30Toggle').on('change', function() {
+      const checked = $(this).is(':checked');
+      const url = new URL(window.location.href);
+      if (checked) {
+        url.searchParams.set('last_30_min', '1');
+      } else {
+        url.searchParams.delete('last_30_min');
+      }
+      window.history.replaceState({}, '', url);
+      table_big.draw();
+      syncPagination();
+      updateUniqueUsersCount();
+    });
+
     $('#table-search').on('keyup', function () {
       table_big.search(this.value).draw();
+      updateUniqueUsersCount();
     });
 
     function syncPagination() {
@@ -261,10 +352,21 @@
       $('#next-btn').prop('disabled', info.page >= info.pages - 1);
     }
 
-    table_big.on('draw', syncPagination);
+    table_big.on('draw', function() {
+      syncPagination();
+      updateUniqueUsersCount();
+    });
+
     $('#next-btn').on('click', (e) => { e.preventDefault(); table_big.page('next').draw('page'); });
     $('#prev-btn').on('click', (e) => { e.preventDefault(); table_big.page('previous').draw('page'); });
+    
+    // Initial calls
     syncPagination();
+    if (isLast30Active) {
+      table_big.draw();
+    } else {
+      updateUniqueUsersCount();
+    }
   });
 </script>
 <script>
