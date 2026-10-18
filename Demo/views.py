@@ -1274,6 +1274,7 @@ def source_weight(source):
         "snapchat": 100,
         "content creators": 100,  # same as socials
 
+        "gemini": 85,
         "google": 70,
         "bing": 60,
 
@@ -4478,7 +4479,7 @@ def save_tracking(request):
                 # ------------------- Step 1: Prefix extraction -------------------
                 prefix_to_source = {
                     "insta": "instagram", "fb": "facebook", "tiktok": "tiktok", "snap": "snapchat",
-                    "google": "google", "x": "x", "li": "linkedin", "pin": "pinterest",
+                    "google": "google", "gemini": "gemini", "x": "x", "li": "linkedin", "pin": "pinterest",
                     "rdt": "reddit", "wa": "whatsapp", "tg": "telegram", "web": "web",
                 }
 
