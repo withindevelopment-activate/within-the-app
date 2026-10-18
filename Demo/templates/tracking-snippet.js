@@ -132,12 +132,14 @@
     function detectPlatform() {
         const ua = navigator.userAgent.toLowerCase();
         const params = new URLSearchParams(window.location.search);
+        const referrer = document.referrer ? document.referrer.toLowerCase() : "";
 
         if (ua.includes("instagram")) return "instagram";
         if (ua.includes("fbav") || ua.includes("fban") || ua.includes("facebook")) return "facebook";
         if (ua.includes("musical_ly") || ua.includes("tiktok")) return "tiktok";
         if (ua.includes("snapchat")) return "snapchat";
         if (params.has("gclid") || ua.includes("youtube")) return "google";
+        if (referrer.includes("gemini.google.com") || params.get("utm_source") === "gemini") return "gemini";
         if (ua.includes("twitter") || ua.includes("x.com")) return "x";
         if (ua.includes("linkedin")) return "linkedin";
         if (ua.includes("pinterest")) return "pinterest";
@@ -156,6 +158,7 @@
             tiktok: "tiktok_",
             snapchat: "snap_",
             google: "google_",
+            gemini: "gemini_",
             x: "x_",
             linkedin: "li_",
             pinterest: "pin_",
@@ -188,6 +191,7 @@
             fb_: 100,
             tiktok_: 100,
             snap_: 100,
+            gemini_: 85,
             google_: 80,
             x_: 70,
             li_: 60,
@@ -293,6 +297,7 @@
             tiktok: "tiktok_device_id",
             snapchat: "snapchat_device_id",
             google: "google_device_id",
+            
         };
 
         const specificKey = platformMap[platform];
@@ -514,6 +519,7 @@
                 if (h.includes("facebook"))  return { source: "facebook",  medium: "social", campaign: "organic", attribution_type: "referrer" };
                 if (h.includes("tiktok"))    return { source: "tiktok",    medium: "social", campaign: "organic", attribution_type: "referrer" };
                 if (h.includes("snapchat"))  return { source: "snapchat",  medium: "social", campaign: "organic", attribution_type: "referrer" };
+                if (h.includes("gemini.google.com")) return { source: "gemini", medium: "ai", campaign: "organic", attribution_type: "referrer_confirmed" };
                 if (h.includes("google")) return { source: "google", medium: "organic", campaign: "n/a", attribution_type: "referrer_confirmed" };
             } catch {}
         }
