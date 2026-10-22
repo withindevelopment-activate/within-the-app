@@ -7227,7 +7227,7 @@ def events_table_view(request):
         filters["SleecID"] = ("eq", sleecid)
 
     if timezone_search and timezone_search != "None":
-        filters["Timezone"] = ("eq", timezone_search)
+        filters["Timezone"] != ("eq", timezone_search)
 
     if date_after and not date_end:
         if len(date_after) == 10:
